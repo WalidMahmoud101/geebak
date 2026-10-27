@@ -1,0 +1,127 @@
+package com.nabd.money.data
+
+import androidx.room.withTransaction
+import org.json.JSONArray
+import org.json.JSONObject
+
+/** ملخص نسخة قبل ما ترجعلها */
+data class BackupInfo(
+    val createdAt: Long,
+    val appVersion: String,
+    val accounts: Int,
+    val transactions: Int,
+    val firstTxn: Long?,
+    val lastTxn: Long?,
+)
+
+/**
+ * النسخة الاحتياطية: ملف JSON واحد فيه كل حاجة
+ * (الحسابات، العمليات، الميزانيات، التنبيهات، والإعدادات زي المرتب والقواعد والتصنيفات).
+ * الرجوع بيحط النسخة مكان البيانات الحالية بالظبط، وبنفس الأرقام التعريفية علشان العمليات تفضل مربوطة بحساباتها.
+ */
+object Backup {
+    const val FORMAT = 1
+    private const val MAGIC = "nabd-backup"
+
+    suspend fun export(db: NabdDatabase, settings: Settings, appVersion: String): String {
+        val dao = db.dao()
+        return JSONObject().apply {
+            put("magic", MAGIC)
+            put("format", FORMAT)
+            put("createdAt", System.currentTimeMillis())
+            put("appVersion", appVersion)
+            put("accounts", JSONArray(dao.accountsOnce().map(::accountJson)))
+            put("transactions", JSONArray(dao.allTxnsOnce().map(::txnJson)))
+            put("budgets", JSONArray(dao.budgetsOnce().map { JSONObject().put("category", it.category).put("limit", it.monthlyLimit) }))
+            put("insights", JSONArray(dao.insightsOnce().map(::insightJson)))
+            put("settings", settings.exportPrefs())
+        }.toString()
+    }
+
+    /** بيرجع null لو الملف مش نسخة نبض */
+    fun info(json: String): BackupInfo? = runCatching {
+        val o = JSONObject(json)
+        if (o.optString("magic") != MAGIC) return null
+        val txns = o.getJSONArray("transactions")
+        val times = (0 until txns.length()).map { txns.getJSONObject(it).getLong("timestamp") }
+        BackupInfo(
+            createdAt = o.getLong("createdAt"),
+            appVersion = o.optString("appVersion"),
+            accounts = o.getJSONArray("accounts").length(),
+            transactions = txns.length(),
+            firstTxn = times.minOrNull(),
+            lastTxn = times.maxOrNull(),
+        )
+    }.getOrNull()
+
+    suspend fun restore(db: NabdDatabase, settings: Settings, json: String): BackupInfo {
+        val o = JSONObject(json)
+        require(o.optString("magic") == MAGIC) { "الملف ده مش نسخة احتياطية من نبض" }
+        require(o.optInt("format") <= FORMAT) { "النسخة دي من إصدار أحدث، حدّث التطبيق الأول" }
+        // نقرا كل حاجة الأول، علشان لو في غلط في الملف مانمسحش البيانات الحالية
+        val accounts = o.getJSONArray("accounts").objects().map(::account)
+        val txns = o.getJSONArray("transactions").objects().map(::txn)
+        val budgets = o.optJSONArray("budgets")?.objects()?.map { Budget(it.getString("category"), it.getDouble("limit")) } ?: emptyList()
+        val insights = o.optJSONArray("insights")?.objects()?.map(::insight) ?: emptyList()
+        val dao = db.dao()
+        db.withTransaction {
+            dao.clearTxns(); dao.clearAccounts(); dao.clearBudgets(); dao.clearInsights()
+            dao.putAccounts(accounts)
+            dao.putTxns(txns)
+            dao.putBudgets(budgets)
+            dao.putInsights(insights)
+        }
+        o.optJSONObject("settings")?.let(settings::importPrefs)
+        return info(json)!!
+    }
+
+    private fun JSONArray.objects() = (0 until length()).map { getJSONObject(it) }
+
+    private fun JSONObject.optLongOrNull(k: String) = if (has(k) && !isNull(k)) getLong(k) else null
+    private fun JSONObject.optDoubleOrNull(k: String) = if (has(k) && !isNull(k)) getDouble(k) else null
+    private fun JSONObject.optStringOrNull(k: String) = if (has(k) && !isNull(k)) getString(k) else null
+
+    private fun accountJson(a: Account) = JSONObject()
+        .put("id", a.id).put("name", a.name).put("type", a.type.name).put("agentId", a.agentId)
+        .put("accountKey", a.accountKey).put("balance", a.balance).put("currency", a.currency)
+        .put("balanceKnown", a.balanceKnown).put("balanceAt", a.balanceAt).put("updatedAt", a.updatedAt)
+        .put("includeInTotal", a.includeInTotal).put("isCredit", a.isCredit)
+
+    private fun account(o: JSONObject) = Account(
+        id = o.getLong("id"), name = o.getString("name"), type = AccountType.valueOf(o.getString("type")),
+        agentId = o.getString("agentId"), accountKey = o.getString("accountKey"), balance = o.getDouble("balance"),
+        currency = o.getString("currency"), balanceKnown = o.getBoolean("balanceKnown"), balanceAt = o.getLong("balanceAt"),
+        updatedAt = o.getLong("updatedAt"), includeInTotal = o.optBoolean("includeInTotal", true),
+        isCredit = o.optBoolean("isCredit", false),
+    )
+
+    private fun txnJson(t: Txn) = JSONObject()
+        .put("id", t.id).put("accountId", t.accountId ?: JSONObject.NULL).put("amount", t.amount)
+        .put("currency", t.currency).put("direction", t.direction.name).put("balanceAfter", t.balanceAfter ?: JSONObject.NULL)
+        .put("merchant", t.merchant ?: JSONObject.NULL).put("category", t.category).put("purpose", t.purpose.name)
+        .put("timestamp", t.timestamp).put("source", t.source.name).put("agentId", t.agentId)
+        .put("rawText", t.rawText ?: JSONObject.NULL).put("note", t.note ?: JSONObject.NULL)
+        .put("fingerprint", t.fingerprint).put("reimbursable", t.reimbursable)
+        .put("reimbursedAt", t.reimbursedAt ?: JSONObject.NULL).put("excluded", t.excluded)
+
+    private fun txn(o: JSONObject) = Txn(
+        id = o.getLong("id"), accountId = o.optLongOrNull("accountId"), amount = o.getDouble("amount"),
+        currency = o.getString("currency"), direction = Direction.valueOf(o.getString("direction")),
+        balanceAfter = o.optDoubleOrNull("balanceAfter"), merchant = o.optStringOrNull("merchant"),
+        category = o.getString("category"), purpose = Purpose.valueOf(o.getString("purpose")),
+        timestamp = o.getLong("timestamp"), source = TxnSource.valueOf(o.getString("source")),
+        agentId = o.getString("agentId"), rawText = o.optStringOrNull("rawText"), note = o.optStringOrNull("note"),
+        fingerprint = o.getString("fingerprint"), reimbursable = o.optBoolean("reimbursable"),
+        reimbursedAt = o.optLongOrNull("reimbursedAt"), excluded = o.optBoolean("excluded"),
+    )
+
+    private fun insightJson(i: Insight) = JSONObject()
+        .put("id", i.id).put("agentId", i.agentId).put("title", i.title).put("body", i.body)
+        .put("severity", i.severity).put("timestamp", i.timestamp).put("dedupKey", i.dedupKey).put("read", i.read)
+
+    private fun insight(o: JSONObject) = Insight(
+        id = o.getLong("id"), agentId = o.getString("agentId"), title = o.getString("title"), body = o.getString("body"),
+        severity = o.getInt("severity"), timestamp = o.getLong("timestamp"), dedupKey = o.getString("dedupKey"),
+        read = o.optBoolean("read"),
+    )
+}

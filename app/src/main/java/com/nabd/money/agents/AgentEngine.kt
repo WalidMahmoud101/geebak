@@ -34,6 +34,8 @@ class AgentEngine(
     suspend fun ingest(m: RawMessage, notify: Boolean = true): Txn? = mutex.withLock { ingestLocked(m, notify) }
 
     private suspend fun ingestLocked(m: RawMessage, notify: Boolean): Txn? {
+        // بعد "ابدأ من جديد" الرسائل القديمة ماترجعش
+        if (m.timestamp < settings.ignoreBefore) return null
         val agent = AgentRegistry.sources.firstOrNull { settings.isEnabled(it.id) && it.matches(m) } ?: return null
         val p = agent.parse(m) ?: return null
         val account = resolveAccount(agent, m, p)

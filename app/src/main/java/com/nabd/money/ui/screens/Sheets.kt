@@ -27,6 +27,8 @@ import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Category
+import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.AlertDialog
@@ -582,8 +584,18 @@ fun AddAccountDialog(onDismiss: () -> Unit, onConfirm: (String, AccountType, Str
 @Composable
 fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
     var categories by remember { mutableStateOf(false) }
+    var backup by remember { mutableStateOf(false) }
+    var reset by remember { mutableStateOf(false) }
+    if (reset) {
+        ResetSheet(vm) { reset = false }
+        return
+    }
     if (categories) {
         CategoriesSheet(vm) { categories = false }
+        return
+    }
+    if (backup) {
+        BackupSheet(vm) { backup = false }
         return
     }
     val s = vm.settings
@@ -613,6 +625,8 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                     shape = RoundedCornerShape(14.dp)
                 )
                 PillButton("التصنيفات والقواعد", Icons.Rounded.Category, NabdColors.Mint, Modifier.fillMaxWidth()) { categories = true }
+                PillButton("النسخة الاحتياطية", Icons.Rounded.CloudDone, NabdColors.Mint, Modifier.fillMaxWidth()) { backup = true }
+                PillButton("ابدأ من جديد", Icons.Rounded.RestartAlt, NabdColors.Danger, Modifier.fillMaxWidth()) { reset = true }
                 Text("الشكل", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
                 val mode by vm.themeMode.collectAsState()
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

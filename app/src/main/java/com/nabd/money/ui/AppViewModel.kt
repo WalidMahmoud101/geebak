@@ -39,6 +39,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.YearMonth
 
+private const val RESET_SNAPSHOT = "before-reset.json"
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val nabd = app as NabdApp
@@ -229,6 +231,116 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deleteRule(r: UserRule) = viewModelScope.launch(Dispatchers.IO) {
         settings.updateTaxonomy { it.copy(rules = it.rules - r) }
+    }
+
+    // ---------- النسخة الاحتياطية ----------
+    val backupMessage = MutableStateFlow<String?>(null)
+    val pendingRestore = MutableStateFlow<Pair<com.nabd.money.data.BackupInfo, String>?>(null)
+    val backupBusy = MutableStateFlow(false)
+
+    private fun backupJob(block: suspend () -> Unit) = viewModelScope.launch {
+        backupBusy.value = true
+        try { block() } catch (e: Exception) {
+            backupMessage.value = "حصلت مشكلة: ${e.message ?: "جرب تاني"}"
+        } finally { backupBusy.value = false }
+    }
+
+    fun saveBackup(uri: android.net.Uri) = backupJob {
+        val json = withContext(Dispatchers.IO) { com.nabd.money.util.BackupFiles.build(nabd) }
+        com.nabd.money.util.BackupFiles.writeTo(getApplication(), uri, json)
+        settings.lastBackupAt = System.currentTimeMillis()
+        val info = com.nabd.money.data.Backup.info(json)
+        backupMessage.value = "اتحفظت النسخة: ${info?.transactions ?: 0} عملية و ${info?.accounts ?: 0} حساب"
+    }
+
+    fun shareBackup() = backupJob {
+        val json = withContext(Dispatchers.IO) { com.nabd.money.util.BackupFiles.build(nabd) }
+        com.nabd.money.util.BackupFiles.share(getApplication(), json)
+        settings.lastBackupAt = System.currentTimeMillis()
+    }
+
+    /** قبل الرجوع: نقرا الملف ونوري ملخصه */
+    fun openBackup(uri: android.net.Uri) = backupJob {
+        val json = com.nabd.money.util.BackupFiles.read(getApplication(), uri)
+        val info = com.nabd.money.data.Backup.info(json)
+        if (info == null) backupMessage.value = "الملف ده مش نسخة احتياطية من نبض"
+        else pendingRestore.value = info to json
+    }
+
+    fun confirmRestore() = backupJob {
+        val (_, json) = pendingRestore.value ?: return@backupJob
+        pendingRestore.value = null
+        // نسخة من الحالي قبل الرجوع، علشان لو غيرت رأيك
+        withContext(Dispatchers.IO) {
+            val current = com.nabd.money.util.BackupFiles.build(nabd)
+            java.io.File(nabd.filesDir, "before-restore.json").writeText(current)
+            com.nabd.money.data.Backup.restore(nabd.db, settings, json)
+        }
+        backupMessage.value = "رجعت النسخة بنجاح"
+    }
+
+    fun setBackupFolder(uri: android.net.Uri?) = backupJob {
+        settings.backupFolder = uri?.toString()
+        settings.lastAutoBackupDay = 0
+        if (uri != null) {
+            val ok = com.nabd.money.util.BackupFiles.autoBackup(nabd)
+            backupMessage.value = if (ok) "النسخة التلقائية اشتغلت، وأول نسخة اتحفظت" else "مقدرتش أكتب في الفولدر ده، اختار فولدر تاني"
+        }
+    }
+
+    // ---------- ابدأ من جديد ----------
+    enum class ResetScope { BEFORE_THIS_MONTH, ALL_TXNS, EVERYTHING }
+
+    val resetCounts = MutableStateFlow<Pair<Int, Int>?>(null) // (قبل الشهر ده، الكل)
+    val canUndoReset = MutableStateFlow(java.io.File(app.filesDir, RESET_SNAPSHOT).exists())
+
+    fun loadResetCounts() = viewModelScope.launch(Dispatchers.IO) {
+        val monthStart = Dates.monthRange(YearMonth.now()).first
+        resetCounts.value = dao.countTxnsBefore(monthStart) to dao.countTxns()
+    }
+
+    fun reset(scope: ResetScope) = backupJob {
+        withContext(Dispatchers.IO) {
+            // نسخة كاملة قبل المسح، علشان "رجّع اللي اتمسح"
+            java.io.File(nabd.filesDir, RESET_SNAPSHOT).writeText(com.nabd.money.util.BackupFiles.build(nabd))
+            val now = System.currentTimeMillis()
+            when (scope) {
+                ResetScope.BEFORE_THIS_MONTH -> {
+                    val start = Dates.monthRange(YearMonth.now()).first
+                    dao.deleteTxnsBefore(start)
+                    settings.ignoreBefore = start
+                }
+                ResetScope.ALL_TXNS -> {
+                    dao.clearTxns(); dao.clearInsights(); dao.zeroEstimatedBalances()
+                    settings.ignoreBefore = now
+                }
+                ResetScope.EVERYTHING -> {
+                    dao.clearTxns(); dao.clearInsights(); dao.clearAccounts(); dao.clearBudgets()
+                    settings.resetUserSettings()
+                    settings.ignoreBefore = now
+                }
+            }
+        }
+        canUndoReset.value = true
+        resetCounts.value = null
+        backupMessage.value = when (scope) {
+            ResetScope.BEFORE_THIS_MONTH -> "بدأت من أول الشهر ده"
+            ResetScope.ALL_TXNS -> "العمليات اتمسحت، وحساباتك وإعداداتك زي ما هي"
+            ResetScope.EVERYTHING -> "بدأت من الصفر"
+        }
+    }
+
+    /** يرجّع كل اللي اتمسح بآخر "ابدأ من جديد" */
+    fun undoReset() = backupJob {
+        val f = java.io.File(nabd.filesDir, RESET_SNAPSHOT)
+        if (!f.exists()) return@backupJob
+        withContext(Dispatchers.IO) {
+            com.nabd.money.data.Backup.restore(nabd.db, settings, f.readText())
+            settings.ignoreBefore = 0
+            f.delete()
+        }
+        canUndoReset.value = false
+        backupMessage.value = "رجعت كل اللي اتمسح"
     }
 
     // ---------- الإدخال بالصوت ----------

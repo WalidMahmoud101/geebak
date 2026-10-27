@@ -77,6 +77,87 @@ class Settings(context: Context) {
         sp.edit().putString("taxonomy", t.encode()).apply()
     }
 
+    // ---------- النسخة الاحتياطية ----------
+    /** فولدر النسخة التلقائية اليومية (Storage Access Framework) */
+    var backupFolder: String?
+        get() = sp.getString("backup_folder", null)
+        set(v) = sp.edit().putString("backup_folder", v).apply()
+
+    var lastBackupAt: Long
+        get() = sp.getLong("last_backup_at", 0)
+        set(v) = sp.edit().putLong("last_backup_at", v).apply()
+
+    var lastAutoBackupDay: Long
+        get() = sp.getLong("last_auto_backup_day", 0)
+        set(v) = sp.edit().putLong("last_auto_backup_day", v).apply()
+
+    /** بعد "ابدأ من جديد": الرسائل والإشعارات الأقدم من كده مابتتسجلش تاني */
+    var ignoreBefore: Long
+        get() = sp.getLong("ignore_before", 0)
+        set(v) = sp.edit().putLong("ignore_before", v).apply()
+
+    /** "امسح كل حاجة": الإعدادات ترجع زي الأول، ماعدا الشكل وسعر الدولار والأشياء الخاصة بالموبايل */
+    fun resetUserSettings() {
+        val keep = deviceOnly + setOf("theme", "usd_rate", "ignore_before", "last_backup_at")
+        val ed = sp.edit()
+        sp.all.keys.filter { it !in keep }.forEach { ed.remove(it) }
+        ed.commit()
+        reload()
+    }
+
+    /** مفاتيح خاصة بالموبايل ده بس، مابتتنقلش في النسخة */
+    private val deviceOnly = setOf("backup_folder", "last_auto_backup_day", "did_initial_scan", "notified_update")
+
+    fun exportPrefs(): org.json.JSONObject {
+        val o = org.json.JSONObject()
+        sp.all.forEach { (k, v) ->
+            if (k in deviceOnly || v == null) return@forEach
+            val e = org.json.JSONObject()
+            when (v) {
+                is Boolean -> e.put("t", "b").put("v", v)
+                is Int -> e.put("t", "i").put("v", v)
+                is Long -> e.put("t", "l").put("v", v)
+                is Float -> e.put("t", "f").put("v", v.toDouble())
+                is String -> e.put("t", "s").put("v", v)
+                is Set<*> -> e.put("t", "ss").put("v", org.json.JSONArray(v.map { it.toString() }))
+                else -> return@forEach
+            }
+            o.put(k, e)
+        }
+        return o
+    }
+
+    fun importPrefs(o: org.json.JSONObject) {
+        val ed = sp.edit()
+        sp.all.keys.filter { it !in deviceOnly }.forEach { ed.remove(it) }
+        o.keys().forEach { k ->
+            if (k in deviceOnly) return@forEach
+            val e = o.getJSONObject(k)
+            when (e.getString("t")) {
+                "b" -> ed.putBoolean(k, e.getBoolean("v"))
+                "i" -> ed.putInt(k, e.getInt("v"))
+                "l" -> ed.putLong(k, e.getLong("v"))
+                "f" -> ed.putFloat(k, e.getDouble("v").toFloat())
+                "s" -> ed.putString(k, e.getString("v"))
+                "ss" -> e.getJSONArray("v").let { a -> ed.putStringSet(k, (0 until a.length()).map { a.getString(it) }.toSet()) }
+            }
+        }
+        ed.commit()
+        reload()
+    }
+
+    /** بعد الرجوع لنسخة: كل القيم تتقري من جديد والشاشات تتحدث */
+    fun reload() {
+        _disabled.value = sp.getStringSet("disabled_agents", emptySet())!!.toSet()
+        _usdRate.value = sp.getFloat("usd_rate", 50f).toDouble()
+        _theme.value = runCatching { com.nabd.money.ui.theme.ThemeMode.valueOf(sp.getString("theme", "SYSTEM")!!) }
+            .getOrDefault(com.nabd.money.ui.theme.ThemeMode.SYSTEM)
+        _saved.value = FilterCodec.decode(sp.getString("saved_filters", null))
+        _taxonomy.value = UserTaxonomy.decode(sp.getString("taxonomy", null))
+        com.nabd.money.agents.Categorizer.user = _taxonomy.value
+        _salary.value = readSalary()
+    }
+
     /** آخر نسخة اتبعت عنها إشعار تحديث */
     var notifiedUpdate: Int
         get() = sp.getInt("notified_update", 0)

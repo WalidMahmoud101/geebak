@@ -17,6 +17,8 @@ class DigestWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         InboxScanner.scan(applicationContext, app.engine, days = 3, notify = true)
         app.engine.runPeriodicInsights(notify = true)
         app.engine.dailyDigest()
+        // نسخة احتياطية تلقائية مرة في اليوم لو اخترت فولدر
+        com.nabd.money.util.BackupFiles.autoBackup(app)
         // التحديثات: إشعار مرة واحدة لكل نسخة جديدة
         com.nabd.money.util.Updater.latest()?.let { r ->
             if (r.versionCode > com.nabd.money.BuildConfig.VERSION_CODE && app.settings.notifiedUpdate < r.versionCode) {

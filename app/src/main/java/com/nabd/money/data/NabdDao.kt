@@ -37,6 +37,25 @@ interface NabdDao {
     @Query("SELECT * FROM transactions")
     suspend fun allTxnsOnce(): List<Txn>
 
+    // ---------- النسخة الاحتياطية ----------
+    @Query("SELECT * FROM insights")
+    suspend fun insightsOnce(): List<Insight>
+
+    @Query("DELETE FROM transactions") suspend fun clearTxns()
+    @Query("DELETE FROM transactions WHERE timestamp < :before") suspend fun deleteTxnsBefore(before: Long): Int
+    @Query("SELECT COUNT(*) FROM transactions WHERE timestamp < :before") suspend fun countTxnsBefore(before: Long): Int
+    @Query("SELECT COUNT(*) FROM transactions") suspend fun countTxns(): Int
+    /** الأرصدة التقديرية مالهاش معنى من غير العمليات، فبترجع صفر */
+    @Query("UPDATE accounts SET balance = 0, balanceAt = 0 WHERE balanceKnown = 0") suspend fun zeroEstimatedBalances()
+    @Query("DELETE FROM accounts") suspend fun clearAccounts()
+    @Query("DELETE FROM budgets") suspend fun clearBudgets()
+    @Query("DELETE FROM insights") suspend fun clearInsights()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putAccounts(list: List<Account>)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putTxns(list: List<Txn>)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putBudgets(list: List<Budget>)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putInsights(list: List<Insight>)
+
     @Query("UPDATE transactions SET category = :to WHERE category = :from")
     suspend fun renameCategory(from: String, to: String)
 
