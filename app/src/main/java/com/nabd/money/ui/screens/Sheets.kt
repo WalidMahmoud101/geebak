@@ -1,0 +1,621 @@
+package com.nabd.money.ui.screens
+
+import com.nabd.money.ui.components.agentTint
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.nabd.money.agents.AgentRegistry
+import com.nabd.money.agents.Categorizer
+import com.nabd.money.agents.Draft
+import com.nabd.money.data.Account
+import com.nabd.money.data.AccountType
+import com.nabd.money.data.Direction
+import com.nabd.money.data.Purpose
+import com.nabd.money.data.Txn
+import com.nabd.money.data.TxnSource
+import com.nabd.money.ui.AppViewModel
+import com.nabd.money.ui.components.GradientButton
+import com.nabd.money.ui.components.PillButton
+import com.nabd.money.ui.components.PurposeChips
+import com.nabd.money.ui.components.SelectChip
+import com.nabd.money.ui.components.icon
+import com.nabd.money.ui.theme.NabdColors
+import com.nabd.money.util.Dates
+import com.nabd.money.util.Money
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZoneOffset
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun AddTxnSheet(
+    initialDirection: Direction,
+    initialPurpose: Purpose?,
+    accounts: List<Account>,
+    onDismiss: () -> Unit,
+    initialCompany: Boolean = false,
+    draft: Draft? = null,
+    onSave: (Double, Direction, Purpose, String, String?, Long?, Long, String?, Boolean) -> Unit,
+) {
+    val draftTime = draft?.let { Dates.toLocal(it.timestamp) }
+    var company by remember { mutableStateOf(draft?.company ?: initialCompany) }
+    var direction by remember { mutableStateOf(draft?.direction ?: initialDirection) }
+    var amountText by remember {
+        mutableStateOf(draft?.amount?.toBigDecimal()?.stripTrailingZeros()?.toPlainString() ?: "")
+    }
+    var merchant by remember { mutableStateOf(draft?.merchant.orEmpty()) }
+    var purpose by remember { mutableStateOf(draft?.purpose ?: initialPurpose ?: Purpose.HOME) }
+    var purposeTouched by remember { mutableStateOf(draft != null || initialPurpose != null) }
+    var category by remember {
+        mutableStateOf(
+            draft?.category ?: if (initialDirection == Direction.IN) "مصروف البيت"
+            else when (initialPurpose) {
+                Purpose.CAR -> "وقود"
+                Purpose.OUTING -> "مطاعم وكافيهات"
+                Purpose.WORK -> "أدوات شغل"
+                else -> "بقالة"
+            }
+        )
+    }
+    var accountId by remember { mutableStateOf(draft?.accountId) }
+    var date by remember { mutableStateOf(draftTime?.toLocalDate() ?: LocalDate.now()) }
+    var time by remember {
+        mutableStateOf((draftTime?.toLocalTime() ?: LocalTime.now()).withSecond(0).withNano(0))
+    }
+    var note by remember { mutableStateOf(draft?.note.orEmpty()) }
+    var pickDate by remember { mutableStateOf(false) }
+    var pickTime by remember { mutableStateOf(false) }
+    val amount = Money.parseInput(amountText)
+    val color = if (direction == Direction.OUT) NabdColors.Pink else NabdColors.Mint
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = NabdColors.Surface,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                if (direction == Direction.OUT) "تسجيل مصروف" else "إضافة مبلغ",
+                style = MaterialTheme.typography.titleLarge
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DirectionTab("خصم / مصروف", Icons.Rounded.ArrowUpward, NabdColors.Pink, direction == Direction.OUT, Modifier.weight(1f)) {
+                    direction = Direction.OUT
+                }
+                DirectionTab("إضافة / إيداع", Icons.Rounded.ArrowDownward, NabdColors.Mint, direction == Direction.IN, Modifier.weight(1f)) {
+                    direction = Direction.IN
+                }
+            }
+            OutlinedTextField(
+                value = amountText,
+                onValueChange = { amountText = it },
+                label = { Text("المبلغ") },
+                suffix = { Text(accounts.firstOrNull { it.id == accountId }?.currency ?: "ج.م") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                textStyle = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Bold, color = color),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+            )
+            OutlinedTextField(
+                value = merchant,
+                onValueChange = { merchant = it },
+                label = { Text(if (direction == Direction.OUT) "اتصرف على إيه؟ (سوبر ماركت، بنزين...)" else "منين؟ (مرتب، تحويل...)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+            )
+
+            Label("للبيت ولا للشغل ولا للعربية؟")
+            PurposeChips(purpose, includeAll = false) { p ->
+                if (p != null) {
+                    purpose = p; purposeTouched = true
+                }
+            }
+
+            Label("التصنيف")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Categorizer.CATEGORIES.forEach { c ->
+                    SelectChip(c, c == category, NabdColors.Cyan) {
+                        category = c
+                        if (!purposeTouched) Categorizer.suggestPurpose(c)?.let { purpose = it }
+                    }
+                }
+            }
+
+            Label("من أنهي حساب؟")
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SelectChip("كاش / بدون حساب", accountId == null, NabdColors.Gold, AccountType.CASH.icon()) { accountId = null }
+                accounts.forEach { a ->
+                    SelectChip(a.name, accountId == a.id, NabdColors.Gold, a.type.icon()) { accountId = a.id }
+                }
+            }
+
+            Label("إمتى؟")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                PillButton(
+                    "${date.dayOfMonth} ${Dates.MONTHS[date.monthValue - 1]} ${date.year}",
+                    Icons.Rounded.CalendarMonth, NabdColors.Text, Modifier.weight(1f)
+                ) { pickDate = true }
+                val ts = LocalDateTime.of(date, time).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                PillButton(Dates.time(ts), Icons.Rounded.Schedule, NabdColors.Text, Modifier.weight(1f)) { pickTime = true }
+            }
+
+            if (direction == Direction.OUT) {
+                CompanyToggle(company) {
+                    company = it
+                    if (it) { purpose = Purpose.WORK; purposeTouched = true }
+                }
+            }
+
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                label = { Text("ملاحظة (اختياري)") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+            )
+
+            GradientButton(
+                if (amount != null && amount > 0) "حفظ ${Money.fmt(amount)}" else "اكتب المبلغ",
+                Modifier.fillMaxWidth(),
+                Icons.Rounded.Check
+            ) {
+                val a = amount ?: return@GradientButton
+                if (a <= 0) return@GradientButton
+                val ts = LocalDateTime.of(date, time).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                onSave(
+                    a, direction, purpose, category, merchant.trim().ifBlank { null }, accountId, ts,
+                    note.trim().ifBlank { null }, company && direction == Direction.OUT
+                )
+            }
+        }
+    }
+
+    if (pickDate) {
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { pickDate = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let {
+                        date = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()
+                    }
+                    pickDate = false
+                }) { Text("تم") }
+            },
+            dismissButton = { TextButton(onClick = { pickDate = false }) { Text("إلغاء") } },
+        ) { DatePicker(state = state) }
+    }
+    if (pickTime) {
+        val state = rememberTimePickerState(time.hour, time.minute, is24Hour = false)
+        AlertDialog(
+            onDismissRequest = { pickTime = false },
+            confirmButton = {
+                TextButton(onClick = { time = LocalTime.of(state.hour, state.minute); pickTime = false }) { Text("تم") }
+            },
+            dismissButton = { TextButton(onClick = { pickTime = false }) { Text("إلغاء") } },
+            text = { TimePicker(state = state) },
+            containerColor = NabdColors.Surface,
+        )
+    }
+}
+
+@Composable
+private fun ToggleRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(NabdColors.SurfaceHigh)
+            .border(1.dp, NabdColors.Stroke, RoundedCornerShape(16.dp))
+            .clickable { onChange(!checked) }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim)
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
+private fun CompanyToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(if (checked) NabdColors.Cyan.copy(alpha = 0.12f) else NabdColors.SurfaceHigh)
+            .border(1.dp, if (checked) NabdColors.Cyan else NabdColors.Stroke, shape)
+            .clickable { onChange(!checked) }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("على حساب الشركة", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "دفعته من جيبي وهسترده من الشركة/المكتب",
+                style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
+private fun Label(text: String) {
+    Text(text, style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+}
+
+@Composable
+private fun DirectionTab(
+    text: String, icon: ImageVector, color: Color, selected: Boolean, modifier: Modifier, onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        modifier
+            .clip(shape)
+            .background(if (selected) color.copy(alpha = 0.18f) else NabdColors.SurfaceHigh)
+            .border(1.dp, if (selected) color else NabdColors.Stroke, shape)
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, null, tint = if (selected) color else NabdColors.TextDim, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(text, color = if (selected) color else NabdColors.TextDim, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun EditTxnSheet(
+    txn: Txn,
+    accountName: String?,
+    onDismiss: () -> Unit,
+    onSave: (Txn) -> Unit,
+    onDelete: (Txn) -> Unit,
+) {
+    var purpose by remember { mutableStateOf(txn.purpose) }
+    var category by remember { mutableStateOf(txn.category) }
+    var merchant by remember { mutableStateOf(txn.merchant.orEmpty()) }
+    var note by remember { mutableStateOf(txn.note.orEmpty()) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    var company by remember { mutableStateOf(txn.reimbursable) }
+    var counted by remember { mutableStateOf(!txn.excluded) }
+    val out = txn.direction == Direction.OUT
+    val agent = AgentRegistry.byId(txn.agentId)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = NabdColors.Surface,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    (if (out) "−" else "+") + Money.fmt(txn.amount, txn.currency),
+                    fontSize = 32.sp, fontWeight = FontWeight.Bold,
+                    color = if (out) NabdColors.Text else NabdColors.Mint
+                )
+                Text(
+                    "${accountName ?: "كاش"} • ${Dates.full(txn.timestamp)}",
+                    style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim
+                )
+                Text(
+                    "${txn.source.ar} • ${agent?.name ?: ""}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = agent?.let { agentTint(it.color) } ?: NabdColors.TextDim
+                )
+                txn.balanceAfter?.let {
+                    Text("الباقي بعد العملية: ${Money.fmt(it, txn.currency)}", style = MaterialTheme.typography.labelMedium, color = NabdColors.Cyan)
+                }
+            }
+            txn.rawText?.let { raw ->
+                Text(
+                    raw,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NabdColors.TextDim,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(NabdColors.SurfaceHigh)
+                        .padding(12.dp)
+                )
+            }
+            OutlinedTextField(
+                value = merchant, onValueChange = { merchant = it }, label = { Text("الوصف / التاجر") },
+                singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)
+            )
+            Label("الغرض")
+            PurposeChips(purpose, includeAll = false) { p -> if (p != null) purpose = p }
+            Label("التصنيف")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Categorizer.CATEGORIES.forEach { c -> SelectChip(c, c == category, NabdColors.Cyan) { category = c } }
+            }
+            if (out) CompanyToggle(company) { company = it; if (it) purpose = Purpose.WORK }
+            ToggleRow(
+                "يتحسب في الإجمالي",
+                if (counted) "داخلة في الدخل والمصروف" else "برا الإجمالي (تحويل بين حساباتك أو حاجة مش مصروف حقيقي)",
+                counted
+            ) { counted = it }
+            OutlinedTextField(
+                value = note, onValueChange = { note = it }, label = { Text("ملاحظة") },
+                modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                GradientButton("حفظ", Modifier.weight(1f), Icons.Rounded.Check) {
+                    onSave(
+                        txn.copy(
+                            purpose = purpose, category = category,
+                            merchant = merchant.trim().ifBlank { null }, note = note.trim().ifBlank { null },
+                            reimbursable = company && out,
+                            excluded = !counted,
+                            reimbursedAt = if (company && out) txn.reimbursedAt else null,
+                        )
+                    )
+                }
+                PillButton("حذف", Icons.Rounded.Delete, NabdColors.Danger, Modifier.weight(0.6f)) { confirmDelete = true }
+            }
+            if (txn.source != TxnSource.MANUAL) {
+                Text(
+                    "حذف عملية ملتقطة مش هيغير رصيد الحساب.",
+                    style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint
+                )
+            }
+        }
+    }
+    if (confirmDelete) {
+        ConfirmDialog("حذف العملية؟", "هتتشال من نبض بس.", onDismiss = { confirmDelete = false }) {
+            confirmDelete = false; onDelete(txn)
+        }
+    }
+}
+
+@Composable
+fun AmountDialog(title: String, initial: Double, onDismiss: () -> Unit, onConfirm: (Double) -> Unit) {
+    var text by remember { mutableStateOf(if (initial == 0.0) "" else initial.toBigDecimal().stripTrailingZeros().toPlainString()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NabdColors.Surface,
+        title = { Text(title, style = MaterialTheme.typography.titleMedium) },
+        text = {
+            OutlinedTextField(
+                value = text, onValueChange = { text = it }, singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                shape = RoundedCornerShape(14.dp)
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { Money.parseInput(text.ifBlank { "0" })?.let(onConfirm) }) { Text("حفظ") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+    )
+}
+
+@Composable
+fun TextDialog(title: String, initial: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var text by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NabdColors.Surface,
+        title = { Text(title, style = MaterialTheme.typography.titleMedium) },
+        text = { OutlinedTextField(value = text, onValueChange = { text = it }, singleLine = true, shape = RoundedCornerShape(14.dp)) },
+        confirmButton = { TextButton(onClick = { if (text.isNotBlank()) onConfirm(text.trim()) }) { Text("حفظ") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+    )
+}
+
+@Composable
+fun ConfirmDialog(title: String, body: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NabdColors.Surface,
+        title = { Text(title, style = MaterialTheme.typography.titleMedium) },
+        text = { Text(body, color = NabdColors.TextDim) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text("حذف", color = NabdColors.Danger) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun AddAccountDialog(onDismiss: () -> Unit, onConfirm: (String, AccountType, String, Double) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var type by remember { mutableStateOf(AccountType.CASH) }
+    var currency by remember { mutableStateOf("EGP") }
+    var balance by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NabdColors.Surface,
+        title = { Text("حساب جديد", style = MaterialTheme.typography.titleMedium) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = name, onValueChange = { name = it }, label = { Text("الاسم (مثلاً: كاش البيت)") },
+                    singleLine = true, shape = RoundedCornerShape(14.dp)
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AccountType.entries.forEach { t -> SelectChip(t.ar, t == type, NabdColors.Mint, t.icon()) { type = t } }
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("EGP", "USD", "USDT").forEach { c -> SelectChip(c, c == currency, NabdColors.Gold) { currency = c } }
+                }
+                OutlinedTextField(
+                    value = balance, onValueChange = { balance = it }, label = { Text("الرصيد الحالي") },
+                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(14.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (name.isNotBlank()) onConfirm(name.trim(), type, currency, Money.parseInput(balance) ?: 0.0)
+            }) { Text("إضافة") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+    )
+}
+
+@Composable
+fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
+    val s = vm.settings
+    var usd by remember { mutableStateOf(s.usdRate.value.toString()) }
+    var low by remember { mutableStateOf(s.lowBalance.toInt().toString()) }
+    var large by remember { mutableStateOf(s.largeSpend.toInt().toString()) }
+    var notify by remember { mutableStateOf(s.notifyCaptures) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NabdColors.Surface,
+        title = { Text("الإعدادات", style = MaterialTheme.typography.titleMedium) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = usd, onValueChange = { usd = it }, label = { Text("سعر الدولار بالجنيه") },
+                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                OutlinedTextField(
+                    value = low, onValueChange = { low = it }, label = { Text("حارس الرصيد: نبهني لو الرصيد أقل من") },
+                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                OutlinedTextField(
+                    value = large, onValueChange = { large = it }, label = { Text("كاشف المصاريف: مبلغ كبير لو أكتر من") },
+                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                Text("الشكل", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+                val mode by vm.themeMode.collectAsState()
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.nabd.money.ui.theme.ThemeMode.entries.forEach { m ->
+                        SelectChip(m.ar, m == mode) { vm.setTheme(m) }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("إشعار مع كل عملية ملتقطة", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = notify, onCheckedChange = { notify = it })
+                }
+                Spacer(Modifier.height(2.dp))
+                val update by vm.update.collectAsState()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("الإصدار ${com.nabd.money.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            when (val u = update) {
+                                is com.nabd.money.util.UpdateState.Checking -> "بيدور على تحديث…"
+                                is com.nabd.money.util.UpdateState.UpToDate -> "عندك آخر نسخة"
+                                is com.nabd.money.util.UpdateState.Available -> "في نسخة جديدة: ${u.release.name}"
+                                is com.nabd.money.util.UpdateState.Downloading -> "بينزل ${(u.progress * 100).toInt()}%"
+                                is com.nabd.money.util.UpdateState.Ready -> "جاهز للتثبيت"
+                                is com.nabd.money.util.UpdateState.Error -> u.message
+                                else -> "التحديثات بتوصل لوحدها"
+                            },
+                            style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim
+                        )
+                    }
+                    val u = update
+                    if (u is com.nabd.money.util.UpdateState.Available) {
+                        TextButton(onClick = { vm.downloadAndInstall(u.release) }) { Text("حدّث") }
+                    } else {
+                        TextButton(onClick = { vm.checkForUpdate(manual = true) }) { Text("اتحقق") }
+                    }
+                }
+                Text(
+                    "بياناتك المالية على الموبايل بس. النت بيستخدم للتحديثات وبس.",
+                    style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                Money.parseInput(usd)?.takeIf { it > 0 }?.let(vm::setUsdRate)
+                Money.parseInput(low)?.let { s.lowBalance = it }
+                Money.parseInput(large)?.let { s.largeSpend = it }
+                s.notifyCaptures = notify
+                onDismiss()
+            }) { Text("حفظ") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+    )
+}
