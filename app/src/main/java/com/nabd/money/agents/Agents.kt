@@ -99,10 +99,25 @@ class GenericBankAgent : SourceAgent(
     }
 
     override fun accountKey(m: RawMessage, p: ParsedMoney) =
-        m.sender.uppercase() + (p.cardLast4?.let { "-$it" } ?: "")
+        bankKey(m.sender) + (p.cardLast4?.let { "-$it" } ?: "")
 
     override fun accountLabel(m: RawMessage, p: ParsedMoney) =
-        m.sender + (p.cardLast4?.let { " •••• $it" } ?: "")
+        m.sender.trim() + (p.cardLast4?.let { " •••• $it" } ?: "")
+
+    companion object {
+        private val suffix = Regex("(EGYPT|EGY|EG|BANK|SMS|ALERT|ALERTS)$")
+
+        /** "HSBC-EG" و "hsbc" و "HSBC EGYPT" = نفس البنك */
+        fun bankKey(sender: String): String {
+            var k = sender.uppercase().filter { it.isLetterOrDigit() }
+            while (true) {
+                val cut = suffix.replace(k, "")
+                if (cut == k || cut.length < 2) break
+                k = cut
+            }
+            return k.ifEmpty { sender.uppercase() }
+        }
+    }
 }
 
 /** وكيل تحليل: بيشتغل على العمليات اللي اتجمعت */

@@ -10,6 +10,7 @@ import com.nabd.money.data.NabdDatabase
 import com.nabd.money.data.Settings
 import com.nabd.money.ingest.DigestWorker
 import com.nabd.money.util.Notifier
+import kotlinx.coroutines.launch
 
 class NabdApp : Application() {
     lateinit var db: NabdDatabase
@@ -25,6 +26,12 @@ class NabdApp : Application() {
         settings = Settings(this)
         engine = AgentEngine(this, db.dao(), settings)
         Notifier.ensureChannels(this)
+        // مرة واحدة بعد التحديث: نلم الكروت والحسابات اللي اتكررت قبل كده
+        if (settings.accountsTidied < 1) {
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                runCatching { engine.tidyAccounts() }.onSuccess { settings.accountsTidied = 1 }
+            }
+        }
         runCatching { DigestWorker.schedule(this) }
         // لو السيستم قفل خدمة الإشعارات، نطلب منه يرجعها علشان التسجيل يفضل تلقائي
         if (NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)) {

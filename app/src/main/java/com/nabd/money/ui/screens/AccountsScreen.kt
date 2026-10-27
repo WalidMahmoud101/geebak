@@ -72,6 +72,7 @@ import com.nabd.money.util.Money
 fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
     val accounts by vm.accounts.collectAsStateWithLifecycle()
     vm.usdRate.collectAsStateWithLifecycle().value
+    val tidyMessage by vm.tidyMessage.collectAsStateWithLifecycle()
     var adding by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var openId by remember { mutableStateOf<Long?>(null) }
@@ -92,6 +93,14 @@ fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
             }
             if (needBalance.isNotEmpty()) {
                 item { NeedBalanceCard(needBalance.size) { setBalanceFor = needBalance.first() } }
+            }
+            if (institutions.any { inst -> inst.accounts.count { !it.isCredit } > 1 }) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        PillButton("لمّ الكروت والحسابات المكررة", Icons.Rounded.CallMerge, NabdColors.Mint, Modifier.fillMaxWidth()) { vm.tidyAccounts() }
+                        tidyMessage?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim) }
+                    }
+                }
             }
             if (accounts.isEmpty()) {
                 item {

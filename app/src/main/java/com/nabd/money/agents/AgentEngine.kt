@@ -6,6 +6,7 @@ import com.nabd.money.data.AccountType
 import com.nabd.money.data.Direction
 import com.nabd.money.data.Insight
 import com.nabd.money.data.NabdDao
+import com.nabd.money.data.NetWorth
 import com.nabd.money.data.Purpose
 import com.nabd.money.data.Settings
 import com.nabd.money.data.Txn
@@ -244,7 +245,10 @@ class AgentEngine(
 
     private suspend fun resolveAccount(agent: SourceAgent, m: RawMessage, p: ParsedMoney): Account {
         val key = agent.accountKey(m, p)
-        dao.findAccount(agent.id, key)?.let { existing ->
+        val found = dao.findAccount(agent.id, key)
+            ?: settings.accountAlias(agent.id, key)?.let { dao.findAccount(agent.id, it) }
+            ?: sameMoneyAccount(agent, key, p)?.also { settings.setAccountAlias(agent.id, key, it.accountKey) }
+        found?.let { existing ->
             if (p.isCredit && !existing.isCredit) {
                 val u = existing.copy(isCredit = true, type = AccountType.CARD, includeInTotal = false)
                 dao.updateAccount(u)
@@ -264,6 +268,99 @@ class AgentEngine(
             )
         )
         return dao.findAccount(agent.id, key)!!
+    }
+
+    /**
+     * البنك ساعات يبعت بآخر 4 أرقام الكارت، وساعات برقم الحساب، وساعات من غير رقم خالص،
+     * وكلهم نفس الفلوس. قبل ما نعمل حساب جديد نشوف لو ده نفس حساب موجود:
+     * - في البنك ده حساب واحد بس (مش ائتمان) ورصيده مايتعارضش مع الرسالة، أو
+     * - الرصيد اللي في الرسالة بيكمّل رصيد حساب موجود بالظبط.
+     */
+    private suspend fun sameMoneyAccount(agent: SourceAgent, key: String, p: ParsedMoney): Account? {
+        if (p.isCredit) return null
+        val probe = Account(name = "", type = agent.accountType, agentId = agent.id, accountKey = key, currency = agent.accountCurrency(p))
+        val siblings = dao.accountsForAgent(agent.id).filter {
+            !it.isCredit && it.currency.equals(probe.currency, ignoreCase = true) &&
+                NetWorth.institutionKey(it) == NetWorth.institutionKey(probe)
+        }
+        if (siblings.isEmpty()) return null
+        val matching = siblings.filter { balanceFits(it, p) == true }
+        if (matching.size == 1) return matching.first()
+        return siblings.singleOrNull()?.takeIf { balanceFits(it, p) != false }
+    }
+
+    /** true = الرصيد بيكمّل، false = بيتعارض، null = مانقدرش نعرف */
+    private fun balanceFits(a: Account, p: ParsedMoney): Boolean? {
+        val b = p.balance ?: return null
+        if (!a.balanceKnown) return null
+        val amount = p.amount ?: 0.0
+        val after = when (p.direction) {
+            Direction.IN -> a.balance + amount
+            Direction.OUT -> a.balance - amount
+            null -> a.balance
+        }
+        return abs(after - b) < 0.01 || abs(a.balance - b) < 0.01
+    }
+
+    /** دمج حساب في حساب تاني: العمليات بتتنقل، والرسايل الجاية للحساب القديم بتروح للجديد */
+    suspend fun mergeAccounts(fromId: Long, intoId: Long) = mutex.withLock { mergeLocked(fromId, intoId) }
+
+    private suspend fun mergeLocked(fromId: Long, intoId: Long) {
+        if (fromId == intoId) return
+        val from = dao.account(fromId) ?: return
+        val into = dao.account(intoId) ?: return
+        dao.moveTxns(from.id, into.id)
+        val takeFrom = from.balanceKnown && (!into.balanceKnown || from.balanceAt > into.balanceAt)
+        val merged = if (takeFrom) into.copy(balance = from.balance, balanceKnown = true, balanceAt = from.balanceAt, updatedAt = now()) else into
+        dao.updateAccount(if (into.name.contains("••••") && !from.name.contains("••••")) merged.copy(name = from.name) else merged)
+        if (from.agentId == into.agentId) settings.setAccountAlias(from.agentId, from.accountKey, into.accountKey)
+        dao.deleteAccount(from)
+        removeDuplicateTxns(into.id)
+    }
+
+    /** نفس المبلغ ونفس الاتجاه في خلال 3 دقايق على نفس الحساب = اتسجلت مرتين (رسالة الكارت + رسالة الحساب) */
+    private suspend fun removeDuplicateTxns(accountId: Long) {
+        val kept = mutableListOf<Txn>()
+        for (t in dao.forAccountOnce(accountId)) {
+            val dup = t.source != TxnSource.MANUAL && kept.any {
+                it.source != TxnSource.MANUAL && it.direction == t.direction &&
+                    abs(it.amount - t.amount) < 0.001 && abs(it.timestamp - t.timestamp) <= 3 * 60_000L
+            }
+            if (dup) dao.deleteTxn(t) else kept += t
+        }
+    }
+
+    /**
+     * مرة واحدة: يلم الحسابات اللي اتكررت قبل كده لنفس البنك أو المحفظة.
+     * - حسابات رصيدها نفس الرقم = نفس الفلوس
+     * - حسابات مالهاش رصيد مؤكد بتتضم للحساب الوحيد اللي رصيده مؤكد (أو لأقدم حساب لو مفيش)
+     * البنك اللي فيه حسابين رصيدهم مختلف فعلاً بيفضلوا منفصلين.
+     */
+    suspend fun tidyAccounts(): Int = mutex.withLock {
+        var merged = 0
+        val groups = dao.accountsOnce()
+            .filter { !it.isCredit && it.agentId != AgentRegistry.MANUAL_ID && it.agentId != "binance" }
+            .groupBy { NetWorth.institutionKey(it) to it.currency.uppercase() }
+        for ((_, list) in groups) {
+            if (list.size < 2) continue
+            val pool = list.sortedBy { it.id }.toMutableList()
+            // نفس الرصيد المؤكد
+            val known = pool.filter { it.balanceKnown }
+            for (a in known) {
+                if (a !in pool) continue
+                val target = pool.firstOrNull { it.id != a.id && it.balanceKnown && it.id < a.id && abs(it.balance - a.balance) < 0.01 }
+                    ?: continue
+                mergeLocked(a.id, target.id); pool.remove(a); merged++
+            }
+            val stillKnown = pool.filter { it.balanceKnown }
+            val target = when {
+                stillKnown.size == 1 -> stillKnown.first()
+                stillKnown.isEmpty() -> pool.first()
+                else -> null
+            } ?: continue
+            pool.filter { !it.balanceKnown && it.id != target.id }.forEach { mergeLocked(it.id, target.id); merged++ }
+        }
+        merged
     }
 
     private suspend fun applyKnownBalance(a: Account, balance: Double, at: Long): Account {

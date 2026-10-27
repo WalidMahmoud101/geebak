@@ -72,6 +72,16 @@ data class Txn(
 /** العملية دي تدخل في إجمالي الدخل والمصروف الشخصي؟ مصاريف الشركة ليها إجمالي لوحدها */
 fun Txn.countsInTotals(): Boolean = !excluded && !reimbursable
 
+/** فلوس انت حطيتها بإيدك في صندوق (مصروف البيت مثلاً). المرتب والتحويلات اللي جاتلك دخل مش صندوق */
+fun Txn.isTopUp(): Boolean = direction == Direction.IN && source == TxnSource.MANUAL &&
+    purpose != Purpose.OTHER && category != "مرتب" && category != "استرداد مصاريف الشركة"
+
+/** الدخل ليه حسابه لوحده: صندوق البيت أو الشغل فيه مصاريفه واللي انت ضفته ليه بس */
+fun Txn.belongsTo(p: Purpose): Boolean = purpose == p && (direction == Direction.OUT || isTopUp())
+
+/** دخل حقيقي (مرتب، تحويل جالك…) مش فلوس اتحطت في صندوق */
+fun Txn.isIncome(): Boolean = direction == Direction.IN && !isTopUp()
+
 /** ميزانية شهرية لكل غرض (category = اسم الـ Purpose) */
 @Entity(tableName = "budgets")
 data class Budget(

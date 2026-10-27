@@ -172,6 +172,30 @@ class Settings(context: Context) {
         get() = sp.getBoolean("did_initial_scan", false)
         set(v) = sp.edit().putBoolean("did_initial_scan", v).apply()
 
+    // ---------- الكروت والحسابات المربوطة ببعض ----------
+    /** "agentId|مفتاح" → مفتاح الحساب اللي اتدمج فيه (كارت ••1234 ورقم الحساب نفسه مثلاً) */
+    fun accountAliases(): Map<String, String> = runCatching {
+        val o = org.json.JSONObject(sp.getString("account_aliases", null) ?: return emptyMap())
+        o.keys().asSequence().associateWith { o.getString(it) }
+    }.getOrDefault(emptyMap())
+
+    fun accountAlias(agentId: String, key: String): String? = accountAliases()["$agentId|$key"]
+
+    fun setAccountAlias(agentId: String, from: String, to: String) {
+        if (from == to) return
+        val all = accountAliases().toMutableMap()
+        // اللي كان مربوط بالحساب القديم يتنقل للجديد
+        all.keys.filter { it.startsWith("$agentId|") && all[it] == from }.forEach { all[it] = to }
+        all["$agentId|$from"] = to
+        all.remove("$agentId|$to")
+        sp.edit().putString("account_aliases", org.json.JSONObject(all as Map<*, *>).toString()).apply()
+    }
+
+    /** ترتيب الحسابات المكررة القديمة اتعمل مرة */
+    var accountsTidied: Int
+        get() = sp.getInt("accounts_tidied", 0)
+        set(v) = sp.edit().putInt("accounts_tidied", v).apply()
+
     // ---------- المرتب ----------
     private val _salary = MutableStateFlow(readSalary())
     val salary: StateFlow<SalaryConfig> = _salary

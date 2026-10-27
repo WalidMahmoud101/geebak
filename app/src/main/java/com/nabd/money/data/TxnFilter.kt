@@ -157,7 +157,7 @@ data class TxnFilter(
         if (!showExcluded && t.excluded) return false
         if (companyOnly && !t.reimbursable) return false
         if (direction != null && t.direction != direction) return false
-        if (purposes.isNotEmpty() && t.purpose !in purposes) return false
+        if (purposes.isNotEmpty() && purposes.none { t.belongsTo(it) }) return false
         if (categories.isNotEmpty() && t.category !in categories) return false
         if (accountIds.isNotEmpty() && (t.accountId ?: CASH_ACCOUNT_ID) !in accountIds) return false
         if (sources.isNotEmpty() && t.source !in sources) return false

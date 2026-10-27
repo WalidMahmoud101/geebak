@@ -22,6 +22,9 @@ interface NabdDao {
     @Query("SELECT * FROM accounts WHERE agentId = :agentId AND accountKey = :key LIMIT 1")
     suspend fun findAccount(agentId: String, key: String): Account?
 
+    @Query("SELECT * FROM accounts WHERE agentId = :agentId ORDER BY id")
+    suspend fun accountsForAgent(agentId: String): List<Account>
+
     @Query("SELECT * FROM accounts WHERE id = :id")
     suspend fun account(id: Long): Account?
 
@@ -78,6 +81,9 @@ interface NabdDao {
 
     @Query("SELECT * FROM transactions WHERE accountId = :accountId ORDER BY timestamp DESC")
     fun forAccount(accountId: Long): Flow<List<Txn>>
+
+    @Query("SELECT * FROM transactions WHERE accountId = :accountId ORDER BY timestamp")
+    suspend fun forAccountOnce(accountId: Long): List<Txn>
 
     @Query("DELETE FROM transactions WHERE accountId = :accountId")
     suspend fun deleteTxnsForAccount(accountId: Long)

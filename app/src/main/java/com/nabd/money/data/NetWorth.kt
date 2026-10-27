@@ -1,6 +1,7 @@
 package com.nabd.money.data
 
 import com.nabd.money.agents.AgentRegistry
+import com.nabd.money.agents.GenericBankAgent
 
 /** ليه حساب مش داخل في إجمالي فلوسك */
 enum class Exclusion(val ar: String) {
@@ -46,13 +47,16 @@ object NetWorth {
     fun institutionKey(a: Account): String = when (a.agentId) {
         AgentRegistry.MANUAL_ID -> "manual:${a.id}"
         // البنوك الأخرى: مفتاح الحساب = اسم المرسل + آخر 4 أرقام
-        "other_banks" -> "other:" + a.accountKey.substringBefore('-')
+        "other_banks" -> "other:" + GenericBankAgent.bankKey(a.accountKey.substringBefore('-'))
         else -> a.agentId
     }
 
     fun institutionName(a: Account): String = when (a.agentId) {
         AgentRegistry.MANUAL_ID -> a.name
-        "other_banks" -> a.accountKey.substringBefore('-')
+        "other_banks" -> a.accountKey.substringBefore('-').let { key ->
+            // اسم المرسل زي ما البنك كاتبه ("HSBC-EG") لو هو نفس البنك، وإلا المفتاح
+            a.name.substringBefore(" ••••").trim().takeIf { GenericBankAgent.bankKey(it) == GenericBankAgent.bankKey(key) } ?: key
+        }
         else -> AgentRegistry.byId(a.agentId)?.name?.removePrefix("وكيل ") ?: a.name
     }
 

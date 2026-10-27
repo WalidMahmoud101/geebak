@@ -55,7 +55,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nabd.money.agents.AgentRegistry
 import com.nabd.money.agents.SalaryWatch
 import com.nabd.money.data.Account
-import com.nabd.money.data.CashFlow
 import com.nabd.money.data.Direction
 import com.nabd.money.data.Exclusion
 import com.nabd.money.data.Insight
@@ -63,6 +62,10 @@ import com.nabd.money.data.Institution
 import com.nabd.money.data.NetWorth
 import com.nabd.money.data.Purpose
 import com.nabd.money.data.Txn
+import com.nabd.money.data.TxnFilter
+import com.nabd.money.data.belongsTo
+import com.nabd.money.data.countsInTotals
+import com.nabd.money.data.isIncome
 import com.nabd.money.ui.AppViewModel
 import com.nabd.money.ui.COMPANY_TAB
 import com.nabd.money.ui.Perms
@@ -113,7 +116,6 @@ fun HomeScreen(
     val institutions = NetWorth.institutions(accounts, accEgp)
     val counted = accounts.count { NetWorth.counts(it, accEgp) }
     val pending = accounts.count { NetWorth.exclusion(it, accEgp(it)) == Exclusion.UNKNOWN }
-    val flow = CashFlow.of(month, vm::txnEgp)
     val names = accounts.associate { it.id to it.name }
     val unread = insights.filter { !it.read }
 
@@ -132,7 +134,7 @@ fun HomeScreen(
             )
         }
         updateCard(update, vm)
-        item { BalanceCard(total, counted, pending, flow, onClick = { breakdown = true }) }
+        item { BalanceCard(total, counted, pending, onClick = { breakdown = true }) }
         item {
             QuickActions(
                 companyCount = companyPending.size,
@@ -148,9 +150,7 @@ fun HomeScreen(
             items(unread.take(2).size) { i -> InsightRow(unread[i]) { vm.dismissInsight(unread[i]) } }
         }
 
-        item { MonthSplit(flow) { onNavigate(4) } }
-
-        item { SectionHeader("حساباتك", "الكل") { onNavigate(2) } }
+        item { SectionHeader("فلوسك في كل حساب", "الكل") { onNavigate(2) } }
         item {
             if (institutions.isEmpty()) {
                 GlassCard(Modifier.fillMaxWidth()) {
@@ -160,12 +160,17 @@ fun HomeScreen(
             } else {
                 GlassCard(Modifier.fillMaxWidth(), padding = 8.dp) {
                     institutions.filter { inst -> inst.accounts.any { NetWorth.exclusion(it, accEgp(it)) != Exclusion.INTERMEDIATE } }
-                        .take(5).forEachIndexed { i, inst ->
+                        .forEachIndexed { i, inst ->
                         if (i > 0) HorizontalDivider(color = NabdColors.Stroke, modifier = Modifier.padding(horizontal = 8.dp))
-                        InstitutionLine(inst) { onNavigate(2) }
+                        InstitutionLine(inst, accEgp) { onNavigate(2) }
                     }
                 }
             }
+        }
+
+        item { SectionHeader("حسابات ${Dates.MONTHS[YearMonth.now().monthValue - 1]}", "التقارير") { onNavigate(4) } }
+        item {
+            MonthBoxes(month, vm::txnEgp) { f -> vm.setFilter(f); onNavigate(1) }
         }
 
         item { SectionHeader("آخر العمليات", "الكل") { onNavigate(1) } }
@@ -214,9 +219,9 @@ private fun greeting(): String = when (java.time.LocalTime.now().hour) {
     else -> "مساء الخير"
 }
 
-/** الكارت الأساسي: إجمالي فلوسك، وتحته داخل وخارج الشهر */
+/** الكارت الأساسي: إجمالي فلوسك في كل الحسابات */
 @Composable
-private fun BalanceCard(total: Double, counted: Int, pending: Int, flow: CashFlow, onClick: () -> Unit) {
+private fun BalanceCard(total: Double, counted: Int, pending: Int, onClick: () -> Unit) {
     val shape = RoundedCornerShape(24.dp)
     val onCard = Color.White
     Column(
@@ -245,31 +250,6 @@ private fun BalanceCard(total: Double, counted: Int, pending: Int, flow: CashFlo
             style = MaterialTheme.typography.labelMedium,
             color = if (pending > 0) Color(0xFFFFE08A) else onCard.copy(alpha = 0.7f)
         )
-        Spacer(Modifier.height(18.dp))
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.Black.copy(alpha = 0.18f))
-                .padding(vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val m = Dates.MONTHS[YearMonth.now().monthValue - 1]
-            FlowCell("داخل $m", Money.signed("+", flow.totalIn, decimals = false), Modifier.weight(1f))
-            Box(Modifier.width(1.dp).height(32.dp).background(onCard.copy(alpha = 0.15f)))
-            FlowCell("خارج $m", Money.signed("−", flow.totalOut, decimals = false), Modifier.weight(1f))
-            Box(Modifier.width(1.dp).height(32.dp).background(onCard.copy(alpha = 0.15f)))
-            FlowCell("الصافي", Money.signed(if (flow.net >= 0) "+" else "−", kotlin.math.abs(flow.net), decimals = false), Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-private fun FlowCell(label: String, value: String, modifier: Modifier) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), maxLines = 1)
-        Spacer(Modifier.height(2.dp))
-        Text(value, style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1)
     }
 }
 
@@ -309,83 +289,125 @@ private fun QuickAction(label: String, icon: ImageVector, onClick: () -> Unit) {
     }
 }
 
-/** الخارج الشهر ده متقسم على الأغراض في شريط واحد */
+/**
+ * كل حاجة في حسابها لوحده: الدخل في خانة، والبيت في خانة، والشغل في خانة…
+ * الدخل (مرتب، تحويلات جاتلك) مابيدخلش في صندوق البيت أو الشغل.
+ */
 @Composable
-private fun MonthSplit(flow: CashFlow, onClick: () -> Unit) {
-    GlassCard(Modifier.fillMaxWidth(), onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("مصروف الشهر رايح فين", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            Text(Money.fmt(flow.totalOut, decimals = false), style = MaterialTheme.typography.titleSmall)
+private fun MonthBoxes(month: List<Txn>, egp: (Txn) -> Double, onOpen: (TxnFilter) -> Unit) {
+    val counted = month.filter { it.countsInTotals() }
+    val income = counted.filter { it.isIncome() }
+    val topIncome = income.groupBy { it.category }.maxByOrNull { (_, l) -> l.sumOf(egp) }
+    val boxes = mutableListOf<@Composable (Modifier) -> Unit>()
+    boxes += { m ->
+        MoneyBox(
+            "الدخل", Icons.Rounded.Paid, NabdColors.Mint,
+            income.sumOf(egp).let { if (it > 0) Money.signed("+", it, decimals = false) else Money.fmt(0.0, decimals = false) },
+            topIncome?.let { (cat, l) -> if (income.size > l.size) "منه $cat ${Money.fmt(l.sumOf(egp), decimals = false)}" else cat }
+                ?: "لسه مافيش دخل",
+            m,
+        ) { onOpen(TxnFilter(direction = Direction.IN)) }
+    }
+    Purpose.entries.forEach { p ->
+        val mine = counted.filter { it.belongsTo(p) }
+        if (mine.isEmpty() && p != Purpose.HOME && p != Purpose.WORK) return@forEach
+        val spent = mine.filter { it.direction == Direction.OUT }.sumOf(egp)
+        val added = mine.filter { it.direction == Direction.IN }.sumOf(egp)
+        boxes += { m ->
+            MoneyBox(
+                p.ar, p.icon(), p.color(),
+                if (spent > 0) Money.signed("−", spent, decimals = false) else Money.fmt(0.0, decimals = false),
+                when {
+                    added > 0 -> if (added >= spent) "باقي ${Money.fmt(added - spent, decimals = false)} من ${Money.fmt(added, decimals = false)}" else "زاد ${Money.fmt(spent - added, decimals = false)} عن اللي اتحط"
+                    mine.isEmpty() -> "مافيش مصاريف"
+                    else -> "${mine.size} عملية"
+                },
+                m,
+            ) { onOpen(TxnFilter(purposes = setOf(p))) }
         }
-        Spacer(Modifier.height(12.dp))
-        if (flow.totalOut <= 0) {
-            Text("مافيش مصاريف لسه", style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim)
-            return@GlassCard
-        }
-        Row(
-            Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)),
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            flow.outflow.forEach { line ->
-                Box(
-                    Modifier
-                        .weight((line.amount / flow.totalOut).toFloat().coerceAtLeast(0.01f))
-                        .fillMaxHeight()
-                        .background(line.purpose?.color() ?: NabdColors.TextDim)
-                )
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        flow.outflow.take(4).forEach { line ->
-            Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(line.purpose?.color() ?: NabdColors.TextDim))
-                Spacer(Modifier.width(8.dp))
-                Text(line.label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                Text(
-                    "${(line.amount / flow.totalOut * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim,
-                    modifier = Modifier.padding(end = 10.dp)
-                )
-                Text(Money.fmt(line.amount, decimals = false), style = MaterialTheme.typography.labelLarge)
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        boxes.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { it(Modifier.weight(1f)) }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-private fun InstitutionLine(inst: Institution, onClick: () -> Unit) {
+private fun MoneyBox(title: String, icon: ImageVector, color: Color, value: String, sub: String, modifier: Modifier, onClick: () -> Unit) {
+    GlassCard(modifier, padding = 14.dp, onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconBubble(icon, color, 30.dp)
+            Spacer(Modifier.width(8.dp))
+            Text(title, style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim, maxLines = 1)
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(value, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(sub, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** بنك أو محفظة بإجمالي فلوسه، وتحته كل حساب أو كارت ورصيده لوحده */
+@Composable
+private fun InstitutionLine(inst: Institution, egp: (Account) -> Double, onClick: () -> Unit) {
     val first = inst.accounts.first()
-    Row(
+    val shown = inst.accounts.filter { NetWorth.exclusion(it, egp(it)) != Exclusion.INTERMEDIATE }
+    Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 8.dp, vertical = 10.dp)
     ) {
-        Box(
-            Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(Brush.linearGradient(first.colors())),
-            contentAlignment = Alignment.Center
-        ) { Icon(first.type.icon(), null, tint = Color.White, modifier = Modifier.size(19.dp)) }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(inst.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(Brush.linearGradient(first.colors())),
+                contentAlignment = Alignment.Center
+            ) { Icon(first.type.icon(), null, tint = Color.White, modifier = Modifier.size(19.dp)) }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(inst.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    when {
+                        inst.accounts.all { it.isCredit } -> "كارت ائتمان"
+                        inst.countedCount == 0 -> "محتاج رصيده"
+                        shown.size > 1 -> "الإجمالي"
+                        else -> first.type.ar
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (inst.countedCount == 0 && !inst.accounts.all { it.isCredit }) NabdColors.Gold else NabdColors.TextDim
+                )
+            }
             Text(
-                when {
-                    inst.accounts.all { it.isCredit } -> "كارت ائتمان"
-                    inst.countedCount == 0 -> "محتاج رصيده"
-                    inst.accounts.size > 1 -> "${inst.accounts.size} حسابات وكروت"
-                    else -> first.type.ar
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = if (inst.countedCount == 0 && !inst.accounts.all { it.isCredit }) NabdColors.Gold else NabdColors.TextDim
+                if (inst.countedCount > 0) Money.fmt(inst.total, decimals = false) else "—",
+                style = MaterialTheme.typography.titleSmall,
+                color = if (inst.countedCount > 0) NabdColors.Text else NabdColors.TextFaint
             )
         }
-        Text(
-            if (inst.countedCount > 0) Money.fmt(inst.total, decimals = false) else "—",
-            style = MaterialTheme.typography.titleSmall,
-            color = if (inst.countedCount > 0) NabdColors.Text else NabdColors.TextFaint
-        )
+        if (shown.size > 1) {
+            shown.forEach { a ->
+                val ex = NetWorth.exclusion(a, egp(a))
+                Row(Modifier.padding(start = 50.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(if (ex == null) NabdColors.Mint else NabdColors.TextFaint))
+                    Spacer(Modifier.width(8.dp))
+                    Text(a.name, style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(
+                        when (ex) {
+                            null -> Money.fmt(a.balance, a.currency, decimals = false)
+                            Exclusion.CREDIT -> "متاح ${Money.fmt(a.balance, a.currency, decimals = false)}"
+                            Exclusion.UNKNOWN -> "محتاج رصيده"
+                            else -> Money.fmt(a.balance, a.currency, decimals = false)
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (ex == null) NabdColors.Text else NabdColors.TextFaint
+                    )
+                }
+            }
+        }
     }
 }
 

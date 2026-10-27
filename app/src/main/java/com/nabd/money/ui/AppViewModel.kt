@@ -389,12 +389,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** دمج حساب متكرر: العمليات تتنقل، والرصيد المؤكد الأحدث يفضل */
     fun mergeAccounts(from: Account, into: Account) = viewModelScope.launch(Dispatchers.IO) {
-        dao.moveTxns(from.id, into.id)
-        val takeFrom = from.balanceKnown && (!into.balanceKnown || from.balanceAt > into.balanceAt)
-        if (takeFrom) {
-            dao.updateAccount(into.copy(balance = from.balance, balanceKnown = true, balanceAt = from.balanceAt, updatedAt = System.currentTimeMillis()))
-        }
-        dao.deleteAccount(from)
+        engine.mergeAccounts(from.id, into.id)
+    }
+
+    /** يلم الكروت والحسابات المكررة لنفس البنك */
+    val tidyMessage = MutableStateFlow<String?>(null)
+    fun tidyAccounts() = viewModelScope.launch(Dispatchers.IO) {
+        val n = engine.tidyAccounts()
+        tidyMessage.value = if (n > 0) "اتدمج $n حساب مكرر" else "مافيش حسابات مكررة"
     }
 
     fun setIncludeInTotal(a: Account, include: Boolean) = viewModelScope.launch(Dispatchers.IO) {
