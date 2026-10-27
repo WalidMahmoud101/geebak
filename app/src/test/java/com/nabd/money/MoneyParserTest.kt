@@ -109,6 +109,19 @@ class MoneyParserTest {
     }
 
     @Test
+    fun salaryAmountRules() {
+        val base = com.nabd.money.data.SalaryConfig("ACME", 0, 25, 0.0, 0)
+        val sw = com.nabd.money.agents.SalaryWatch
+        assertEquals(true, sw.amountQualifies(base, 300.0))                       // من غير مبلغ: أي مبلغ
+        val min = base.copy(amount = 15_000.0)
+        assertEquals(false, sw.amountQualifies(min, 2_000.0))                     // أقل من المرتب = مش مرتب
+        assertEquals(true, sw.amountQualifies(min, 16_500.0))                     // أكتر = مرتب (بونص مثلاً)
+        val exact = min.copy(exactOnly = true)
+        assertEquals(true, sw.amountQualifies(exact, 15_000.0))
+        assertEquals(false, sw.amountQualifies(exact, 16_500.0))                  // بالظبط بس
+    }
+
+    @Test
     fun salaryWatch() {
         val today = java.time.LocalDate.of(2026, 10, 29)
         val received = java.time.LocalDate.of(2026, 10, 25).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()

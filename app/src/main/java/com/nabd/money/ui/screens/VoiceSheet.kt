@@ -193,7 +193,7 @@ private fun DraftCard(d: Draft, accountName: String?, onEdit: () -> Unit, onRemo
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    (if (out) "−" else "+") + Money.fmt(d.amount, d.currency),
+                    Money.signed(if (out) "−" else "+", d.amount, d.currency),
                     fontSize = 20.sp, fontWeight = FontWeight.Bold,
                     color = if (out) NabdColors.Text else NabdColors.Mint
                 )

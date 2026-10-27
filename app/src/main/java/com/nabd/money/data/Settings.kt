@@ -62,6 +62,21 @@ class Settings(context: Context) {
         sp.edit().putString("saved_filters", FilterCodec.encode(list)).apply()
     }
 
+    // ---------- تصنيفاتك وقواعدك ----------
+    private val _taxonomy = MutableStateFlow(UserTaxonomy.decode(sp.getString("taxonomy", null)))
+    val taxonomy: StateFlow<UserTaxonomy> = _taxonomy
+
+    init {
+        com.nabd.money.agents.Categorizer.user = _taxonomy.value
+    }
+
+    fun updateTaxonomy(transform: (UserTaxonomy) -> UserTaxonomy) {
+        val t = transform(_taxonomy.value)
+        _taxonomy.value = t
+        com.nabd.money.agents.Categorizer.user = t
+        sp.edit().putString("taxonomy", t.encode()).apply()
+    }
+
     /** آخر نسخة اتبعت عنها إشعار تحديث */
     var notifiedUpdate: Int
         get() = sp.getInt("notified_update", 0)
@@ -86,6 +101,8 @@ class Settings(context: Context) {
         learnedDay = sp.getInt("salary_learned_day", 0),
         lastAmount = sp.getFloat("salary_last_amount", 0f).toDouble(),
         lastAt = sp.getLong("salary_last_at", 0),
+        amount = sp.getFloat("salary_amount", 0f).toDouble(),
+        exactOnly = sp.getBoolean("salary_exact", false),
     )
 
     fun updateSalary(transform: (SalaryConfig) -> SalaryConfig) {
@@ -96,6 +113,8 @@ class Settings(context: Context) {
             .putInt("salary_learned_day", s.learnedDay)
             .putFloat("salary_last_amount", s.lastAmount.toFloat())
             .putLong("salary_last_at", s.lastAt)
+            .putFloat("salary_amount", s.amount.toFloat())
+            .putBoolean("salary_exact", s.exactOnly)
             .apply()
         _salary.value = s
     }
@@ -113,6 +132,10 @@ data class SalaryConfig(
     val learnedDay: Int,
     val lastAmount: Double,
     val lastAt: Long,
+    /** مبلغ المرتب اللي انت كاتبه (0 = أي مبلغ) */
+    val amount: Double = 0.0,
+    /** true = المبلغ ده بالظبط بس، false = المبلغ ده أو أكتر */
+    val exactOnly: Boolean = false,
 ) {
     val enabled get() = payer.isNotBlank()
     val payday get() = if (fixedDay in 1..31) fixedDay else learnedDay

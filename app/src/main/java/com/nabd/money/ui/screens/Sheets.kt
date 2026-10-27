@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.AlertDialog
@@ -93,6 +94,7 @@ fun AddTxnSheet(
     onDismiss: () -> Unit,
     initialCompany: Boolean = false,
     draft: Draft? = null,
+    onNewCategory: (String, Purpose) -> Unit = { _, _ -> },
     onSave: (Double, Direction, Purpose, String, String?, Long?, Long, String?, Boolean) -> Unit,
 ) {
     val draftTime = draft?.let { Dates.toLocal(it.timestamp) }
@@ -180,12 +182,21 @@ fun AddTxnSheet(
             }
 
             Label("التصنيف")
+            var newCat by remember { mutableStateOf(false) }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Categorizer.CATEGORIES.forEach { c ->
+                (Categorizer.allCategories() + listOfNotNull(category.takeIf { it !in Categorizer.allCategories() })).forEach { c ->
                     SelectChip(c, c == category, NabdColors.Cyan) {
                         category = c
                         if (!purposeTouched) Categorizer.suggestPurpose(c)?.let { purpose = it }
                     }
+                }
+                SelectChip("+ تصنيف جديد", false, NabdColors.Mint) { newCat = true }
+            }
+            if (newCat) {
+                TextDialog("اسم التصنيف الجديد", "", onDismiss = { newCat = false }) { name ->
+                    onNewCategory(name, purpose)
+                    category = name
+                    newCat = false
                 }
             }
 
@@ -347,8 +358,12 @@ fun EditTxnSheet(
     onDismiss: () -> Unit,
     onSave: (Txn) -> Unit,
     onDelete: (Txn) -> Unit,
+    onNewCategory: (String, Purpose) -> Unit = { _, _ -> },
+    onRule: (keyword: String, category: String, purpose: Purpose) -> Unit = { _, _, _ -> },
 ) {
     var purpose by remember { mutableStateOf(txn.purpose) }
+    var applyAll by remember { mutableStateOf(true) }
+    var newCat by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf(txn.category) }
     var merchant by remember { mutableStateOf(txn.merchant.orEmpty()) }
     var note by remember { mutableStateOf(txn.note.orEmpty()) }
@@ -374,7 +389,7 @@ fun EditTxnSheet(
         ) {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    (if (out) "−" else "+") + Money.fmt(txn.amount, txn.currency),
+                    Money.signed(if (out) "−" else "+", txn.amount, txn.currency),
                     fontSize = 32.sp, fontWeight = FontWeight.Bold,
                     color = if (out) NabdColors.Text else NabdColors.Mint
                 )
@@ -411,7 +426,30 @@ fun EditTxnSheet(
             PurposeChips(purpose, includeAll = false) { p -> if (p != null) purpose = p }
             Label("التصنيف")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Categorizer.CATEGORIES.forEach { c -> SelectChip(c, c == category, NabdColors.Cyan) { category = c } }
+                (Categorizer.allCategories() + listOfNotNull(category.takeIf { it !in Categorizer.allCategories() })).forEach { c ->
+                    SelectChip(c, c == category, NabdColors.Cyan) {
+                        category = c
+                        Categorizer.suggestPurpose(c)?.let { if (!company) purpose = it }
+                    }
+                }
+                SelectChip("+ تصنيف جديد", false, NabdColors.Mint) { newCat = true }
+            }
+            if (newCat) {
+                TextDialog("اسم التصنيف الجديد", "", onDismiss = { newCat = false }) { name ->
+                    onNewCategory(name, purpose)
+                    category = name
+                    newCat = false
+                }
+            }
+            // التعديل يبقى قاعدة ثابتة: كل عمليات المكان ده تتصنف كده
+            val changed = category != txn.category || purpose != txn.purpose
+            val keyword = merchant.trim()
+            if (changed && keyword.length >= 2) {
+                ToggleRow(
+                    "طبّق على كل «$keyword»",
+                    "اللي فات واللي جاي هيتصنف $category • ${purpose.ar}",
+                    applyAll
+                ) { applyAll = it }
             }
             if (out) CompanyToggle(company) { company = it; if (it) purpose = Purpose.WORK }
             ToggleRow(
@@ -425,6 +463,10 @@ fun EditTxnSheet(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GradientButton("حفظ", Modifier.weight(1f), Icons.Rounded.Check) {
+                    val kw = merchant.trim()
+                    if (applyAll && kw.length >= 2 && (category != txn.category || purpose != txn.purpose)) {
+                        onRule(kw, category, purpose)
+                    }
                     onSave(
                         txn.copy(
                             purpose = purpose, category = category,
@@ -539,6 +581,11 @@ fun AddAccountDialog(onDismiss: () -> Unit, onConfirm: (String, AccountType, Str
 
 @Composable
 fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
+    var categories by remember { mutableStateOf(false) }
+    if (categories) {
+        CategoriesSheet(vm) { categories = false }
+        return
+    }
     val s = vm.settings
     var usd by remember { mutableStateOf(s.usdRate.value.toString()) }
     var low by remember { mutableStateOf(s.lowBalance.toInt().toString()) }
@@ -565,6 +612,7 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                     singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     shape = RoundedCornerShape(14.dp)
                 )
+                PillButton("التصنيفات والقواعد", Icons.Rounded.Category, NabdColors.Mint, Modifier.fillMaxWidth()) { categories = true }
                 Text("الشكل", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
                 val mode by vm.themeMode.collectAsState()
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

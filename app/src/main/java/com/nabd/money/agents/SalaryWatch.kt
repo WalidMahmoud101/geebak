@@ -20,6 +20,18 @@ object SalaryWatch {
         return norm(text).contains(p) || (merchant != null && norm(merchant).contains(p))
     }
 
+    /**
+     * المبلغ ده يتحسب مرتب؟
+     * - من غير مبلغ محدد: أي مبلغ
+     * - مبلغ محدد: المبلغ ده أو أكتر (اللي أقل منه مش مرتب)
+     * - "بالظبط بس": المبلغ ده بالظبط (فرق قروش بسيط مسموح)
+     */
+    fun amountQualifies(cfg: SalaryConfig, amountEgp: Double): Boolean {
+        if (cfg.amount <= 0) return true
+        return if (cfg.exactOnly) kotlin.math.abs(amountEgp - cfg.amount) <= maxOf(1.0, cfg.amount * 0.002)
+        else amountEgp >= cfg.amount - 0.5
+    }
+
     fun expectedDate(payday: Int, ym: YearMonth): LocalDate = ym.atDay(min(payday, ym.lengthOfMonth()))
 
     data class Status(

@@ -25,7 +25,7 @@ class NabdApp : Application() {
         settings = Settings(this)
         engine = AgentEngine(this, db.dao(), settings)
         Notifier.ensureChannels(this)
-        DigestWorker.schedule(this)
+        runCatching { DigestWorker.schedule(this) }
         // لو السيستم قفل خدمة الإشعارات، نطلب منه يرجعها علشان التسجيل يفضل تلقائي
         if (NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)) {
             runCatching {

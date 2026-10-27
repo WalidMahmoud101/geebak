@@ -40,44 +40,45 @@ data class Palette(
     val onBrand: Color,
 )
 
+// لون أساسي واحد (أخضر هادي) + محايد. باقي الألوان للمعنى بس (دخل، تحذير، أغراض)
 val DarkPalette = Palette(
     isDark = true,
-    bg = Color(0xFF080C17),
-    surface = Color(0xFF0F1626),
-    surfaceHigh = Color(0xFF141C2F),
-    surfaceTop = Color(0xFF1B2540),
-    stroke = Color(0xFF212C44),
-    mint = Color(0xFF3EE6B0),
-    cyan = Color(0xFF52B6F5),
-    gold = Color(0xFFF2C25B),
-    pink = Color(0xFFF27BB1),
-    violet = Color(0xFFA18BFA),
-    danger = Color(0xFFF46B83),
-    text = Color(0xFFE9EEF9),
-    textDim = Color(0xFF8D99B3),
-    textFaint = Color(0xFF5B6884),
-    hero = listOf(Color(0xFF0E3540), Color(0xFF13224A), Color(0xFF221A4A)),
-    onBrand = Color(0xFF00261B),
+    bg = Color(0xFF0B0E14),
+    surface = Color(0xFF12161F),
+    surfaceHigh = Color(0xFF161B26),
+    surfaceTop = Color(0xFF1E2431),
+    stroke = Color(0xFF232A38),
+    mint = Color(0xFF3DD6A3),
+    cyan = Color(0xFF6AA6FF),
+    gold = Color(0xFFE6B84F),
+    pink = Color(0xFFF08AA4),
+    violet = Color(0xFFA898FF),
+    danger = Color(0xFFF07171),
+    text = Color(0xFFEEF1F6),
+    textDim = Color(0xFF98A2B3),
+    textFaint = Color(0xFF5F6B7E),
+    hero = listOf(Color(0xFF123A32), Color(0xFF0F2E2A)),
+    onBrand = Color(0xFF04261C),
 )
 
 val LightPalette = Palette(
     isDark = false,
-    bg = Color(0xFFF3F5FA),
+    bg = Color(0xFFF4F5F9),
     surface = Color(0xFFFFFFFF),
     surfaceHigh = Color(0xFFFFFFFF),
-    surfaceTop = Color(0xFFEDF1F8),
-    stroke = Color(0xFFE1E6EF),
-    mint = Color(0xFF0E9F7A),
-    cyan = Color(0xFF1C7ED0),
-    gold = Color(0xFFB7800A),
-    pink = Color(0xFFC93D78),
-    violet = Color(0xFF6A4FD8),
-    danger = Color(0xFFD23B57),
-    text = Color(0xFF111827),
-    textDim = Color(0xFF5E6A82),
-    textFaint = Color(0xFF9AA5BA),
-    hero = listOf(Color(0xFFDDF7EE), Color(0xFFE2EEFF), Color(0xFFEDE6FF)),
-    onBrand = Color(0xFF00261B),
+    surfaceTop = Color(0xFFF0F2F6),
+    stroke = Color(0xFFE6E9F0),
+    mint = Color(0xFF0E9A76),
+    cyan = Color(0xFF2F6FDB),
+    gold = Color(0xFFB9841A),
+    pink = Color(0xFFD14D72),
+    violet = Color(0xFF6B5BD6),
+    danger = Color(0xFFD64545),
+    text = Color(0xFF121826),
+    textDim = Color(0xFF667085),
+    textFaint = Color(0xFFA0A8B8),
+    hero = listOf(Color(0xFF0F5C4A), Color(0xFF0C4B3D)),
+    onBrand = Color.White,
 )
 
 /**
@@ -103,12 +104,12 @@ object NabdColors {
     val TextFaint get() = palette.textFaint
     val OnBrand get() = palette.onBrand
     /** النص فوق زرار بلون واحد (Mint/Cyan) */
-    val OnAccent get() = if (palette.isDark) Color(0xFF00261B) else Color.White
+    val OnAccent get() = if (palette.isDark) Color(0xFF04261C) else Color.White
     val isDark get() = palette.isDark
 }
 
-/** المزيج الأساسي ثابت في الوضعين علشان يفضل شكل البراند واحد */
-val BrandGradient = Brush.linearGradient(listOf(Color(0xFF2EE6B0), Color(0xFF3DB2F5)))
+/** زرار أساسي: لون واحد سادة (اتسمى Gradient من النسخ القديمة) */
+val BrandGradient: Brush get() = androidx.compose.ui.graphics.SolidColor(NabdColors.Mint)
 val HeroGradient: Brush get() = Brush.linearGradient(NabdColors.palette.hero)
 
 val NabdFont = FontFamily(

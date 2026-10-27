@@ -8,6 +8,28 @@ data class Classification(val category: String, val purpose: Purpose)
 object Categorizer {
     const val ID = "categorizer"
 
+    /** تصنيفاتك وقواعدك (بتتحدث من الإعدادات) */
+    @Volatile
+    var user: com.nabd.money.data.UserTaxonomy = com.nabd.money.data.UserTaxonomy()
+
+    /** كل التصنيفات: الأساسية + اللي ضفتها، و"أخرى" في الآخر */
+    fun allCategories(): List<String> =
+        (CATEGORIES.filter { it != "أخرى" } + user.customCategories + "أخرى").distinct()
+
+    /** قاعدة من عندك تنطبق على العملية دي؟ */
+    fun userMatch(merchant: String?, text: String): Classification? {
+        if (user.rules.isEmpty()) return null
+        val hay = ArabicNumbers.norm((merchant ?: "") + " " + text)
+        // الكلمة الأطول الأول: "costa maadi" قبل "costa"
+        val rule = user.rules.sortedByDescending { it.keyword.length }
+            .firstOrNull { r -> ArabicNumbers.norm(r.keyword).trim().let { k -> k.isNotEmpty() && hay.contains(k) } }
+            ?: return null
+        return Classification(rule.category, rule.purpose ?: purposeOf(rule.category) ?: Purpose.OTHER)
+    }
+
+    /** الغرض الثابت للتصنيف: اللي انت حددته، وإلا الافتراضي */
+    fun purposeOf(category: String): Purpose? = user.categoryPurpose[category] ?: suggestPurposeBuiltIn(category)
+
     val CATEGORIES = listOf(
         "بقالة", "فواتير", "إيجار", "مصروف البيت", "وقود", "صيانة عربية", "مطاعم وكافيهات", "ترفيه",
         "مواصلات", "اشتراكات", "أدوات شغل", "صحة", "تسوق", "تحويلات", "سحب كاش", "كريبتو",
@@ -85,7 +107,15 @@ object Categorizer {
         return rx.containsMatchIn(hay)
     }
 
-    fun classify(merchant: String?, text: String, dir: Direction, agentId: String): Classification {
+    fun classify(merchant: String?, text: String, dir: Direction, agentId: String, builtIn: Boolean = true): Classification {
+        userMatch(merchant, text)?.let { return it }
+        if (!builtIn) return Classification(if (dir == Direction.IN) "دخل" else "أخرى", Purpose.OTHER)
+        val c = classifyBuiltIn(merchant, text, dir, agentId)
+        // لو انت مثبت غرض للتصنيف ده، هو اللي يمشي
+        return user.categoryPurpose[c.category]?.let { c.copy(purpose = it) } ?: c
+    }
+
+    private fun classifyBuiltIn(merchant: String?, text: String, dir: Direction, agentId: String): Classification {
         val hay = ((merchant ?: "") + " " + text).lowercase()
         if (dir == Direction.IN) {
             if (listOf("راتب", "مرتب", "salary", "payroll").any { hit(hay, it) }) {
@@ -105,7 +135,9 @@ object Categorizer {
     }
 
     /** اقتراح الغرض لما المستخدم يختار تصنيف يدوي */
-    fun suggestPurpose(category: String): Purpose? = when (category) {
+    fun suggestPurpose(category: String): Purpose? = purposeOf(category)
+
+    private fun suggestPurposeBuiltIn(category: String): Purpose? = when (category) {
         "بقالة", "فواتير", "إيجار", "مصروف البيت" -> Purpose.HOME
         "وقود", "صيانة عربية" -> Purpose.CAR
         "مطاعم وكافيهات", "ترفيه" -> Purpose.OUTING

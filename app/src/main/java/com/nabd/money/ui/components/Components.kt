@@ -65,12 +65,13 @@ fun GlassCard(
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(24.dp)
+    // كارت هادي: من غير إطار في الفاتح، وإطار خفيف جداً في الداكن
+    val shape = RoundedCornerShape(20.dp)
     Column(
         modifier
             .clip(shape)
             .background(NabdColors.SurfaceHigh)
-            .border(1.dp, NabdColors.Stroke, shape)
+            .then(if (NabdColors.isDark) Modifier.border(1.dp, NabdColors.Stroke, shape) else Modifier)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(padding),
         content = content
@@ -79,11 +80,11 @@ fun GlassCard(
 
 @Composable
 fun ScreenTitle(title: String, subtitle: String? = null, trailing: @Composable RowScope.() -> Unit = {}) {
-    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.headlineSmall)
             if (subtitle != null) {
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = NabdColors.TextDim)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim)
             }
         }
         trailing()
@@ -92,13 +93,13 @@ fun ScreenTitle(title: String, subtitle: String? = null, trailing: @Composable R
 
 @Composable
 fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
         if (action != null && onAction != null) {
             Text(
                 action,
                 style = MaterialTheme.typography.labelLarge,
-                color = NabdColors.Mint,
+                color = NabdColors.TextDim,
                 modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onAction).padding(6.dp)
             )
         }
@@ -121,20 +122,22 @@ fun IconBubble(icon: ImageVector, color: Color, size: Dp = 42.dp) {
 
 @Composable
 fun GradientButton(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null, onClick: () -> Unit) {
+    // الزرار الأساسي: لون واحد سادة
     Row(
         modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(BrandGradient)
+            .height(48.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(NabdColors.Mint)
             .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (icon != null) {
-            Icon(icon, null, tint = Color(0xFF00261B), modifier = Modifier.size(20.dp))
+            Icon(icon, null, tint = NabdColors.OnAccent, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
         }
-        Text(text, color = Color(0xFF00261B), fontWeight = FontWeight.Bold)
+        Text(text, color = NabdColors.OnAccent, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -146,13 +149,14 @@ fun PillButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    // زرار تاني: خلفية رمادي خفيف من غير إطار
     Row(
         modifier
+            .height(48.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(color.copy(alpha = 0.14f))
-            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+            .background(NabdColors.SurfaceTop)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -160,7 +164,7 @@ fun PillButton(
             Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
         }
-        Text(text, color = color, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+        Text(text, color = if (color == NabdColors.Danger) color else NabdColors.Text, style = MaterialTheme.typography.labelLarge, maxLines = 1)
     }
 }
 
@@ -172,14 +176,13 @@ fun SelectChip(
     icon: ImageVector? = null,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(50)
+    val shape = RoundedCornerShape(12.dp)
     Row(
         Modifier
             .clip(shape)
-            .background(if (selected) color.copy(alpha = 0.2f) else NabdColors.Surface)
-            .border(1.dp, if (selected) color else NabdColors.Stroke, shape)
+            .background(if (selected) color.copy(alpha = if (NabdColors.isDark) 0.18f else 0.12f) else NabdColors.SurfaceTop)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (icon != null) {
@@ -189,7 +192,8 @@ fun SelectChip(
         Text(
             text,
             style = MaterialTheme.typography.labelLarge,
-            color = if (selected) color else NabdColors.TextDim
+            color = if (selected) color else NabdColors.Text,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
         )
     }
 }
@@ -210,15 +214,16 @@ fun PurposeChips(selected: Purpose?, includeAll: Boolean, onSelect: (Purpose?) -
 @Composable
 fun TxnRow(t: Txn, accountName: String?, onClick: () -> Unit) {
     val out = t.direction == Direction.OUT
+    val muted = t.excluded || t.reimbursable
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
             .padding(vertical = 10.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconBubble(t.purpose.icon(), t.purpose.color())
+        IconBubble(t.purpose.icon(), t.purpose.color(), 40.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -228,7 +233,11 @@ fun TxnRow(t: Txn, accountName: String?, onClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                "${t.category} • ${accountName ?: "كاش"} • ${Dates.time(t.timestamp)}",
+                listOfNotNull(
+                    t.category.takeIf { t.merchant != null },
+                    accountName ?: "كاش",
+                    Dates.time(t.timestamp),
+                ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = NabdColors.TextDim,
                 maxLines = 1,
@@ -238,19 +247,17 @@ fun TxnRow(t: Txn, accountName: String?, onClick: () -> Unit) {
         Spacer(Modifier.width(8.dp))
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                (if (out) "−" else "+") + Money.fmt(t.amount, t.currency),
-                color = if (out) NabdColors.Text else NabdColors.Mint,
-                fontWeight = FontWeight.Bold,
+                Money.signed(if (out) "−" else "+", t.amount, t.currency),
+                color = when {
+                    muted -> NabdColors.TextDim
+                    out -> NabdColors.Text
+                    else -> NabdColors.Mint
+                },
                 style = MaterialTheme.typography.titleSmall
             )
-            val agent = AgentRegistry.byId(t.agentId)
-            if (agent != null) {
-                Text(
-                    agent.name.removePrefix("وكيل "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = agentTint(agent.color).copy(alpha = 0.9f),
-                    maxLines = 1
-                )
+            when {
+                t.reimbursable -> Text("على الشركة", style = MaterialTheme.typography.labelSmall, color = NabdColors.Cyan)
+                t.excluded -> Text("برا الإجمالي", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint)
             }
         }
     }

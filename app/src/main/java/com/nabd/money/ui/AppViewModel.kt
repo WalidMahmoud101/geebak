@@ -16,6 +16,8 @@ import com.nabd.money.data.TxnFilter
 import com.nabd.money.data.FilterTotals
 import com.nabd.money.data.SavedFilter
 import com.nabd.money.agents.Categorizer
+import com.nabd.money.agents.ArabicNumbers
+import com.nabd.money.data.UserRule
 import com.nabd.money.BuildConfig
 import com.nabd.money.ui.theme.ThemeMode
 import com.nabd.money.util.UpdateState
@@ -70,8 +72,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** كل التصنيفات اللي ظهرت في الفترة (حتى اللي برا القايمة الأساسية) */
     val categoriesInRange = rangeTxns.map { list ->
-        (Categorizer.CATEGORIES + list.map { it.category }).distinct()
-    }.state(Categorizer.CATEGORIES)
+        (Categorizer.allCategories() + list.map { it.category }).distinct()
+    }.state(Categorizer.allCategories())
 
     val savedFilters = settings.savedFilters
 
@@ -163,6 +165,72 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         engine.addManual(amount, direction, purpose, category, merchant, accountId, timestamp, note, reimbursable)
     }
 
+    // ---------- تصنيفاتك وقواعدك ----------
+    val taxonomy = settings.taxonomy
+
+    fun addCategory(name: String, purpose: Purpose?) = viewModelScope.launch(Dispatchers.IO) {
+        val n = name.trim()
+        if (n.isEmpty()) return@launch
+        settings.updateTaxonomy { t ->
+            t.copy(
+                customCategories = if (n in Categorizer.allCategories()) t.customCategories else t.customCategories + n,
+                categoryPurpose = if (purpose != null) t.categoryPurpose + (n to purpose) else t.categoryPurpose,
+            )
+        }
+    }
+
+    fun renameCategory(old: String, new: String) = viewModelScope.launch(Dispatchers.IO) {
+        val n = new.trim()
+        if (n.isEmpty() || n == old) return@launch
+        settings.updateTaxonomy { t ->
+            t.copy(
+                customCategories = t.customCategories.map { if (it == old) n else it },
+                categoryPurpose = t.categoryPurpose.mapKeys { (k, _) -> if (k == old) n else k },
+                rules = t.rules.map { if (it.category == old) it.copy(category = n) else it },
+            )
+        }
+        dao.renameCategory(old, n)
+    }
+
+    /** بيمسح تصنيف من عندك: عملياته بترجع "أخرى" */
+    fun deleteCategory(name: String) = viewModelScope.launch(Dispatchers.IO) {
+        settings.updateTaxonomy { t ->
+            t.copy(
+                customCategories = t.customCategories - name,
+                categoryPurpose = t.categoryPurpose - name,
+                rules = t.rules.filterNot { it.category == name },
+            )
+        }
+        dao.renameCategory(name, "أخرى")
+    }
+
+    /** الغرض الثابت للتصنيف: بيتطبق على القديم والجديد */
+    fun setCategoryPurpose(category: String, purpose: Purpose) = viewModelScope.launch(Dispatchers.IO) {
+        settings.updateTaxonomy { it.copy(categoryPurpose = it.categoryPurpose + (category to purpose)) }
+        dao.setPurposeForCategory(category, purpose.name)
+    }
+
+    /** قاعدة جديدة: بتتطبق على كل العمليات اللي فاتت ولوحدها على الجاية */
+    fun addRule(keyword: String, category: String, purpose: Purpose?) = viewModelScope.launch(Dispatchers.IO) {
+        val k = keyword.trim()
+        if (k.isEmpty()) return@launch
+        settings.updateTaxonomy { t ->
+            t.copy(
+                rules = t.rules.filterNot { ArabicNumbers.norm(it.keyword) == ArabicNumbers.norm(k) } + UserRule(k, category, purpose),
+                customCategories = if (category in Categorizer.allCategories()) t.customCategories else t.customCategories + category,
+            )
+        }
+        val p = purpose ?: Categorizer.purposeOf(category) ?: Purpose.OTHER
+        val nk = ArabicNumbers.norm(k)
+        dao.allTxnsOnce()
+            .filter { t -> !t.excluded && ArabicNumbers.norm(listOfNotNull(t.merchant, t.rawText, t.note).joinToString(" ")).contains(nk) }
+            .forEach { t -> dao.updateTxn(t.copy(category = category, purpose = if (t.reimbursable) Purpose.WORK else p)) }
+    }
+
+    fun deleteRule(r: UserRule) = viewModelScope.launch(Dispatchers.IO) {
+        settings.updateTaxonomy { it.copy(rules = it.rules - r) }
+    }
+
     // ---------- الإدخال بالصوت ----------
     fun saveDrafts(drafts: List<com.nabd.money.agents.Draft>) = viewModelScope.launch(Dispatchers.IO) {
         drafts.forEach { d ->
@@ -242,8 +310,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val salary = settings.salary
 
-    fun setSalary(payer: String, fixedDay: Int) =
-        viewModelScope.launch(Dispatchers.IO) { engine.configureSalary(payer, fixedDay) }
+    fun setSalary(payer: String, fixedDay: Int, amount: Double, exactOnly: Boolean) =
+        viewModelScope.launch(Dispatchers.IO) { engine.configureSalary(payer, fixedDay, amount, exactOnly) }
 
     /**
      * تسجيل تلقائي من غير ما تلمس حاجة: أول مرة فحص كامل لآخر 4 شهور،

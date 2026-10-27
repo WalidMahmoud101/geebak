@@ -1,6 +1,9 @@
 package com.nabd.money.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,22 +11,25 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.FilterAltOff
 import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nabd.money.data.Direction
 import com.nabd.money.data.FilterTotals
+import com.nabd.money.data.Period
 import com.nabd.money.data.Purpose
 import com.nabd.money.data.Txn
 import com.nabd.money.data.TxnFilter
@@ -32,23 +38,18 @@ import com.nabd.money.ui.AppViewModel
 import com.nabd.money.ui.components.EmptyState
 import com.nabd.money.ui.components.FilterBar
 import com.nabd.money.ui.components.GlassCard
-import com.nabd.money.ui.components.GradientButton
-import com.nabd.money.ui.components.IconBubble
-import com.nabd.money.ui.components.PillButton
 import com.nabd.money.ui.components.ProgressBar
 import com.nabd.money.ui.components.ScreenPadding
 import com.nabd.money.ui.components.ScreenTitle
-import com.nabd.money.ui.components.StatColumn
 import com.nabd.money.ui.components.TxnRow
 import com.nabd.money.ui.components.color
-import com.nabd.money.ui.components.icon
 import com.nabd.money.ui.theme.NabdColors
 import com.nabd.money.util.Dates
 import com.nabd.money.util.Money
 
 /**
- * المصاريف: كل العمليات حسب الفلتر.
- * لما تختار غرض واحد (البيت مثلاً) بيبقى "صندوق": اتضاف كام، اتصرف كام، والباقي.
+ * العمليات: كل حاجة دخلت وخرجت حسب الفلتر.
+ * لما تختار غرض واحد (البيت مثلاً) الملخص بيبقى "صندوق": اتضاف كام، اتصرف كام، والباقي.
  */
 @Composable
 fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit: (Txn) -> Unit) {
@@ -66,7 +67,13 @@ fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit:
     val single = filter.purposes.singleOrNull()
 
     LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { ScreenTitle("المصاريف", "كل جنيه رايح فين وإمتى") }
+        item {
+            ScreenTitle("العمليات", "${totals.count} عملية") {
+                IconButton(onClick = { onAdd(Direction.OUT, single) }) {
+                    Icon(Icons.Rounded.Add, "عملية جديدة", tint = NabdColors.Mint)
+                }
+            }
+        }
         item {
             FilterBar(
                 filter, accounts, categories, saved,
@@ -74,57 +81,45 @@ fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit:
             )
         }
         item {
-            val c = single?.color() ?: NabdColors.Mint
             GlassCard(Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconBubble(single?.icon() ?: Icons.Rounded.ReceiptLong, c, 38.dp)
-                    Spacer(Modifier.width(10.dp))
+                if (single != null || filter.companyOnly) {
                     Text(
-                        when {
-                            filter.companyOnly -> "مصاريف الشركة"
-                            single != null -> "صندوق ${single.ar}"
-                            else -> "الإجمالي"
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f)
+                        if (filter.companyOnly) "مصاريف الشركة" else "صندوق ${single!!.ar}",
+                        style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim,
+                        modifier = Modifier.padding(bottom = 10.dp)
                     )
-                    Text("${totals.count} عملية", style = MaterialTheme.typography.labelMedium, color = NabdColors.TextDim)
                 }
-                Spacer(Modifier.height(14.dp))
-                Row {
-                    StatColumn("اتضاف", Money.fmt(totals.income, decimals = false), NabdColors.Mint, Modifier.weight(1f))
-                    StatColumn("اتصرف", Money.fmt(totals.spent, decimals = false), NabdColors.Pink, Modifier.weight(1f))
-                    StatColumn(
-                        "الباقي", Money.fmt(totals.net, decimals = false),
-                        if (totals.net >= 0) NabdColors.Text else NabdColors.Danger, Modifier.weight(1f)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SummaryCell(if (single != null) "اتضاف" else "الداخل", Money.signed("+", totals.income, decimals = false), NabdColors.Mint, Modifier.weight(1f))
+                    CellDivider()
+                    SummaryCell(if (single != null) "اتصرف" else "الخارج", Money.signed("−", totals.spent, decimals = false), NabdColors.Text, Modifier.weight(1f))
+                    CellDivider()
+                    SummaryCell(
+                        if (single != null) "الباقي" else "الصافي",
+                        Money.signed(if (totals.net >= 0) "+" else "−", kotlin.math.abs(totals.net), decimals = false),
+                        if (totals.net >= 0) NabdColors.Mint else NabdColors.Danger, Modifier.weight(1f)
                     )
                 }
                 ComparisonLine(totals, prev, filter)
                 if (totals.company > 0 && !filter.companyOnly) {
                     Text(
-                        "+ ${Money.fmt(totals.company, decimals = false)} مصاريف شركة لوحدها",
-                        style = MaterialTheme.typography.labelSmall, color = NabdColors.Cyan,
-                        modifier = Modifier.padding(top = 6.dp)
+                        "مصاريف شركة ${Money.fmt(totals.company, decimals = false)} محسوبة لوحدها",
+                        style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                     )
                 }
                 val limit = single?.let { budgets[it.name] }
-                if (limit != null && limit > 0 && filter.isMonthly) {
+                if (single != null && limit != null && limit > 0 && filter.isMonthly) {
                     Spacer(Modifier.height(12.dp))
                     val frac = (totals.spent / limit).toFloat()
-                    ProgressBar(frac, if (frac >= 1f) NabdColors.Danger else if (frac >= 0.8f) NabdColors.Gold else c)
+                    ProgressBar(frac, if (frac >= 1f) NabdColors.Danger else if (frac >= 0.8f) NabdColors.Gold else single.color())
                     Text(
                         "الميزانية ${Money.fmt(limit, decimals = false)} • ${(frac * 100).toInt()}%",
                         style = MaterialTheme.typography.labelSmall,
                         color = NabdColors.TextDim,
                         modifier = Modifier.padding(top = 4.dp)
                     )
-                }
-                Spacer(Modifier.height(14.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    GradientButton("مصروف", Modifier.weight(1f), Icons.Rounded.Add) { onAdd(Direction.OUT, single) }
-                    PillButton("إضافة مبلغ", Icons.Rounded.ArrowDownward, NabdColors.Mint, Modifier.weight(1f)) {
-                        onAdd(Direction.IN, single)
-                    }
                 }
             }
         }
@@ -133,41 +128,63 @@ fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit:
                 EmptyState(
                     if (filter.activeCount > 0) Icons.Rounded.FilterAltOff else Icons.Rounded.ReceiptLong,
                     if (filter.activeCount > 0) "مافيش نتايج للفلتر ده" else "مافيش حركة في الفترة دي",
-                    if (filter.activeCount > 0) "جرب تشيل فلتر أو توسع الفترة." else "سجّل مصروف أو استنى الوكلاء يلقطوا عملياتك."
+                    if (filter.activeCount > 0) "جرب تشيل فلتر أو توسع الفترة." else "سجّل مصروف أو استنى العمليات تتسجل لوحدها."
                 )
             }
         }
         byDay.forEach { (_, dayTxns) ->
-            item(key = "h" + dayTxns.first().timestamp) {
+            item(key = "d" + dayTxns.first().timestamp) {
                 val dayOut = dayTxns.filter { it.direction == Direction.OUT && (filter.companyOnly || it.countsInTotals()) }
                     .sumOf { vm.txnEgp(it) }
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(Dates.dayHeader(dayTxns.first().timestamp), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
-                    if (dayOut > 0) {
-                        Text("−" + Money.fmt(dayOut, decimals = false), style = MaterialTheme.typography.labelMedium, color = NabdColors.TextDim)
+                Column {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            Dates.dayHeader(dayTxns.first().timestamp), style = MaterialTheme.typography.labelLarge,
+                            color = NabdColors.TextDim, modifier = Modifier.weight(1f)
+                        )
+                        if (dayOut > 0) {
+                            Text(Money.signed("−", dayOut, decimals = false), style = MaterialTheme.typography.labelMedium, color = NabdColors.TextDim)
+                        }
+                    }
+                    GlassCard(Modifier.fillMaxWidth(), padding = 8.dp) {
+                        dayTxns.forEach { t -> TxnRow(t, names[t.accountId]) { onEdit(t) } }
                     }
                 }
             }
-            items(dayTxns, key = { "t" + it.id }) { t -> TxnRow(t, names[t.accountId]) { onEdit(t) } }
         }
     }
 }
 
-/** "أقل بـ 12% من الفترة اللي قبلها" */
+@Composable
+fun SummaryCell(label: String, value: String, color: Color, modifier: Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = NabdColors.TextDim)
+        Spacer(Modifier.height(2.dp))
+        Text(value, style = MaterialTheme.typography.titleMedium, color = color, maxLines = 1)
+    }
+}
+
+@Composable
+fun CellDivider() {
+    Box(Modifier.width(1.dp).height(30.dp).background(NabdColors.Stroke))
+}
+
+/** "↑ 12% عن الفترة اللي قبلها" */
 @Composable
 fun ComparisonLine(now: FilterTotals, prev: FilterTotals?, filter: TxnFilter) {
-    if (prev == null || prev.spent <= 0 || filter.period == com.nabd.money.data.Period.ALL) return
+    if (prev == null || prev.spent <= 0 || filter.period == Period.ALL) return
     val diff = (now.spent - prev.spent) / prev.spent * 100
     val up = diff > 0
     val text = when {
-        kotlin.math.abs(diff) < 1 -> "زي الفترة اللي قبلها تقريباً"
-        up -> "↑ ${diff.toInt()}% عن الفترة اللي قبلها"
-        else -> "↓ ${(-diff).toInt()}% عن الفترة اللي قبلها"
+        kotlin.math.abs(diff) < 1 -> "المصروف زي الفترة اللي قبلها تقريباً"
+        up -> "المصروف ↑ ${diff.toInt()}% عن الفترة اللي قبلها"
+        else -> "المصروف ↓ ${(-diff).toInt()}% عن الفترة اللي قبلها"
     }
     Text(
         text,
         style = MaterialTheme.typography.labelSmall,
         color = if (up) NabdColors.Gold else NabdColors.Mint,
-        modifier = Modifier.padding(top = 8.dp)
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
     )
 }

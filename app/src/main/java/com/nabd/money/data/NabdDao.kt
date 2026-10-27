@@ -34,6 +34,15 @@ interface NabdDao {
     @Delete
     suspend fun deleteAccount(a: Account)
 
+    @Query("SELECT * FROM transactions")
+    suspend fun allTxnsOnce(): List<Txn>
+
+    @Query("UPDATE transactions SET category = :to WHERE category = :from")
+    suspend fun renameCategory(from: String, to: String)
+
+    @Query("UPDATE transactions SET purpose = :purpose WHERE category = :category AND excluded = 0 AND reimbursable = 0")
+    suspend fun setPurposeForCategory(category: String, purpose: String)
+
     /** دمج حساب متكرر في حساب تاني */
     @Query("UPDATE transactions SET accountId = :to WHERE accountId = :from")
     suspend fun moveTxns(from: Long, to: Long)

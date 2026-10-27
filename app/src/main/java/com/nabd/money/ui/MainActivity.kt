@@ -22,6 +22,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -210,12 +212,15 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
         }
     }
 
+    // الرجوع من أي شاشة بيودي للرئيسية بدل ما يقفل التطبيق
+    androidx.activity.compose.BackHandler(enabled = tab != 0) { tab = 0 }
+
     val onAdd: (Direction, Purpose?) -> Unit = { d, p -> addRequest = AddRequest(d, p) }
     val onEdit: (Txn) -> Unit = { editing = it }
 
     Scaffold(
         containerColor = NabdColors.Bg,
-        bottomBar = { BottomBar(if (tab == COMPANY_TAB) 1 else tab, onMic = startVoice) { tab = it } },
+        bottomBar = { BottomBar(if (tab == COMPANY_TAB || tab == 3) 0 else tab, onMic = startVoice) { tab = it } },
     ) { pad ->
         Box(Modifier.fillMaxSize().padding(top = pad.calculateTopPadding())) {
             when (tab) {
@@ -241,6 +246,7 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
             accounts = accounts,
             onDismiss = { addRequest = null },
             initialCompany = req.company,
+            onNewCategory = { name, p -> vm.addCategory(name, p) },
             onSave = { amount, dir, purpose, category, merchant, accountId, ts, note, company ->
                 vm.addManual(amount, dir, purpose, category, merchant, accountId, ts, note, company)
                 addRequest = null
@@ -272,6 +278,7 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
             accounts = accounts,
             onDismiss = { editDraft = null },
             draft = d,
+            onNewCategory = { name, p -> vm.addCategory(name, p) },
             onSave = { amount, dir, purpose, category, merchant, accountId, ts, note, company ->
                 vm.addManual(amount, dir, purpose, category, merchant, accountId, ts, note, company)
                 editDraft = null
@@ -285,60 +292,54 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
             onDismiss = { editing = null },
             onSave = { vm.updateTxn(it); editing = null },
             onDelete = { vm.deleteTxn(it); editing = null },
+            onNewCategory = { name, p -> vm.addCategory(name, p) },
+            onRule = { k, c, p -> vm.addRule(k, c, p) },
         )
     }
 }
 
-private data class NavItem(val label: String, val icon: ImageVector)
+private data class NavItem(val label: String, val icon: ImageVector, val tab: Int)
 
+// الوكلاء بقوا من أيقونة في الرئيسية، علشان الشريط يبقى أبسط
 private val navItems = listOf(
-    NavItem("الرئيسية", Icons.Rounded.Home),
-    NavItem("المصاريف", Icons.Rounded.ReceiptLong),
-    NavItem("الحسابات", Icons.Rounded.AccountBalanceWallet),
-    NavItem("الوكلاء", Icons.Rounded.SmartToy),
-    NavItem("التقارير", Icons.Rounded.PieChart),
+    NavItem("الرئيسية", Icons.Rounded.Home, 0),
+    NavItem("العمليات", Icons.Rounded.ReceiptLong, 1),
+    NavItem("التقارير", Icons.Rounded.PieChart, 4),
+    NavItem("الحسابات", Icons.Rounded.AccountBalanceWallet, 2),
 )
 
 @Composable
 private fun BottomBar(selected: Int, onMic: () -> Unit, onSelect: (Int) -> Unit) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .background(NabdColors.Bg)
-            .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
+    Column(Modifier.fillMaxWidth().background(NabdColors.Surface)) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(NabdColors.Stroke))
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(26.dp))
-                .background(NabdColors.Surface)
-                .border(1.dp, NabdColors.Stroke, RoundedCornerShape(26.dp))
-                .padding(6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .navigationBarsPadding()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             navItems.forEachIndexed { i, item ->
                 if (i == 2) MicButton(onMic)
-                val active = i == selected
+                val active = item.tab == selected
                 Column(
                     Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (active) NabdColors.Mint.copy(alpha = 0.14f) else NabdColors.Surface)
-                        .clickable { onSelect(i) }
-                        .padding(vertical = 8.dp),
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onSelect(item.tab) }
+                        .padding(vertical = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Icon(
                         item.icon, item.label,
-                        tint = if (active) NabdColors.Mint else NabdColors.TextDim,
-                        modifier = Modifier.size(22.dp)
+                        tint = if (active) NabdColors.Mint else NabdColors.TextFaint,
+                        modifier = Modifier.size(24.dp)
                     )
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         item.label,
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (active) NabdColors.Mint else NabdColors.TextDim,
+                        color = if (active) NabdColors.Text else NabdColors.TextFaint,
                         maxLines = 1
                     )
                 }
@@ -352,13 +353,13 @@ private fun BottomBar(selected: Int, onMic: () -> Unit, onSelect: (Int) -> Unit)
 private fun MicButton(onClick: () -> Unit) {
     Box(
         Modifier
-            .padding(horizontal = 4.dp)
-            .size(54.dp)
+            .padding(horizontal = 6.dp)
+            .size(52.dp)
             .clip(CircleShape)
-            .background(BrandGradient)
+            .background(NabdColors.Mint)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(Icons.Rounded.Mic, "سجّل بصوتك", tint = androidx.compose.ui.graphics.Color(0xFF00261B), modifier = Modifier.size(28.dp))
+        Icon(Icons.Rounded.Mic, "سجّل بصوتك", tint = NabdColors.OnAccent, modifier = Modifier.size(26.dp))
     }
 }

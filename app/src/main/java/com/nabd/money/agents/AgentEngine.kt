@@ -65,17 +65,19 @@ class AgentEngine(
         }
 
         val salaryCfg = settings.salary.value
-        val isSalary = dir == Direction.IN && settings.isEnabled(SalaryWatch.ID) &&
+        val fromPayer = dir == Direction.IN && settings.isEnabled(SalaryWatch.ID) &&
             SalaryWatch.matchesPayer(salaryCfg.payer, p.merchant, m.title + " " + m.text)
         // تحويل من الشركة بنفس إجمالي مصاريف الشركة المستحقة = الشركة رجعتلك فلوسك
-        val pendingCompany = if (isSalary) dao.companyPendingOnce() else emptyList()
+        val pendingCompany = if (fromPayer) dao.companyPendingOnce() else emptyList()
         val isRefund = pendingCompany.isNotEmpty() &&
             abs(pendingCompany.sumOf { settings.toEgp(it.amount, it.currency) } - settings.toEgp(amount, p.currency)) < 1.0
+        // المرتب: من الشركة وبالمبلغ اللي انت محدده (أي حاجة أقل منه = دخل عادي)
+        val isSalary = fromPayer && !isRefund && SalaryWatch.amountQualifies(salaryCfg, settings.toEgp(amount, p.currency))
         val cls = when {
             isRefund -> Classification(REFUND_CATEGORY, Purpose.WORK)
             isSalary -> Classification(SALARY_CATEGORY, Purpose.WORK)
-            settings.isEnabled(Categorizer.ID) -> Categorizer.classify(p.merchant, m.text, dir, agent.id)
-            else -> Classification(if (dir == Direction.IN) "دخل" else "أخرى", Purpose.OTHER)
+            // قواعدك بتمشي دايماً، والتصنيف التلقائي لو وكيل التصنيف شغال
+            else -> Categorizer.classify(p.merchant, m.text, dir, agent.id, builtIn = settings.isEnabled(Categorizer.ID))
         }
 
         val txn = Txn(
@@ -182,16 +184,22 @@ class AgentEngine(
     }
 
     /** المستخدم حدد اسم الشركة: نرجع نعلم العمليات القديمة كمرتب ونتعلم الميعاد */
-    suspend fun configureSalary(payer: String, fixedDay: Int) = mutex.withLock {
-        settings.updateSalary { it.copy(payer = payer.trim(), fixedDay = fixedDay) }
-        if (payer.isNotBlank()) {
-            dao.betweenOnce(now() - 400L * 86_400_000, now())
-                .filter {
-                    it.direction == Direction.IN && it.category != SALARY_CATEGORY &&
-                        SalaryWatch.matchesPayer(payer, it.merchant, it.rawText ?: it.merchant.orEmpty())
+    suspend fun configureSalary(payer: String, fixedDay: Int, amount: Double = 0.0, exactOnly: Boolean = false) = mutex.withLock {
+        settings.updateSalary { it.copy(payer = payer.trim(), fixedDay = fixedDay, amount = amount, exactOnly = exactOnly) }
+        val cfg = settings.salary.value
+        // نراجع كل التحويلات اللي فاتت بالشروط الجديدة: اللي ينطبق عليه يبقى مرتب، واللي مايطابقش يرجع دخل
+        dao.betweenOnce(now() - 400L * 86_400_000, now())
+            .filter { it.direction == Direction.IN && it.category != REFUND_CATEGORY }
+            .forEach { t ->
+                val match = payer.isNotBlank() &&
+                    SalaryWatch.matchesPayer(payer, t.merchant, t.rawText ?: t.merchant.orEmpty()) &&
+                    SalaryWatch.amountQualifies(cfg, settings.toEgp(t.amount, t.currency))
+                when {
+                    match && t.category != SALARY_CATEGORY -> dao.updateTxn(t.copy(category = SALARY_CATEGORY, purpose = Purpose.WORK))
+                    !match && t.category == SALARY_CATEGORY && t.source != TxnSource.MANUAL ->
+                        dao.updateTxn(t.copy(category = "دخل", purpose = Purpose.OTHER))
                 }
-                .forEach { dao.updateTxn(it.copy(category = SALARY_CATEGORY, purpose = Purpose.WORK)) }
-        }
+            }
         learnSalary()
         salaryWatch(notify = false)
     }

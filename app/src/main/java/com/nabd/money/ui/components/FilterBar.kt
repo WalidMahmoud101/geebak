@@ -95,115 +95,211 @@ fun FilterBar(
     onDeleteSaved: (SavedFilter) -> Unit,
 ) {
     var panel by remember { mutableStateOf<Panel?>(null) }
-    var searching by remember { mutableStateOf(filter.query.isNotBlank()) }
+    var sheet by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        // الفترة + أسهم قبل/بعد
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(NabdColors.Surface)
-                .border(1.dp, NabdColors.Stroke, RoundedCornerShape(16.dp)),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = { onChange(filter.shift(-1)) }, enabled = filter.period != Period.ALL) {
-                Icon(Icons.Rounded.ChevronRight, "اللي قبلها", tint = NabdColors.TextDim)
-            }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // الفترة + أسهم قبل/بعد
             Row(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { panel = Panel.PERIOD }
-                    .padding(vertical = 10.dp),
-                horizontalArrangement = Arrangement.Center,
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(NabdColors.SurfaceHigh),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Rounded.CalendarMonth, null, tint = NabdColors.Mint, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(filter.periodLabel(), style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                IconButton(onClick = { onChange(filter.shift(-1)) }, enabled = filter.period != Period.ALL) {
+                    Icon(Icons.Rounded.ChevronRight, "اللي قبلها", tint = NabdColors.TextDim)
+                }
+                Text(
+                    filter.periodLabel(),
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { panel = Panel.PERIOD }
+                        .padding(vertical = 10.dp)
+                )
+                val canNext = filter.shift(1) != filter
+                IconButton(onClick = { onChange(filter.shift(1)) }, enabled = canNext) {
+                    Icon(Icons.Rounded.ChevronLeft, "اللي بعدها", tint = if (canNext) NabdColors.TextDim else NabdColors.Stroke)
+                }
             }
-            val canNext = filter.shift(1) != filter
-            IconButton(onClick = { onChange(filter.shift(1)) }, enabled = canNext) {
-                Icon(Icons.Rounded.ChevronLeft, "اللي بعدها", tint = if (canNext) NabdColors.TextDim else NabdColors.Stroke)
+            // زرار فلترة واحد
+            val n = filter.activeCount
+            Row(
+                Modifier
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (n > 0) NabdColors.Mint.copy(alpha = if (NabdColors.isDark) 0.18f else 0.12f) else NabdColors.SurfaceHigh)
+                    .clickable { sheet = true }
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Rounded.Tune, null, tint = if (n > 0) NabdColors.Mint else NabdColors.Text, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    if (n > 0) "فلترة ($n)" else "فلترة",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (n > 0) NabdColors.Mint else NabdColors.Text
+                )
             }
         }
-
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            FilterPill(
-                when (filter.direction) {
-                    Direction.OUT -> "مصروف بس"
-                    Direction.IN -> "دخل بس"
-                    null -> "مصروف ودخل"
-                },
-                Icons.Rounded.SwapVert, filter.direction != null
+        // الفلاتر الشغالة بس، وتتشال بلمسة
+        val chips = activeChips(filter, accounts)
+        if (chips.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                onChange(filter.copy(direction = when (filter.direction) {
-                    null -> Direction.OUT
-                    Direction.OUT -> Direction.IN
-                    Direction.IN -> null
-                }))
-            }
-            FilterPill(countLabel("الغرض", filter.purposes.size, filter.purposes.singleOrNull()?.ar), Icons.Rounded.Tune, filter.purposes.isNotEmpty()) { panel = Panel.PURPOSE }
-            FilterPill(countLabel("التصنيف", filter.categories.size, filter.categories.singleOrNull()), Icons.Rounded.Category, filter.categories.isNotEmpty()) { panel = Panel.CATEGORY }
-            FilterPill(
-                countLabel("الحساب", filter.accountIds.size, filter.accountIds.singleOrNull()?.let { id -> if (id == CASH_ACCOUNT_ID) "كاش" else accounts.firstOrNull { it.id == id }?.name }),
-                Icons.Rounded.AccountBalanceWallet, filter.accountIds.isNotEmpty()
-            ) { panel = Panel.ACCOUNT }
-            FilterPill(countLabel("المصدر", filter.sources.size, filter.sources.singleOrNull()?.ar), Icons.Rounded.Inbox, filter.sources.isNotEmpty()) { panel = Panel.SOURCE }
-            FilterPill(amountLabel(filter), Icons.Rounded.Tune, filter.minAmount != null || filter.maxAmount != null) { panel = Panel.AMOUNT }
-            FilterPill("بحث", Icons.Rounded.Search, filter.query.isNotBlank()) { searching = !searching }
-            FilterPill("مصاريف الشركة", Icons.Rounded.BusinessCenter, filter.companyOnly) { onChange(filter.copy(companyOnly = !filter.companyOnly)) }
-            FilterPill("التحويلات الداخلية", Icons.Rounded.VisibilityOff, filter.showExcluded) { onChange(filter.copy(showExcluded = !filter.showExcluded)) }
-            FilterPill(if (saved.isEmpty()) "احفظ الفلتر" else "المحفوظة (${saved.size})", Icons.Rounded.Bookmark, false) { panel = Panel.SAVED }
-            if (filter.activeCount > 0) {
-                FilterPill("مسح (${filter.activeCount})", Icons.Rounded.FilterAltOff, false, NabdColors.Danger) {
-                    searching = false
-                    onChange(filter.clearedFilters())
+                chips.forEach { (label, clear) ->
+                    Row(
+                        Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(NabdColors.SurfaceTop)
+                            .clickable { onChange(clear(filter)) }
+                            .padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                        Spacer(Modifier.width(4.dp))
+                        Icon(Icons.Rounded.Close, "شيل", tint = NabdColors.TextDim, modifier = Modifier.size(14.dp))
+                    }
                 }
             }
         }
-
-        if (searching) {
-            OutlinedTextField(
-                value = filter.query,
-                onValueChange = { onChange(filter.copy(query = it)) },
-                placeholder = { Text("دوّر في الوصف والملاحظات…") },
-                leadingIcon = { Icon(Icons.Rounded.Search, null) },
-                trailingIcon = {
-                    IconButton(onClick = { onChange(filter.copy(query = "")); searching = false }) {
-                        Icon(Icons.Rounded.Close, "قفل")
-                    }
-                },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-            )
-        }
     }
 
+    if (sheet) {
+        FilterSheet(
+            filter, accounts, categories, saved,
+            onDismiss = { sheet = false },
+            onApply = { onChange(it); sheet = false },
+            onOpenSaved = { sheet = false; panel = Panel.SAVED },
+        )
+    }
     when (panel) {
         Panel.PERIOD -> PeriodSheet(filter, onDismiss = { panel = null }) { onChange(it); panel = null }
-        Panel.PURPOSE -> ChoiceSheet(
-            "الغرض", Purpose.entries.map { it.ar to it }, filter.purposes,
-            icon = { it.icon() }, color = { it.color() }, onDismiss = { panel = null }
-        ) { onChange(filter.copy(purposes = it)) }
-        Panel.CATEGORY -> ChoiceSheet(
-            "التصنيف", categories.map { it to it }, filter.categories, onDismiss = { panel = null }
-        ) { onChange(filter.copy(categories = it)) }
-        Panel.ACCOUNT -> ChoiceSheet(
-            "الحساب", listOf("كاش / بدون حساب" to CASH_ACCOUNT_ID) + accounts.map { it.name to it.id }, filter.accountIds,
-            onDismiss = { panel = null }
-        ) { onChange(filter.copy(accountIds = it)) }
-        Panel.SOURCE -> ChoiceSheet(
-            "المصدر", TxnSource.entries.map { it.ar to it }, filter.sources, onDismiss = { panel = null }
-        ) { onChange(filter.copy(sources = it)) }
-        Panel.AMOUNT -> AmountSheet(filter, onDismiss = { panel = null }) { onChange(it); panel = null }
         Panel.SAVED -> SavedSheet(saved, filter, onDismiss = { panel = null }, onApply = { onChange(it.filter); panel = null }, onSave = onSave, onDelete = onDeleteSaved)
-        null -> Unit
+        else -> Unit
+    }
+}
+
+private fun activeChips(f: TxnFilter, accounts: List<Account>): List<Pair<String, (TxnFilter) -> TxnFilter>> = buildList {
+    f.direction?.let { add((if (it == Direction.OUT) "مصروف بس" else "دخل بس") to { x: TxnFilter -> x.copy(direction = null) }) }
+    f.purposes.forEach { p -> add(p.ar to { x: TxnFilter -> x.copy(purposes = x.purposes - p) }) }
+    f.categories.forEach { c -> add(c to { x: TxnFilter -> x.copy(categories = x.categories - c) }) }
+    f.accountIds.forEach { id ->
+        val name = if (id == CASH_ACCOUNT_ID) "كاش" else accounts.firstOrNull { it.id == id }?.name ?: "حساب"
+        add(name to { x: TxnFilter -> x.copy(accountIds = x.accountIds - id) })
+    }
+    f.sources.forEach { s -> add(s.ar to { x: TxnFilter -> x.copy(sources = x.sources - s) }) }
+    if (f.minAmount != null || f.maxAmount != null) add(amountLabel(f) to { x: TxnFilter -> x.copy(minAmount = null, maxAmount = null) })
+    if (f.query.isNotBlank()) add("«${f.query}»" to { x: TxnFilter -> x.copy(query = "") })
+    if (f.companyOnly) add("مصاريف الشركة" to { x: TxnFilter -> x.copy(companyOnly = false) })
+    if (f.showExcluded) add("+ التحويلات الداخلية" to { x: TxnFilter -> x.copy(showExcluded = false) })
+}
+
+/** كل الفلاتر في شاشة واحدة */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun FilterSheet(
+    filter: TxnFilter,
+    accounts: List<Account>,
+    categories: List<String>,
+    saved: List<SavedFilter>,
+    onDismiss: () -> Unit,
+    onApply: (TxnFilter) -> Unit,
+    onOpenSaved: () -> Unit,
+) {
+    var f by remember { mutableStateOf(filter) }
+    fun str(v: Double?) = v?.toBigDecimal()?.stripTrailingZeros()?.toPlainString().orEmpty()
+    var min by remember { mutableStateOf(str(filter.minAmount)) }
+    var max by remember { mutableStateOf(str(filter.maxAmount)) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = NabdColors.Surface,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("فلترة", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                TextButton(onClick = { f = f.clearedFilters(); min = ""; max = "" }) { Text("مسح الكل", color = NabdColors.TextDim) }
+            }
+            OutlinedTextField(
+                value = f.query, onValueChange = { f = f.copy(query = it) },
+                placeholder = { Text("بحث في الوصف والملاحظات") },
+                leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
+            )
+            Section("النوع") {
+                SelectChip("الكل", f.direction == null) { f = f.copy(direction = null) }
+                SelectChip("مصروف", f.direction == Direction.OUT, NabdColors.Pink) { f = f.copy(direction = Direction.OUT) }
+                SelectChip("دخل", f.direction == Direction.IN) { f = f.copy(direction = Direction.IN) }
+            }
+            Section("الغرض") {
+                Purpose.entries.forEach { p ->
+                    SelectChip(p.ar, p in f.purposes, p.color(), p.icon()) {
+                        f = f.copy(purposes = if (p in f.purposes) f.purposes - p else f.purposes + p)
+                    }
+                }
+            }
+            Section("التصنيف") {
+                categories.forEach { c ->
+                    SelectChip(c, c in f.categories) { f = f.copy(categories = if (c in f.categories) f.categories - c else f.categories + c) }
+                }
+            }
+            Section("الحساب") {
+                (listOf(CASH_ACCOUNT_ID to "كاش") + accounts.map { it.id to it.name }).forEach { (id, name) ->
+                    SelectChip(name, id in f.accountIds) {
+                        f = f.copy(accountIds = if (id in f.accountIds) f.accountIds - id else f.accountIds + id)
+                    }
+                }
+            }
+            Section("المصدر") {
+                TxnSource.entries.forEach { src ->
+                    SelectChip(src.ar, src in f.sources) { f = f.copy(sources = if (src in f.sources) f.sources - src else f.sources + src) }
+                }
+            }
+            Text("المبلغ بالجنيه", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    min, { min = it }, label = { Text("من") }, singleLine = true, modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), shape = RoundedCornerShape(14.dp)
+                )
+                OutlinedTextField(
+                    max, { max = it }, label = { Text("لحد") }, singleLine = true, modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), shape = RoundedCornerShape(14.dp)
+                )
+            }
+            Section("كمان") {
+                SelectChip("مصاريف الشركة بس", f.companyOnly, NabdColors.Cyan, Icons.Rounded.BusinessCenter) { f = f.copy(companyOnly = !f.companyOnly) }
+                SelectChip("وريني التحويلات الداخلية", f.showExcluded, NabdColors.TextDim, Icons.Rounded.VisibilityOff) { f = f.copy(showExcluded = !f.showExcluded) }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                GradientButton("تطبيق", Modifier.weight(1f)) {
+                    onApply(f.copy(minAmount = Money.parseInput(min), maxAmount = Money.parseInput(max)))
+                }
+                PillButton(if (saved.isEmpty()) "احفظه" else "المحفوظة", Icons.Rounded.Bookmark, NabdColors.Mint, Modifier.weight(0.7f)) {
+                    onApply(f.copy(minAmount = Money.parseInput(min), maxAmount = Money.parseInput(max)))
+                    onOpenSaved()
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun Section(title: String, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
     }
 }
 
@@ -218,62 +314,6 @@ private fun amountLabel(f: TxnFilter): String = when {
     f.minAmount != null -> "أكتر من ${Money.compact(f.minAmount)}"
     f.maxAmount != null -> "أقل من ${Money.compact(f.maxAmount)}"
     else -> "المبلغ"
-}
-
-@Composable
-private fun FilterPill(text: String, icon: ImageVector, active: Boolean, tint: Color = NabdColors.Mint, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(50)
-    Row(
-        Modifier
-            .clip(shape)
-            .background(if (active) tint.copy(alpha = 0.14f) else NabdColors.Surface)
-            .border(1.dp, if (active) tint.copy(alpha = 0.7f) else NabdColors.Stroke, shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, null, tint = if (active) tint else NabdColors.TextDim, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(text, style = MaterialTheme.typography.labelLarge, color = if (active) tint else NabdColors.Text, maxLines = 1)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
-@Composable
-private fun <T> ChoiceSheet(
-    title: String,
-    options: List<Pair<String, T>>,
-    selected: Set<T>,
-    icon: ((T) -> ImageVector)? = null,
-    color: ((T) -> Color)? = null,
-    onDismiss: () -> Unit,
-    onChange: (Set<T>) -> Unit,
-) {
-    var current by remember { mutableStateOf(selected) }
-    ModalBottomSheet(
-        onDismissRequest = { onChange(current); onDismiss() },
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = NabdColors.Surface,
-    ) {
-        Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                if (current.isNotEmpty()) TextButton(onClick = { current = emptySet() }) { Text("الكل") }
-            }
-            Text("اختار واحد أو أكتر", style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                options.forEach { (label, v) ->
-                    SelectChip(label, v in current, color?.invoke(v) ?: NabdColors.Mint, icon?.invoke(v)) {
-                        current = if (v in current) current - v else current + v
-                    }
-                }
-            }
-            GradientButton("تطبيق", Modifier.fillMaxWidth()) { onChange(current); onDismiss() }
-        }
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -405,37 +445,6 @@ private fun BigOption(text: String, icon: ImageVector, modifier: Modifier, onCli
 @Composable
 private fun Label(text: String) {
     Text(text, style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AmountSheet(filter: TxnFilter, onDismiss: () -> Unit, onApply: (TxnFilter) -> Unit) {
-    fun str(v: Double?) = v?.toBigDecimal()?.stripTrailingZeros()?.toPlainString().orEmpty()
-    var min by remember { mutableStateOf(str(filter.minAmount)) }
-    var max by remember { mutableStateOf(str(filter.maxAmount)) }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = NabdColors.Surface) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("المبلغ (بالجنيه)", style = MaterialTheme.typography.titleLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    min, { min = it }, label = { Text("من") }, singleLine = true, modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), shape = RoundedCornerShape(14.dp)
-                )
-                OutlinedTextField(
-                    max, { max = it }, label = { Text("لحد") }, singleLine = true, modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), shape = RoundedCornerShape(14.dp)
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(100.0, 500.0, 1000.0, 5000.0).forEach { v ->
-                    SelectChip("أكتر من ${Money.compact(v)}", false) { min = str(v); max = "" }
-                }
-            }
-            GradientButton("تطبيق", Modifier.fillMaxWidth()) {
-                onApply(filter.copy(minAmount = Money.parseInput(min), maxAmount = Money.parseInput(max)))
-            }
-        }
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

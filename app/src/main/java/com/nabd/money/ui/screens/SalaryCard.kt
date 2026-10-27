@@ -1,6 +1,12 @@
 package com.nabd.money.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.Checkbox
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -88,39 +94,67 @@ fun SalaryCard(cfg: SalaryConfig, onClick: () -> Unit) {
 }
 
 @Composable
-fun SalaryDialog(cfg: SalaryConfig, onDismiss: () -> Unit, onSave: (String, Int) -> Unit) {
+fun SalaryDialog(cfg: SalaryConfig, onDismiss: () -> Unit, onSave: (String, Int, Double, Boolean) -> Unit) {
     var payer by remember { mutableStateOf(cfg.payer) }
     var day by remember { mutableStateOf(if (cfg.fixedDay > 0) cfg.fixedDay.toString() else "") }
+    var amount by remember { mutableStateOf(if (cfg.amount > 0) cfg.amount.toBigDecimal().stripTrailingZeros().toPlainString() else "") }
+    var exact by remember { mutableStateOf(cfg.exactOnly) }
+    val amountValue = Money.parseInput(amount) ?: 0.0
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = NabdColors.Surface,
-        title = { Text("ميعاد القبض", style = MaterialTheme.typography.titleMedium) },
+        title = { Text("المرتب", style = MaterialTheme.typography.titleMedium) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "أي تحويل من الشركة دي يتسجل مرتب، وأنبهك لو اتأخر.",
-                    style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim
-                )
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = payer, onValueChange = { payer = it },
-                    label = { Text("اسم الشركة (مثلاً: ACME LTD)") },
+                    label = { Text("اسم الشركة زي ما بيظهر في التحويل") },
                     singleLine = true, shape = RoundedCornerShape(14.dp)
                 )
                 OutlinedTextField(
+                    value = amount, onValueChange = { amount = it },
+                    label = { Text("مبلغ المرتب (فاضي = أي مبلغ)") },
+                    suffix = { Text("ج.م") },
+                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                if (amountValue > 0) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { exact = !exact }
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(checked = exact, onCheckedChange = { exact = it })
+                        Column(Modifier.weight(1f)) {
+                            Text("المبلغ ده بالظبط بس", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                if (exact) "أي تحويل غير ${Money.fmt(amountValue, decimals = false)} مش مرتب"
+                                else "${Money.fmt(amountValue, decimals = false)} أو أكتر = مرتب، والأقل دخل عادي",
+                                style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim
+                            )
+                        }
+                    }
+                } else {
+                    Text("أي تحويل من الشركة دي هيتحسب مرتب.", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
+                }
+                OutlinedTextField(
                     value = day, onValueChange = { day = it.filter(Char::isDigit).take(2) },
-                    label = { Text("يوم القبض في الشهر (سيبه فاضي = تلقائي)") },
+                    label = { Text("يوم القبض (فاضي = يتعلمه لوحده)") },
                     singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     shape = RoundedCornerShape(14.dp)
                 )
                 if (cfg.learnedDay > 0) {
-                    Text("الوكيل اتعلم إن قبضك يوم ${cfg.learnedDay}", style = MaterialTheme.typography.labelSmall, color = SalaryGreen)
+                    Text("اتعلم إن قبضك يوم ${cfg.learnedDay}", style = MaterialTheme.typography.labelSmall, color = SalaryGreen)
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = {
                 val d = day.toIntOrNull()?.takeIf { it in 1..31 } ?: 0
-                onSave(payer, d)
+                onSave(payer, d, amountValue, exact && amountValue > 0)
             }) { Text("حفظ") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
