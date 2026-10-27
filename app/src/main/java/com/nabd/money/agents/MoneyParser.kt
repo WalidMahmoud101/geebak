@@ -9,6 +9,8 @@ data class ParsedMoney(
     val balance: Double?,
     val merchant: String?,
     val cardLast4: String?,
+    /** الرقم اللي بعد "الحد المتاح" في كارت ائتمان: ده حد البنك مش فلوسك */
+    val isCredit: Boolean = false,
 )
 
 /**
@@ -34,7 +36,11 @@ object MoneyParser {
     )
 
     private val balanceKw = Regex(
-        """(الرصيد المتاح|الرصيد الحالي|الرصيد|رصيدك الحالي|رصيدك|رصيد|المتبقي|المتاح|avail(?:able)?\.?\s*bal(?:ance)?|balance|bal\b\.?)""",
+        """(الحد المتاح|الحد الائتماني المتاح|حد الائتمان|available limit|avail\.?\s*limit|credit limit|الرصيد المتاح|الرصيد الحالي|الرصيد|رصيدك الحالي|رصيدك|رصيد|المتبقي|المتاح|avail(?:able)?\.?\s*bal(?:ance)?|balance|bal\b\.?)""",
+        RegexOption.IGNORE_CASE
+    )
+    private val creditRx = Regex(
+        """(الحد المتاح|الحد الائتماني|حد الائتمان|available limit|avail\.?\s*limit|credit limit|limit available|بطاقة ائتمان|بطاقتك الائتمانية|البطاقة الائتمانية|credit card)""",
         RegexOption.IGNORE_CASE
     )
     private val fromBalance = Regex("""(من رصيد|from (?:your )?balance)""", RegexOption.IGNORE_CASE)
@@ -184,6 +190,7 @@ object MoneyParser {
             balance = balance?.value,
             merchant = merchant,
             cardLast4 = card,
+            isCredit = creditRx.containsMatchIn(t),
         )
     }
 

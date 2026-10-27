@@ -49,6 +49,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nabd.money.agents.AgentRegistry
 import com.nabd.money.data.Account
+import com.nabd.money.data.Exclusion
+import com.nabd.money.data.Institution
+import com.nabd.money.data.NetWorth
 import com.nabd.money.data.Direction
 import com.nabd.money.data.Insight
 import com.nabd.money.data.Purpose
@@ -106,10 +109,17 @@ fun HomeScreen(
     }
 
     // الإجمالي من غير الحسابات الوسيطة (InstaPay/Wallet)، والمصروف من غير التحويلات الداخلية ومصاريف الشركة
-    val total = accounts.filter { it.includeInTotal }.sumOf { vm.toEgp(it.balance, it.currency) }
-    val counted = month.filter { it.countsInTotals() }
-    val spent = counted.filter { it.direction == Direction.OUT }.sumOf { vm.txnEgp(it) }
-    val income = counted.filter { it.direction == Direction.IN }.sumOf { vm.txnEgp(it) }
+    // إجمالي فلوسك = الحسابات اللي رصيدها مؤكد بس (من البنك أو انت كتبته)
+    val accEgp: (Account) -> Double = { vm.toEgp(it.balance, it.currency) }
+    val total = NetWorth.total(accounts, accEgp)
+    val institutions = NetWorth.institutions(accounts, accEgp)
+    val counted = accounts.count { NetWorth.counts(it, accEgp) }
+    val pending = accounts.count { NetWorth.exclusion(it, accEgp(it)) == Exclusion.UNKNOWN }
+    var breakdown by remember { mutableStateOf(false) }
+    if (breakdown) NetWorthSheet(vm, accounts, onDismiss = { breakdown = false }, onOpenAccounts = { breakdown = false; onNavigate(2) })
+    val countedTxns = month.filter { it.countsInTotals() }
+    val spent = countedTxns.filter { it.direction == Direction.OUT }.sumOf { vm.txnEgp(it) }
+    val income = countedTxns.filter { it.direction == Direction.IN }.sumOf { vm.txnEgp(it) }
     val themeMode by vm.themeMode.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
     val names = accounts.associate { it.id to it.name }
@@ -132,7 +142,7 @@ fun HomeScreen(
             )
         }
         updateCard(update, vm)
-        item { HeroCard(total, income, spent, accounts.count { it.includeInTotal }, onAdd) }
+        item { HeroCard(total, income, spent, counted, pending, onBreakdown = { breakdown = true }, onAdd) }
         if (!perms.allGranted) item { PermissionCard(perms) }
         item { SalaryCard(salary) { salaryDialog = true } }
         item {
@@ -153,7 +163,7 @@ fun HomeScreen(
                 }
             } else {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(accounts, key = { it.id }) { a -> AccountMiniCard(a) { onNavigate(2) } }
+                    items(institutions, key = { it.key }) { inst -> InstitutionMiniCard(inst) { onNavigate(2) } }
                 }
             }
         }
@@ -163,7 +173,7 @@ fun HomeScreen(
             items(insights.take(3), key = { "i" + it.id }) { InsightRow(it) { vm.dismissInsight(it) } }
         }
 
-        item { PurposeBreakdown(counted.filter { it.direction == Direction.OUT }, vm::txnEgp) { onNavigate(4) } }
+        item { PurposeBreakdown(countedTxns.filter { it.direction == Direction.OUT }, vm::txnEgp) { onNavigate(4) } }
 
         item { SectionHeader("آخر العمليات", "عرض الكل") { onNavigate(1) } }
         if (recent.isEmpty()) {
@@ -216,7 +226,10 @@ private fun HomeHeader(unread: Int, themeMode: ThemeMode, onTheme: () -> Unit, o
 }
 
 @Composable
-private fun HeroCard(total: Double, income: Double, spent: Double, count: Int, onAdd: (Direction, Purpose?) -> Unit) {
+private fun HeroCard(
+    total: Double, income: Double, spent: Double, count: Int, pending: Int,
+    onBreakdown: () -> Unit, onAdd: (Direction, Purpose?) -> Unit,
+) {
     val shape = RoundedCornerShape(28.dp)
     Column(
         Modifier
@@ -224,6 +237,7 @@ private fun HeroCard(total: Double, income: Double, spent: Double, count: Int, o
             .clip(shape)
             .background(HeroGradient)
             .border(1.dp, if (NabdColors.isDark) Color.White.copy(alpha = 0.08f) else NabdColors.Stroke, shape)
+            .clickable(onClick = onBreakdown)
             .padding(20.dp)
     ) {
         Text("إجمالي فلوسك", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
@@ -235,10 +249,18 @@ private fun HeroCard(total: Double, income: Double, spent: Double, count: Int, o
             overflow = TextOverflow.Ellipsis
         )
         Text(
-            "في $count حساب ومحفظة • بالجنيه المصري",
+            "من $count حساب مؤكد • دوس للتفاصيل",
             style = MaterialTheme.typography.bodySmall,
             color = NabdColors.TextDim
         )
+        if (pending > 0) {
+            Text(
+                "$pending حساب لسه محتاج رصيده الحقيقي",
+                style = MaterialTheme.typography.labelMedium,
+                color = NabdColors.Gold,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
         PulseLine(Modifier.fillMaxWidth().height(36.dp).padding(vertical = 6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             FlowStat("دخل الشهر", Money.fmt(income, decimals = false), Icons.Rounded.ArrowDownward, NabdColors.Mint, Modifier.weight(1f))
@@ -294,28 +316,29 @@ private fun PermissionCard(perms: Perms) {
 }
 
 @Composable
-private fun AccountMiniCard(a: Account, onClick: () -> Unit) {
+private fun InstitutionMiniCard(inst: Institution, onClick: () -> Unit) {
     val shape = RoundedCornerShape(22.dp)
+    val first = inst.accounts.first()
     Column(
         Modifier
-            .width(180.dp)
-            .height(118.dp)
+            .width(170.dp)
+            .height(112.dp)
             .clip(shape)
-            .background(Brush.linearGradient(a.colors()))
+            .background(Brush.linearGradient(first.colors()))
             .clickable(onClick = onClick)
             .padding(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(a.type.icon(), null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Icon(first.type.icon(), null, tint = Color.White, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(6.dp))
             Text(
-                a.name, color = Color.White, style = MaterialTheme.typography.labelLarge,
+                inst.name, color = Color.White, style = MaterialTheme.typography.labelLarge,
                 maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
         Spacer(Modifier.weight(1f))
         Text(
-            Money.fmt(a.balance, a.currency),
+            if (inst.countedCount > 0) Money.fmt(inst.total, decimals = false) else "اكتب الرصيد",
             color = Color.White,
             fontWeight = FontWeight.Bold,
             fontSize = 18.sp,
@@ -323,8 +346,13 @@ private fun AccountMiniCard(a: Account, onClick: () -> Unit) {
             overflow = TextOverflow.Ellipsis
         )
         Text(
-            (if (a.balanceKnown) "رصيد مؤكد" else "رصيد تقديري") + " • " + Dates.relative(a.updatedAt),
-            color = Color.White.copy(alpha = 0.75f),
+            when {
+                inst.accounts.all { it.isCredit } -> "كارت ائتمان"
+                inst.countedCount == 0 -> "مش محسوب لسه"
+                inst.accounts.size > 1 -> "${inst.accounts.size} حسابات"
+                else -> "مؤكد • " + Dates.relative(first.updatedAt)
+            },
+            color = Color.White.copy(alpha = 0.8f),
             style = MaterialTheme.typography.labelSmall
         )
     }

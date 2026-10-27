@@ -234,4 +234,7 @@ object AgentRegistry {
     fun byId(id: String): TrackerAgent? = byIdMap[id]
 
     const val MANUAL_ID = "manual"
+
+    /** وكلاء بيكرروا عمليات البنك (نفس الفلوس، مصدر تاني) وحساباتهم وسيطة */
+    val MIRROR_AGENTS = setOf("instapay", "wallet_cards")
 }

@@ -46,6 +46,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nabd.money.data.Account
+import com.nabd.money.data.Exclusion
+import com.nabd.money.data.Institution
+import com.nabd.money.data.NetWorth
+import com.nabd.money.ui.components.IconBubble
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.rounded.CallMerge
 import com.nabd.money.data.AccountType
 import com.nabd.money.data.Txn
 import com.nabd.money.ui.AppViewModel
@@ -69,16 +75,23 @@ fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
     var adding by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var openId by remember { mutableStateOf<Long?>(null) }
-    val total = accounts.filter { it.includeInTotal }.sumOf { vm.toEgp(it.balance, it.currency) }
+    var setBalanceFor by remember { mutableStateOf<Account?>(null) }
+    val egp: (Account) -> Double = { vm.toEgp(it.balance, it.currency) }
+    val total = NetWorth.total(accounts, egp)
+    val institutions = NetWorth.institutions(accounts, egp)
+    val needBalance = accounts.filter { NetWorth.exclusion(it, egp(it)) == Exclusion.UNKNOWN }
 
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
-                ScreenTitle("الحسابات", "إجمالي ${Money.fmt(total)}") {
+                ScreenTitle("الحسابات", "إجمالي فلوسك ${Money.fmt(total)}") {
                     IconButton(onClick = { settingsOpen = true }) {
                         Icon(Icons.Rounded.Settings, "الإعدادات", tint = NabdColors.TextDim)
                     }
                 }
+            }
+            if (needBalance.isNotEmpty()) {
+                item { NeedBalanceCard(needBalance.size) { setBalanceFor = needBalance.first() } }
             }
             if (accounts.isEmpty()) {
                 item {
@@ -88,17 +101,12 @@ fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
                     )
                 }
             }
-            AccountType.entries.forEach { type ->
-                val group = accounts.filter { it.type == type }
-                if (group.isEmpty()) return@forEach
-                item(key = "h" + type.name) {
-                    val sum = group.sumOf { vm.toEgp(it.balance, it.currency) }
-                    Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(type.ar, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        Text(Money.fmt(sum, decimals = false), style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
-                    }
-                }
-                items(group, key = { it.id }) { a -> AccountRow(a) { openId = a.id } }
+            items(institutions, key = { it.key }) { inst ->
+                InstitutionCard(
+                    inst, egp,
+                    onOpen = { openId = it.id },
+                    onSetBalance = { setBalanceFor = it },
+                )
             }
         }
         FloatingActionButton(
@@ -115,47 +123,134 @@ fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
         }
     }
     if (settingsOpen) SettingsDialog(vm) { settingsOpen = false }
+    setBalanceFor?.let { a ->
+        AmountDialog("رصيدك الحقيقي دلوقتي في ${a.name} (${a.currency})", if (a.balanceKnown) a.balance else 0.0, onDismiss = { setBalanceFor = null }) {
+            vm.setBalance(a, it)
+            // اللي بعده في القايمة
+            setBalanceFor = needBalance.firstOrNull { n -> n.id != a.id && needBalance.indexOf(n) > needBalance.indexOf(a) }
+        }
+    }
     openId?.let { id ->
         accounts.firstOrNull { it.id == id }?.let { a ->
-            AccountSheet(vm, a, onDismiss = { openId = null }, onEdit = onEdit)
+            AccountSheet(vm, a, accounts, onDismiss = { openId = null }, onEdit = onEdit)
         }
     }
 }
 
 @Composable
-private fun AccountRow(a: Account, onClick: () -> Unit) {
-    GlassCard(Modifier.fillMaxWidth(), padding = 14.dp, onClick = onClick) {
+private fun NeedBalanceCard(count: Int, onClick: () -> Unit) {
+    GlassCard(Modifier.fillMaxWidth(), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(46.dp).clip(RoundedCornerShape(14.dp)).background(Brush.linearGradient(a.colors())),
-                contentAlignment = Alignment.Center
-            ) { Icon(a.type.icon(), null, tint = Color.White, modifier = Modifier.size(22.dp)) }
-            Spacer(Modifier.width(12.dp))
+            IconBubble(Icons.Rounded.Edit, NabdColors.Gold, 38.dp)
+            Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(a.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("$count حساب محتاج رصيده الحقيقي", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    (if (!a.includeInTotal) "برا الإجمالي • " else "") +
-                        (if (a.balanceKnown) "مؤكد من البنك" else "تقديري") + " • " + Dates.relative(a.updatedAt),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (a.balanceKnown) NabdColors.TextDim else NabdColors.Gold.copy(alpha = 0.8f)
+                    "اكتبه مرة واحدة، وبعد كده العمليات بتحدّثه لوحدها",
+                    style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim
                 )
             }
-            Text(
-                Money.fmt(a.balance, a.currency),
-                fontWeight = FontWeight.Bold,
-                color = if (a.balance < 0) NabdColors.Danger else NabdColors.Text
-            )
+            Text("ابدأ", style = MaterialTheme.typography.labelLarge, color = NabdColors.Gold)
+        }
+    }
+}
+
+/** كارت لكل بنك أو تطبيق: الإجمالي فوق، والحسابات والكروت جواه */
+@Composable
+private fun InstitutionCard(
+    inst: Institution,
+    egp: (Account) -> Double,
+    onOpen: (Account) -> Unit,
+    onSetBalance: (Account) -> Unit,
+) {
+    val first = inst.accounts.first()
+    GlassCard(Modifier.fillMaxWidth(), padding = 14.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Brush.linearGradient(first.colors())),
+                contentAlignment = Alignment.Center
+            ) { Icon(first.type.icon(), null, tint = Color.White, modifier = Modifier.size(22.dp)) }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(inst.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (inst.accounts.size == 1) first.type.ar else "${inst.accounts.size} حسابات وكروت",
+                    style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    if (inst.countedCount > 0) Money.fmt(inst.total) else "—",
+                    fontWeight = FontWeight.Bold, fontSize = 17.sp,
+                    color = if (inst.total < 0) NabdColors.Danger else NabdColors.Text
+                )
+                Text(
+                    if (inst.countedCount > 0) "في إجمالي فلوسك" else "مش محسوب",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (inst.countedCount > 0) NabdColors.Mint else NabdColors.TextFaint
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        inst.accounts.forEach { a ->
+            val ex = NetWorth.exclusion(a, egp(a))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onOpen(a) }
+                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(a.type.icon(), null, tint = NabdColors.TextDim, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(a.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        ex?.ar ?: ("مؤكد • " + Dates.relative(a.updatedAt)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = when (ex) {
+                            null -> NabdColors.TextDim
+                            Exclusion.UNKNOWN -> NabdColors.Gold
+                            else -> NabdColors.TextFaint
+                        }
+                    )
+                }
+                if (ex == Exclusion.UNKNOWN) {
+                    Text(
+                        "اكتب الرصيد",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = NabdColors.Gold,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(NabdColors.Gold.copy(alpha = 0.12f))
+                            .clickable { onSetBalance(a) }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                } else {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            Money.fmt(a.balance, a.currency),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = if (ex == null) NabdColors.Text else NabdColors.TextFaint
+                        )
+                        if (a.isCredit) Text("الحد المتاح", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint)
+                    }
+                }
+            }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AccountSheet(vm: AppViewModel, a: Account, onDismiss: () -> Unit, onEdit: (Txn) -> Unit) {
+private fun AccountSheet(vm: AppViewModel, a: Account, all: List<Account>, onDismiss: () -> Unit, onEdit: (Txn) -> Unit) {
     val txns by vm.txnsFor(a.id).collectAsState(initial = emptyList())
     var editBalance by remember { mutableStateOf(false) }
     var rename by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var merging by remember { mutableStateOf(false) }
+    val ex = NetWorth.exclusion(a, vm.toEgp(a.balance, a.currency))
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -180,16 +275,30 @@ private fun AccountSheet(vm: AppViewModel, a: Account, onDismiss: () -> Unit, on
                     Spacer(Modifier.height(16.dp))
                     Text(Money.fmt(a.balance, a.currency), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
                     Text(
-                        if (a.balanceKnown) "آخر رصيد من رسالة البنك" else "رصيد تقديري محسوب من العمليات",
+                        when {
+                            a.isCredit -> "الحد المتاح في الكارت • مش من فلوسك"
+                            !a.balanceKnown -> "تقديري من العمليات • اكتب رصيدك الحقيقي"
+                            else -> "مؤكد • " + Dates.relative(a.balanceAt.takeIf { it > 0 } ?: a.updatedAt)
+                        },
                         color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.labelSmall
                     )
                 }
             }
             item {
                 Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PillButton("تعديل الرصيد", Icons.Rounded.Edit, NabdColors.Mint, Modifier.weight(1f)) { editBalance = true }
-                    PillButton("إعادة تسمية", Icons.Rounded.Edit, NabdColors.Cyan, Modifier.weight(1f)) { rename = true }
+                    PillButton(if (a.isCredit) "الحد المتاح" else "الرصيد الحقيقي", Icons.Rounded.Edit, NabdColors.Mint, Modifier.weight(1f)) { editBalance = true }
+                    PillButton("الاسم", Icons.Rounded.Edit, NabdColors.Cyan, Modifier.weight(0.7f)) { rename = true }
+                    PillButton("دمج", Icons.Rounded.CallMerge, NabdColors.Violet, Modifier.weight(0.7f)) { merging = true }
                     PillButton("حذف", Icons.Rounded.Delete, NabdColors.Danger, Modifier.weight(0.7f)) { confirmDelete = true }
+                }
+            }
+            if (ex != null) {
+                item {
+                    Text(
+                        "مش داخل في إجمالي فلوسك: ${ex.ar}",
+                        style = MaterialTheme.typography.labelMedium, color = NabdColors.Gold,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
                 }
             }
             item {
@@ -211,6 +320,23 @@ private fun AccountSheet(vm: AppViewModel, a: Account, onDismiss: () -> Unit, on
                     androidx.compose.material3.Switch(checked = a.includeInTotal, onCheckedChange = { vm.setIncludeInTotal(a, it) })
                 }
             }
+            item {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(NabdColors.SurfaceTop)
+                        .padding(horizontal = 14.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("كارت ائتمان", style = MaterialTheme.typography.titleSmall)
+                        Text("الرصيد هنا حد البنك، مش فلوسك", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
+                    }
+                    androidx.compose.material3.Switch(checked = a.isCredit, onCheckedChange = { vm.setCredit(a, it) })
+                }
+            }
             item { SectionHeader("العمليات (${txns.size})") }
             items(txns, key = { it.id }) { t -> TxnRow(t, a.name) { onEdit(t) } }
         }
@@ -225,6 +351,34 @@ private fun AccountSheet(vm: AppViewModel, a: Account, onDismiss: () -> Unit, on
         TextDialog("اسم الحساب", a.name, onDismiss = { rename = false }) {
             vm.renameAccount(a, it); rename = false
         }
+    }
+    if (merging) {
+        val targets = all.filter { it.id != a.id }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { merging = false },
+            containerColor = NabdColors.Surface,
+            title = { Text("دمج ${a.name} في…", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("عملياته هتتنقل للحساب اللي تختاره، وهو هيتشال.", style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim)
+                    if (targets.isEmpty()) Text("مافيش حسابات تانية", color = NabdColors.TextFaint)
+                    targets.forEach { t ->
+                        Text(
+                            t.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(NabdColors.SurfaceTop)
+                                .clickable { vm.mergeAccounts(a, t); merging = false; onDismiss() }
+                                .padding(12.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { merging = false }) { Text("إلغاء") } },
+        )
     }
     if (confirmDelete) {
         ConfirmDialog(

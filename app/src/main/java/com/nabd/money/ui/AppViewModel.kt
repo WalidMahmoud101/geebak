@@ -201,6 +201,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun addAccount(name: String, type: AccountType, currency: String, balance: Double) =
         viewModelScope.launch(Dispatchers.IO) { engine.addManualAccount(name, type, currency, balance) }
 
+    fun accountEgp(a: Account) = settings.toEgp(a.balance, a.currency)
+
+    fun setCredit(a: Account, credit: Boolean) = viewModelScope.launch(Dispatchers.IO) {
+        dao.updateAccount(a.copy(isCredit = credit, includeInTotal = if (credit) false else a.includeInTotal || a.isCredit))
+    }
+
+    /** دمج حساب متكرر: العمليات تتنقل، والرصيد المؤكد الأحدث يفضل */
+    fun mergeAccounts(from: Account, into: Account) = viewModelScope.launch(Dispatchers.IO) {
+        dao.moveTxns(from.id, into.id)
+        val takeFrom = from.balanceKnown && (!into.balanceKnown || from.balanceAt > into.balanceAt)
+        if (takeFrom) {
+            dao.updateAccount(into.copy(balance = from.balance, balanceKnown = true, balanceAt = from.balanceAt, updatedAt = System.currentTimeMillis()))
+        }
+        dao.deleteAccount(from)
+    }
+
     fun setIncludeInTotal(a: Account, include: Boolean) = viewModelScope.launch(Dispatchers.IO) {
         dao.updateAccount(a.copy(includeInTotal = include))
     }

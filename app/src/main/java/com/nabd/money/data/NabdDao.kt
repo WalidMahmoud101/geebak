@@ -34,6 +34,10 @@ interface NabdDao {
     @Delete
     suspend fun deleteAccount(a: Account)
 
+    /** دمج حساب متكرر في حساب تاني */
+    @Query("UPDATE transactions SET accountId = :to WHERE accountId = :from")
+    suspend fun moveTxns(from: Long, to: Long)
+
     // ---------- العمليات ----------
     @Query("SELECT * FROM transactions ORDER BY timestamp DESC LIMIT :limit")
     fun recent(limit: Int): Flow<List<Txn>>

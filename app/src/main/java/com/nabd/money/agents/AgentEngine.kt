@@ -234,15 +234,23 @@ class AgentEngine(
 
     private suspend fun resolveAccount(agent: SourceAgent, m: RawMessage, p: ParsedMoney): Account {
         val key = agent.accountKey(m, p)
-        dao.findAccount(agent.id, key)?.let { return it }
+        dao.findAccount(agent.id, key)?.let { existing ->
+            if (p.isCredit && !existing.isCredit) {
+                val u = existing.copy(isCredit = true, type = AccountType.CARD, includeInTotal = false)
+                dao.updateAccount(u)
+                return u
+            }
+            return existing
+        }
         dao.insertAccount(
             Account(
                 name = agent.accountLabel(m, p),
-                type = agent.accountType,
+                type = if (p.isCredit) AccountType.CARD else agent.accountType,
                 agentId = agent.id,
                 accountKey = key,
                 currency = agent.accountCurrency(p),
-                includeInTotal = agent.id !in MIRROR_AGENTS,
+                includeInTotal = agent.id !in MIRROR_AGENTS && !p.isCredit,
+                isCredit = p.isCredit,
             )
         )
         return dao.findAccount(agent.id, key)!!
@@ -462,7 +470,6 @@ class AgentEngine(
         const val REFUND_CATEGORY = "استرداد مصاريف الشركة"
         const val TRANSFER_CATEGORY = "تحويل بين حساباتي"
 
-        /** وكلاء بيكرروا عمليات البنك (نفس الفلوس، مصدر تاني) */
-        val MIRROR_AGENTS = setOf("instapay", "wallet_cards")
+        val MIRROR_AGENTS = AgentRegistry.MIRROR_AGENTS
     }
 }

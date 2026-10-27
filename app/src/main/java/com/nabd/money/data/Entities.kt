@@ -37,6 +37,8 @@ data class Account(
     val updatedAt: Long = System.currentTimeMillis(),
     /** حسابات وسيطة زي InstaPay و Wallet مابتتحسبش في إجمالي فلوسك */
     @ColumnInfo(defaultValue = "1") val includeInTotal: Boolean = true,
+    /** كارت ائتمان: الرصيد هنا = الحد المتاح، ومابيتحسبش فلوس */
+    @ColumnInfo(defaultValue = "0") val isCredit: Boolean = false,
 )
 
 @Entity(
