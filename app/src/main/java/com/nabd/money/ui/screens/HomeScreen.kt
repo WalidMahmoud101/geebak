@@ -1,5 +1,6 @@
 package com.nabd.money.ui.screens
 
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -117,7 +118,8 @@ fun HomeScreen(
     val counted = accounts.count { NetWorth.counts(it, accEgp) }
     val pending = accounts.count { NetWorth.exclusion(it, accEgp(it)) == Exclusion.UNKNOWN && it.type != com.nabd.money.data.AccountType.CASH }
     val names = accounts.associate { it.id to it.name }
-    val unread = insights.filter { !it.read }
+    // تنبيه تأخير المرتب ظاهر في خانة المرتب نفسها، فمانكررهوش
+    val unread = insights.filter { !it.read && !(it.agentId == SalaryWatch.ID && (it.dedupKey.startsWith("salary_late") || it.dedupKey.startsWith("salary_soon"))) }
 
     if (salaryDialog) {
         SalaryDialog(salary, onDismiss = { salaryDialog = false }) { payer, day, amount, exact -> vm.setSalary(payer, day, amount, exact); salaryDialog = false }
@@ -134,7 +136,13 @@ fun HomeScreen(
             )
         }
         updateCard(update, vm)
-        item { BalanceCard(total, counted, pending, onClick = { breakdown = true }) }
+        item {
+            BalanceCard(
+                total, counted, pending,
+                onDetails = { breakdown = true },
+                onToggleCurrency = { vm.settings.displayCurrency = if (Money.mode == "USD") "EGP" else "USD" },
+            )
+        }
         item {
             QuickActions(
                 companyCount = companyPending.size,
@@ -211,33 +219,82 @@ private fun greeting(): String = when (java.time.LocalTime.now().hour) {
     else -> "مساء الخير"
 }
 
-/** الكارت الأساسي: إجمالي فلوسك في كل الحسابات */
+/**
+ * الكارت الأساسي: إجمالي فلوسك. دوس على الرقم يتحول بين الجنيه والدولار بحركة ناعمة،
+ * وكل المبالغ في التطبيق بتتغير معاه. زرار "التفاصيل" بيفتح تقسيم الإجمالي.
+ */
+@OptIn(androidx.compose.animation.ExperimentalAnimationApi::class)
 @Composable
-private fun BalanceCard(total: Double, counted: Int, pending: Int, onClick: () -> Unit) {
+private fun BalanceCard(total: Double, counted: Int, pending: Int, onDetails: () -> Unit, onToggleCurrency: () -> Unit) {
     val shape = RoundedCornerShape(18.dp)
     val onCard = Color.White
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val usd = Money.mode == "USD"
+    val rate = Money.rate
+    // النص بيتحسب من الاختيار نفسه، فالحركة بين القديم والجديد تفضل صح
+    fun primary(inUsd: Boolean) = if (inUsd) Money.plain("", total / rate, "USD", decimals = total / rate < 1000) else Money.plain("", total, "EGP", decimals = false)
+    fun secondary(inUsd: Boolean) = if (inUsd) "≈ " + Money.plain("", total, "EGP", decimals = false) else "≈ " + Money.plain("", total / rate, "USD", decimals = false)
     Row(
         Modifier
             .fillMaxWidth()
             .clip(shape)
             .background(HeroGradient)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(Modifier.weight(1f)) {
-            Text("إجمالي فلوسك", style = MaterialTheme.typography.labelMedium, color = onCard.copy(alpha = 0.75f))
-            Text(
-                Money.fmt(total, decimals = false),
-                fontSize = 26.sp, fontWeight = FontWeight.Bold, color = onCard, maxLines = 1, overflow = TextOverflow.Ellipsis
-            )
+        Column(
+            Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                    onToggleCurrency()
+                }
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("إجمالي فلوسك", style = MaterialTheme.typography.labelMedium, color = onCard.copy(alpha = 0.75f))
+                Spacer(Modifier.width(6.dp))
+                // شارة العملة: بتوري إن الرقم بيتقلب
+                Row(
+                    Modifier.clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.18f)).padding(horizontal = 8.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Rounded.SwapVert, null, tint = onCard, modifier = Modifier.size(12.dp))
+                    Spacer(Modifier.width(2.dp))
+                    Text(if (usd) "USD" else "EGP", style = MaterialTheme.typography.labelSmall, color = onCard)
+                }
+            }
+            androidx.compose.animation.AnimatedContent(
+                targetState = usd,
+                transitionSpec = {
+                    androidx.compose.animation.ContentTransform(
+                        targetContentEnter = androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(280)) { it / 2 } +
+                            androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(280)) +
+                            androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(280), initialScale = 0.9f),
+                        initialContentExit = androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(280)) { -it / 2 } +
+                            androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(200)),
+                    )
+                },
+                label = "balance-currency",
+            ) { inUsd ->
+                Column {
+                    Text(primary(inUsd), fontSize = 26.sp, fontWeight = FontWeight.Bold, color = onCard, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(secondary(inUsd), style = MaterialTheme.typography.labelMedium, color = onCard.copy(alpha = 0.7f))
+                }
+            }
             Text(
                 if (pending > 0) "من $counted حساب • $pending محتاج رصيده" else "من $counted حساب مؤكد",
                 style = MaterialTheme.typography.labelSmall,
                 color = if (pending > 0) Color(0xFFFFE08A) else onCard.copy(alpha = 0.7f)
             )
         }
-        Icon(Icons.Rounded.ChevronLeft, null, tint = onCard.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
+        Row(
+            Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onDetails).padding(horizontal = 8.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("التفاصيل", style = MaterialTheme.typography.labelMedium, color = onCard.copy(alpha = 0.8f))
+            Icon(Icons.Rounded.ChevronLeft, null, tint = onCard.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+        }
     }
 }
 
