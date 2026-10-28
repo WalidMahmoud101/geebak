@@ -330,6 +330,13 @@ class AgentEngine(
         }
     }
 
+    /** يشيل الإعلانات اللي اتسجلت قبل كده كأنها عمليات ("استمتع بكاش باك لحد 100 جنيه") */
+    suspend fun purgeAds(): Int = mutex.withLock {
+        val ads = dao.allTxnsOnce().filter { it.source != TxnSource.MANUAL && it.rawText?.let(MoneyParser::isPromo) == true }
+        ads.forEach { removeMirror(it) }
+        ads.size
+    }
+
     /**
      * مرة واحدة: يلم الحسابات اللي اتكررت قبل كده لنفس البنك أو المحفظة.
      * - حسابات رصيدها نفس الرقم = نفس الفلوس

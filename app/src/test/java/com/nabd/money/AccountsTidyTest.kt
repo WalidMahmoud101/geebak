@@ -74,6 +74,20 @@ class AccountsTidyTest {
     }
 
     @Test
+    fun adsRecordedBeforeAreRemoved() = runBlocking {
+        val dao = app.db.dao()
+        val acc = dao.insertAccount(Account(name = "فودافون كاش", type = AccountType.WALLET, agentId = "vodafone_cash", accountKey = "main", balance = -100.0))
+        fun t(text: String, f: String) = Txn(accountId = acc, amount = 100.0, direction = Direction.OUT, category = "أخرى", purpose = Purpose.OTHER,
+            timestamp = now, source = TxnSource.SMS, agentId = "vodafone_cash", rawText = text, fingerprint = f)
+        dao.insertTxn(t("استمتع بكاش باك لحد ١٠٠ جنية فلوس على محفظتك", "ad"))
+        dao.insertTxn(t("تم تحويل 100 جنيه لرقم 01012345678", "real"))
+        // التنضيف بيشتغل لوحده كمان أول ما التطبيق يفتح، فبنشوف النتيجة مش العدد
+        app.engine.purgeAds()
+        assertEquals(listOf("real"), dao.allTxnsOnce().map { it.fingerprint })
+        assertEquals(0.0, dao.account(acc)!!.balance, 0.01) // الرصيد التقديري رجع
+    }
+
+    @Test
     fun senderSpellingsAreOneBank() {
         assertEquals(GenericBankAgent.bankKey("HSBC"), GenericBankAgent.bankKey("HSBC-EG"))
         assertEquals(GenericBankAgent.bankKey("hsbc"), GenericBankAgent.bankKey("HSBC Egypt"))

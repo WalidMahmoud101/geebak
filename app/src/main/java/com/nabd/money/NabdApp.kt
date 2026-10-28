@@ -27,9 +27,13 @@ class NabdApp : Application() {
         engine = AgentEngine(this, db.dao(), settings)
         Notifier.ensureChannels(this)
         // مرة واحدة بعد التحديث: نلم الكروت والحسابات اللي اتكررت قبل كده
-        if (settings.accountsTidied < 1) {
+        // وبعد كده: نشيل الإعلانات اللي اتسجلت كأنها عمليات
+        if (settings.accountsTidied < 2) {
             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                runCatching { engine.tidyAccounts() }.onSuccess { settings.accountsTidied = 1 }
+                runCatching {
+                    if (settings.accountsTidied < 1) engine.tidyAccounts()
+                    engine.purgeAds()
+                }.onSuccess { settings.accountsTidied = 2 }
             }
         }
         runCatching { DigestWorker.schedule(this) }

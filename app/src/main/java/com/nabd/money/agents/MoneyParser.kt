@@ -20,7 +20,7 @@ data class ParsedMoney(
 object MoneyParser {
 
     private const val CUR =
-        """EGP|E\.G\.P|L\.E\.?|LE|USDT|USDC|USD|US\$|EUR|GBP|SAR|AED|BTC|ETH|BNB|SOL|\$|€|جنيهات|جنيه(?:اً|ا)?(?:\s*مصري)?|ج\.\s?م\.?|جم|دولار"""
+        """EGP|E\.G\.P|L\.E\.?|LE|USDT|USDC|USD|US\$|EUR|GBP|SAR|AED|BTC|ETH|BNB|SOL|\$|€|جنيهات|جني[هة](?:اً|ا)?(?:\s*مصري)?|ج\.\s?م\.?|جم|دولار"""
     private const val NUM = """\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?"""
 
     private val curFirst =
@@ -34,6 +34,25 @@ object MoneyParser {
         """\b(otp|one[- ]time|verification code|passcode|is your code)\b|رمز التحقق|كود التحقق|رمز التفعيل|كود التفعيل|كلمة المرور لمرة واحدة""",
         RegexOption.IGNORE_CASE
     )
+
+    /** كلام الإعلانات والعروض: "استمتع بكاش باك لحد 100 جنيه"، "اكسب"، "خصم 20%"… */
+    private val promo = Regex(
+        """(?<![\p{L}])(?:و|ف|ب)?(?:استمتع|اكسب|إكسب|اربح|إربح|هدية|هديه|عرض|عروض|لحد|لغاية|لغايه|حتى|يصل|بيوصل|استخدم|إستخدم|اطلب|حمّل|حمل|نزّل|نزل|اتصل|اشترك|سارع|فرصة|فرصه|كوبون|برومو|ماتفوتش|متفوتش)(?![\p{L}])""" +
+            """|لفترة محدودة|لفتره محدوده|متاح الآن|%|up to|\boffer|\benjoy|\bwin\b|\bpromo|don'?t miss|\bdownload|limited time|\bsubscribe|\bdial\b""",
+        RegexOption.IGNORE_CASE
+    )
+    /** علامات إن العملية حصلت فعلاً، علشان الرسالة الحقيقية اللي في آخرها إعلان ماتضيعش */
+    private val completed = Regex(
+        """(?<![\p{L}])(?:و|ف|و?قد)?(?:تم|تمت|اتخصم|اتحول|اتضاف|استلمت|بنجاح)(?![\p{L}])""" +
+            """|(رصيدك الحالي|رصيدك المتاح|الرصيد المتاح|الرصيد الحالي|رصيدك بعد|رقم العملية|العملية رقم|has been|was |were |successful|debited|charged|available balance|avail\.? bal|new balance|balance is|txn id|ref(?:erence)?\s*(?:no|#|:))""",
+        RegexOption.IGNORE_CASE
+    )
+
+    /** رسالة إعلان أو عرض مافيهاش عملية حصلت */
+    fun isPromo(raw: String): Boolean {
+        val t = normalize(raw)
+        return promo.containsMatchIn(t) && !completed.containsMatchIn(t)
+    }
 
     private val balanceKw = Regex(
         """(الحد المتاح|الحد الائتماني المتاح|حد الائتمان|available limit|avail\.?\s*limit|credit limit|الرصيد المتاح|الرصيد الحالي|الرصيد|رصيدك الحالي|رصيدك|رصيد|المتبقي|المتاح|avail(?:able)?\.?\s*bal(?:ance)?|balance|bal\b\.?)""",
@@ -132,6 +151,7 @@ object MoneyParser {
     fun parse(raw: String, defaultCurrency: String = "EGP"): ParsedMoney? {
         val t = normalize(raw)
         if (otp.containsMatchIn(t)) return null
+        if (promo.containsMatchIn(t) && !completed.containsMatchIn(t)) return null
 
         val found = mutableListOf<M>()
         curFirst.findAll(t).forEach { m ->

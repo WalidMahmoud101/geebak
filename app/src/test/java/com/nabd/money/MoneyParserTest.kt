@@ -61,6 +61,23 @@ class MoneyParserTest {
     }
 
     @Test
+    fun adsAreNotTransactions() {
+        assertNull(MoneyParser.parse("استمتع بكاش باك لحد ١٠٠ جنية فلوس على محفظتك"))
+        assertNull(MoneyParser.parse("اكسب 50 جنيه هدية لما تدفع فواتيرك بفودافون كاش! العرض لفترة محدودة"))
+        assertNull(MoneyParser.parse("خصم 20% لحد 200 جنيه على مشترياتك من كارفور بكارتك"))
+        assertNull(MoneyParser.parse("Enjoy up to EGP 100 cashback on your first payment. Download the app now"))
+        // عملية حقيقية في آخرها إعلان بتتسجل عادي
+        val real = MoneyParser.parse("تم خصم 150 جنيه من محفظتك. رصيدك الحالي 850 جنيه. استمتع بكاش باك لحد 100 جنيه")!!
+        assertEquals(150.0, real.amount!!, 0.001)
+        assertEquals(850.0, real.balance!!, 0.001)
+        // "الحد المتاح" في كارت الائتمان مش "لحد" بتاعة الإعلانات
+        assertEquals(500.0, MoneyParser.parse("Purchase EGP 500 at ZARA. الحد المتاح 9,500 جنيه")!!.amount!!, 0.001)
+        assertEquals(1000.0, MoneyParser.parse("تم تحويل 1000 جنيه لحسابك")!!.amount!!, 0.001)
+        // "جنية" بالتاء المربوطة
+        assertEquals(75.0, MoneyParser.parse("تم خصم ٧٥ جنية من محفظتك")!!.amount!!, 0.001)
+    }
+
+    @Test
     fun redotpayDollarSpend() {
         val p = MoneyParser.parse("You spent \$12.50 at NETFLIX.COM", "USD")!!
         assertEquals(12.5, p.amount!!, 0.001)
