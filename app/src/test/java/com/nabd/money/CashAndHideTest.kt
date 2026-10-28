@@ -87,4 +87,18 @@ class CashAndHideTest {
         app.engine.setHidden(listOf(id), false)
         assertEquals(1000.0, dao.account(acc)!!.balance, 0.001)
     }
+
+    @Test
+    fun hiddenAccountsArePersistedAndSurviveBackup() = runBlocking {
+        val dao = app.db.dao()
+        val a = dao.insertAccount(Account(name = "InstaPay تجربة", type = AccountType.BANK, agentId = "cib", accountKey = "x1", balance = 10.0, balanceKnown = true))
+        app.settings.setAccountHidden(a, true)
+        assertEquals(setOf(a), app.settings.hiddenAccounts.value)
+        val json = com.nabd.money.data.Backup.export(app.db, app.settings, "test")
+        app.settings.setAccountHidden(a, false)
+        assertTrue(app.settings.hiddenAccounts.value.isEmpty())
+        com.nabd.money.data.Backup.restore(app.db, app.settings, json)
+        app.settings.reload()
+        assertEquals(setOf(a), app.settings.hiddenAccounts.value)
+    }
 }

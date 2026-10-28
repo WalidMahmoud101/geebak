@@ -1,5 +1,6 @@
 package com.nabd.money.ui.screens
 
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -73,6 +74,8 @@ fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
     val accounts by vm.accounts.collectAsStateWithLifecycle()
     vm.usdRate.collectAsStateWithLifecycle().value
     val tidyMessage by vm.tidyMessage.collectAsStateWithLifecycle()
+    val hidden by vm.hiddenAccounts.collectAsStateWithLifecycle()
+    var showHidden by remember { mutableStateOf(false) }
     var adding by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var openId by remember { mutableStateOf<Long?>(null) }
@@ -116,6 +119,37 @@ fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
                     onOpen = { openId = it.id },
                     onSetBalance = { setBalanceFor = it },
                 )
+            }
+            if (hidden.isNotEmpty()) {
+                item {
+                    GlassCard(Modifier.fillMaxWidth(), padding = 10.dp) {
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { showHidden = !showHidden },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Rounded.VisibilityOff, null, tint = NabdColors.TextDim, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("حسابات مخفية (${hidden.size})", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                            Text(if (showHidden) "اقفل" else "افتح", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+                        }
+                        if (showHidden) {
+                            Text(
+                                "مابتتحسب في إجمالي فلوسك ولا عملياتها في أي قايمة أو تقرير. الرسايل الجاية ليها بتتسجل بس مابتظهرش.",
+                                style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint, modifier = Modifier.padding(top = 6.dp)
+                            )
+                            hidden.forEach { h ->
+                                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(h.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(
+                                        "رجّعه", style = MaterialTheme.typography.labelLarge, color = NabdColors.Mint,
+                                        modifier = Modifier.clip(RoundedCornerShape(50)).background(NabdColors.Mint.copy(alpha = 0.12f))
+                                            .clickable { vm.setAccountHidden(h, false) }.padding(horizontal = 12.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         FloatingActionButton(
@@ -300,6 +334,7 @@ private fun AccountSheet(vm: AppViewModel, a: Account, all: List<Account>, onDis
                     PillButton(if (a.isCredit) "الحد المتاح" else "الرصيد الحقيقي", Icons.Rounded.Edit, NabdColors.Mint, Modifier.weight(1f)) { editBalance = true }
                     PillButton("الاسم", Icons.Rounded.Edit, NabdColors.Cyan, Modifier.weight(0.7f)) { rename = true }
                     PillButton("دمج", Icons.Rounded.CallMerge, NabdColors.Violet, Modifier.weight(0.7f)) { merging = true }
+                    PillButton("إخفاء", Icons.Rounded.VisibilityOff, NabdColors.Gold, Modifier.weight(0.7f)) { vm.setAccountHidden(a, true); onDismiss() }
                     PillButton("حذف", Icons.Rounded.Delete, NabdColors.Danger, Modifier.weight(0.7f)) { confirmDelete = true }
                 }
             }

@@ -51,13 +51,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun <T> Flow<T>.state(initial: T): StateFlow<T> =
         stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initial)
 
-    val accounts = dao.accounts().state(emptyList())
-    val recent = dao.recent(40).state(emptyList())
+    private val hiddenIds = settings.hiddenAccounts
+    private val allAccounts = dao.accounts()
+    /** الحسابات الظاهرة بس: المخفي مابيدخل في إجمالي ولا قوايم */
+    val accounts = combine(allAccounts, hiddenIds) { list, h -> list.filter { it.id !in h } }.state(emptyList())
+    val hiddenAccounts = combine(allAccounts, hiddenIds) { list, h -> list.filter { it.id in h } }.state(emptyList())
+
+    /** عمليات الحسابات المخفية مابتظهرش في أي مكان */
+    private fun Flow<List<Txn>>.visible(): Flow<List<Txn>> = combine(this, hiddenIds) { list, h -> list.filter { it.accountId !in h } }
+
+    fun setAccountHidden(a: Account, hidden: Boolean) = settings.setAccountHidden(a.id, hidden)
+
+    val recent = dao.recent(60).visible().map { it.take(40) }.state(emptyList())
 
     // ---------- الفلتر (مشترك بين المصاريف والتقارير) ----------
     val filter = MutableStateFlow(TxnFilter())
     private val rangeTxns = filter.map { it.range() }.distinctUntilChanged().flatMapLatest { (from, to) ->
-        dao.between(from, to)
+        dao.between(from, to).visible()
     }
     val filtered = combine(rangeTxns, filter, settings.usdRate) { list, f, _ ->
         list.filter { f.matches(it, txnEgp(it)) }
@@ -67,7 +77,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val previousTotals = filter.flatMapLatest { f ->
         val prev = f.previous()
         val (from, to) = prev.range()
-        dao.between(from, to).map { list ->
+        dao.between(from, to).visible().map { list ->
             FilterTotals.of(list.filter { prev.matches(it, txnEgp(it)) }, ::txnEgp, f.companyOnly)
         }
     }.state(null)
@@ -133,7 +143,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    val thisMonthTxns = Dates.monthRange(YearMonth.now()).let { (from, to) -> dao.between(from, to) }.state(emptyList())
+    val thisMonthTxns = Dates.monthRange(YearMonth.now()).let { (from, to) -> dao.between(from, to).visible() }.state(emptyList())
 
     val insights = dao.insights().state(emptyList())
     val budgets = dao.budgets().map { list -> list.associate { it.category to it.monthlyLimit } }.state(emptyMap())
@@ -431,6 +441,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteAccount(a: Account) = viewModelScope.launch(Dispatchers.IO) {
         dao.deleteTxnsForAccount(a.id)
         dao.deleteAccount(a)
+        settings.setAccountHidden(a.id, false)
     }
 
     fun setBudget(p: Purpose, limit: Double) = viewModelScope.launch(Dispatchers.IO) {

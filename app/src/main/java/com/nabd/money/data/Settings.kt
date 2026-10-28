@@ -156,6 +156,7 @@ class Settings(context: Context) {
         _taxonomy.value = UserTaxonomy.decode(sp.getString("taxonomy", null))
         com.nabd.money.agents.Categorizer.user = _taxonomy.value
         _salary.value = readSalary()
+        _hiddenAccounts.value = readHiddenAccounts()
     }
 
     /** آخر نسخة اتبعت عنها إشعار تحديث */
@@ -189,6 +190,19 @@ class Settings(context: Context) {
         all["$agentId|$from"] = to
         all.remove("$agentId|$to")
         sp.edit().putString("account_aliases", org.json.JSONObject(all as Map<*, *>).toString()).apply()
+    }
+
+    // ---------- حسابات مخفية ----------
+    private val _hiddenAccounts = MutableStateFlow(readHiddenAccounts())
+    /** حسابات انت أخفيتها: مابتتحسب في الإجمالي ولا عملياتها في أي قايمة أو تقرير */
+    val hiddenAccounts: StateFlow<Set<Long>> = _hiddenAccounts
+
+    private fun readHiddenAccounts() = sp.getStringSet("hidden_accounts", emptySet())!!.mapNotNull { it.toLongOrNull() }.toSet()
+
+    fun setAccountHidden(id: Long, hidden: Boolean) {
+        val next = if (hidden) _hiddenAccounts.value + id else _hiddenAccounts.value - id
+        sp.edit().putStringSet("hidden_accounts", next.map { it.toString() }.toSet()).apply()
+        _hiddenAccounts.value = next
     }
 
     /** العمليات اللي انت أخفيتها من الحساب (علشان نفرق بينها وبين التحويلات الداخلية اللي بتتستبعد لوحدها) */

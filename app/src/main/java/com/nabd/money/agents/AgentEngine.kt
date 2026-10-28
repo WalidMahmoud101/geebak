@@ -135,7 +135,7 @@ class AgentEngine(
                 notify
             )
         } else if (isSalary) onSalary(saved, notify)
-        if (notify) {
+        if (notify && account.id !in settings.hiddenAccounts.value) {
             if (settings.notifyCaptures) Notifier.capture(context, saved, updated)
             realtimeInsights(saved, notify = true)
         }
@@ -496,6 +496,12 @@ class AgentEngine(
 
     // ------------------------------------------------------------------ وكلاء التحليل
 
+    /** العمليات من غير حسابات انت أخفيتها */
+    private suspend fun betweenVisible(from: Long, to: Long): List<Txn> {
+        val hidden = settings.hiddenAccounts.value
+        return dao.betweenOnce(from, to).filter { it.accountId !in hidden }
+    }
+
     private fun egp(t: Txn) = settings.toEgp(t.amount, t.currency)
 
     private suspend fun emit(i: Insight, notify: Boolean) {
@@ -514,7 +520,7 @@ class AgentEngine(
         val value = egp(t)
         if (value <= 0) return
         val since = t.timestamp - 90L * 86_400_000
-        val history = dao.betweenOnce(since, t.timestamp - 1)
+        val history = betweenVisible(since, t.timestamp - 1)
             .filter { it.direction == Direction.OUT && it.category == t.category && it.countsInTotals() }
             .map { egp(it) }
             .filter { it > 0 }
@@ -542,7 +548,7 @@ class AgentEngine(
         if (limit <= 0) return
         val ym = YearMonth.now()
         val (from, to) = Dates.monthRange(ym)
-        val spent = dao.betweenOnce(from, to)
+        val spent = betweenVisible(from, to)
             .filter { it.direction == Direction.OUT && it.purpose == purpose && it.countsInTotals() }
             .sumOf { egp(it) }
         val pct = spent / limit
@@ -591,7 +597,7 @@ class AgentEngine(
 
     private suspend fun subscriptions(notify: Boolean) {
         val since = now() - 120L * 86_400_000
-        val out = dao.betweenOnce(since, now()).filter { it.direction == Direction.OUT && !it.merchant.isNullOrBlank() }
+        val out = betweenVisible(since, now()).filter { it.direction == Direction.OUT && !it.merchant.isNullOrBlank() }
         out.groupBy { it.merchant!!.lowercase().replace(Regex("[^\\p{L}]"), "") }
             .filterKeys { it.length >= 3 }
             .forEach { (key, list) ->
@@ -617,7 +623,7 @@ class AgentEngine(
         val today = Dates.dayKey(now())
         if (settings.lastDigestDay == today) return
         val (from, to) = Dates.dayRange(now())
-        val txns = dao.betweenOnce(from, to).filter { it.direction == Direction.OUT && it.countsInTotals() }
+        val txns = betweenVisible(from, to).filter { it.direction == Direction.OUT && it.countsInTotals() }
         if (txns.isEmpty()) return
         val total = txns.sumOf { egp(it) }
         val top = txns.groupBy { it.purpose }.maxByOrNull { e -> e.value.sumOf { egp(it) } }?.key
