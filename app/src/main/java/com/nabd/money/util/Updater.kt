@@ -60,11 +60,38 @@ object Updater {
         }.getOrNull()
     }
 
+    private fun dir(ctx: Context) = File(ctx.cacheDir, "updates").apply { mkdirs() }
+
+    /**
+     * لو النسخة دي اتنزلت قبل كده: نتأكد إن الملف كامل وسليم (الحجم، وإنه نبض بنفس رقم النسخة)
+     * ونرجعه علشان مانزلوش تاني. أي ملف ناقص أو قديم أو بايظ بيتمسح.
+     */
+    suspend fun cached(ctx: Context, r: Release): File? = withContext(Dispatchers.IO) {
+        val keep = File(dir(ctx), "nabd-${r.versionCode}.apk")
+        dir(ctx).listFiles()?.filter { it != keep }?.forEach { it.delete() }
+        if (!keep.exists()) return@withContext null
+        val sizeOk = r.sizeBytes <= 0 || keep.length() == r.sizeBytes
+        val info = if (sizeOk) runCatching { ctx.packageManager.getPackageArchiveInfo(keep.path, 0) }.getOrNull() else null
+        val valid = info != null && info.packageName == ctx.packageName &&
+            androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(info) == r.versionCode.toLong()
+        if (valid) keep else { keep.delete(); null }
+    }
+
+    /** بعد ما التطبيق يتحدث: نمسح ملفات التحديث اللي خلصت */
+    fun cleanup(ctx: Context, currentVersionCode: Int) {
+        dir(ctx).listFiles()?.forEach { f ->
+            val code = f.name.removePrefix("nabd-").substringBefore('.').toIntOrNull()
+            if (code == null || code <= currentVersionCode) f.delete()
+        }
+    }
+
     suspend fun download(ctx: Context, r: Release, onProgress: (Float) -> Unit): File? = withContext(Dispatchers.IO) {
         runCatching {
-            val dir = File(ctx.cacheDir, "updates").apply { mkdirs() }
+            val dir = dir(ctx)
             dir.listFiles()?.forEach { it.delete() }
-            val out = File(dir, "nabd-${r.versionCode}.apk")
+            val final = File(dir, "nabd-${r.versionCode}.apk")
+            // بينزل في ملف مؤقت ويتسمى باسمه الحقيقي لما يخلص بس، علشان الناقص مايتحسبش نازل
+            val out = File(dir, "nabd-${r.versionCode}.part")
             var url = URL(r.apkUrl)
             var c: HttpURLConnection
             // GitHub بيحول التحميل لسيرفر تاني
@@ -93,7 +120,9 @@ object Updater {
                     }
                 }
             }
-            out
+            if (r.sizeBytes > 0 && out.length() != r.sizeBytes) { out.delete(); return@runCatching null }
+            if (!out.renameTo(final)) return@runCatching null
+            final
         }.getOrNull()
     }
 

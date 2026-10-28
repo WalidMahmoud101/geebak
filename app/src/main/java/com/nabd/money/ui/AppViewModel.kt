@@ -100,9 +100,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (update.value is UpdateState.Checking || update.value is UpdateState.Downloading) return
         viewModelScope.launch {
             update.value = UpdateState.Checking
+            val app = getApplication<Application>()
             val r = Updater.latest()
+            // لو النسخة دي اتنزلت قبل كده وسليمة، نروح على التثبيت علطول من غير تنزيل
+            val cached = r?.takeIf { it.versionCode > BuildConfig.VERSION_CODE }?.let { Updater.cached(app, it) }
+            if (r != null && r.versionCode <= BuildConfig.VERSION_CODE) Updater.cleanup(app, BuildConfig.VERSION_CODE)
             update.value = when {
                 r == null -> if (manual) UpdateState.Error("مقدرتش أوصل لسيرفر التحديثات، اتأكد من النت") else UpdateState.Idle
+                cached != null -> UpdateState.Ready(r, cached)
                 r.versionCode > BuildConfig.VERSION_CODE -> UpdateState.Available(r)
                 else -> if (manual) UpdateState.UpToDate else UpdateState.Idle
             }
@@ -111,6 +116,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun downloadAndInstall(r: Updater.Release) {
         viewModelScope.launch {
+            val have = Updater.cached(getApplication(), r)
+            if (have != null) {
+                update.value = UpdateState.Ready(r, have)
+                Updater.install(getApplication(), have)
+                return@launch
+            }
             update.value = UpdateState.Downloading(0f)
             val file = Updater.download(getApplication(), r) { p -> update.value = UpdateState.Downloading(p) }
             if (file == null) {
