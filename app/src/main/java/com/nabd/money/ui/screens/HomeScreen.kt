@@ -115,7 +115,7 @@ fun HomeScreen(
     val total = NetWorth.total(accounts, accEgp)
     val institutions = NetWorth.institutions(accounts, accEgp)
     val counted = accounts.count { NetWorth.counts(it, accEgp) }
-    val pending = accounts.count { NetWorth.exclusion(it, accEgp(it)) == Exclusion.UNKNOWN }
+    val pending = accounts.count { NetWorth.exclusion(it, accEgp(it)) == Exclusion.UNKNOWN && it.type != com.nabd.money.data.AccountType.CASH }
     val names = accounts.associate { it.id to it.name }
     val unread = insights.filter { !it.read }
 

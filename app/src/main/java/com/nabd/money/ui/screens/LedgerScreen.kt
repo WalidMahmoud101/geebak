@@ -1,5 +1,17 @@
 package com.nabd.money.ui.screens
 
+import com.nabd.money.ui.components.PillButton
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -65,10 +77,20 @@ fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit:
     val names = accounts.associate { it.id to it.name }
     val byDay = list.groupBy { Dates.dayKey(it.timestamp) }.toSortedMap(compareByDescending { it })
     val single = filter.purposes.singleOrNull()
+    var selected by remember { mutableStateOf(setOf<Long>()) }
+    var selecting by remember { mutableStateOf(false) }
+    // لو العملية اتغيرت أو اختفت من القايمة نشيلها من التحديد
+    val visibleIds = list.map { it.id }.toSet()
+    val picked = selected.filter { it in visibleIds }.toSet()
+    fun toggle(id: Long) { selected = if (id in selected) selected - id else selected + id }
 
+    Box(Modifier.fillMaxSize()) {
     LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
-            ScreenTitle("العمليات", "${totals.count} عملية") {
+            ScreenTitle("العمليات", if (selecting) "اختار العمليات اللي عايز تخفيها" else "${totals.count} عملية") {
+                IconButton(onClick = { selecting = !selecting; if (!selecting) selected = emptySet() }) {
+                    Icon(Icons.Rounded.Checklist, "تحديد", tint = if (selecting) NabdColors.Mint else NabdColors.TextDim)
+                }
                 IconButton(onClick = { onAdd(Direction.OUT, single) }) {
                     Icon(Icons.Rounded.Add, "عملية جديدة", tint = NabdColors.Mint)
                 }
@@ -147,10 +169,66 @@ fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit:
                         }
                     }
                     GlassCard(Modifier.fillMaxWidth(), padding = 8.dp) {
-                        dayTxns.forEach { t -> TxnRow(t, names[t.accountId]) { onEdit(t) } }
+                        dayTxns.forEach { t ->
+                            TxnRow(
+                                t, names[t.accountId], selecting = selecting, selected = t.id in picked,
+                                onLongClick = { selecting = true; toggle(t.id) },
+                            ) { if (selecting) toggle(t.id) else onEdit(t) }
+                        }
                     }
                 }
             }
+        }
+    }
+    if (selecting) {
+        SelectionBar(
+            count = picked.size,
+            showingHidden = filter.showExcluded,
+            onAll = { selected = visibleIds },
+            onHide = { vm.hideTxns(picked, true); selected = emptySet(); selecting = false },
+            onRestore = { vm.hideTxns(picked, false); selected = emptySet(); selecting = false },
+            onCancel = { selected = emptySet(); selecting = false },
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+    }
+    }
+}
+
+/** شريط الإجراءات لما تحدد عمليات: إخفاء من الحساب، أو رجّعها */
+@Composable
+private fun SelectionBar(
+    count: Int, showingHidden: Boolean,
+    onAll: () -> Unit, onHide: () -> Unit, onRestore: () -> Unit, onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(NabdColors.SurfaceTop)
+            .border(1.dp, NabdColors.Stroke, RoundedCornerShape(18.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (count == 0) "ماحددتش حاجة" else "اتحدد $count", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text("الكل", style = MaterialTheme.typography.labelLarge, color = NabdColors.Mint,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onAll).padding(horizontal = 8.dp, vertical = 4.dp))
+            Text("إلغاء", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onCancel).padding(horizontal = 8.dp, vertical = 4.dp))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PillButton("اخفيها من الحساب", Icons.Rounded.VisibilityOff, NabdColors.Danger, Modifier.weight(1f)) { if (count > 0) onHide() }
+            if (showingHidden) {
+                PillButton("رجّعها", Icons.Rounded.Visibility, NabdColors.Mint, Modifier.weight(1f)) { if (count > 0) onRestore() }
+            }
+        }
+        if (!showingHidden) {
+            Text(
+                "المخفي مابيتحسبش خصم ولا إضافة. تلاقيه في الفلتر: «وريني المخفي والتحويلات الداخلية»، ومن هناك تقدر ترجّعه.",
+                style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint
+            )
         }
     }
 }

@@ -199,7 +199,7 @@ private fun activeChips(f: TxnFilter, accounts: List<Account>): List<Pair<String
     if (f.minAmount != null || f.maxAmount != null) add(amountLabel(f) to { x: TxnFilter -> x.copy(minAmount = null, maxAmount = null) })
     if (f.query.isNotBlank()) add("«${f.query}»" to { x: TxnFilter -> x.copy(query = "") })
     if (f.companyOnly) add("مصاريف الشركة" to { x: TxnFilter -> x.copy(companyOnly = false) })
-    if (f.showExcluded) add("+ التحويلات الداخلية" to { x: TxnFilter -> x.copy(showExcluded = false) })
+    if (f.showExcluded) add("+ المخفي والتحويلات" to { x: TxnFilter -> x.copy(showExcluded = false) })
 }
 
 /** كل الفلاتر في شاشة واحدة */
@@ -255,7 +255,8 @@ private fun FilterSheet(
                 }
             }
             Section("الحساب") {
-                (listOf(CASH_ACCOUNT_ID to "كاش") + accounts.map { it.id to it.name }).forEach { (id, name) ->
+                // لو فيه حساب كاش حقيقي بيظهر هو، وإلا "كاش" للعمليات القديمة
+                (listOfNotNull((CASH_ACCOUNT_ID to "كاش").takeIf { accounts.none { it.type == com.nabd.money.data.AccountType.CASH } }) + accounts.map { it.id to it.name }).forEach { (id, name) ->
                     SelectChip(name, id in f.accountIds) {
                         f = f.copy(accountIds = if (id in f.accountIds) f.accountIds - id else f.accountIds + id)
                     }
@@ -279,7 +280,7 @@ private fun FilterSheet(
             }
             Section("كمان") {
                 SelectChip("مصاريف الشركة بس", f.companyOnly, NabdColors.Cyan, Icons.Rounded.BusinessCenter) { f = f.copy(companyOnly = !f.companyOnly) }
-                SelectChip("وريني التحويلات الداخلية", f.showExcluded, NabdColors.TextDim, Icons.Rounded.VisibilityOff) { f = f.copy(showExcluded = !f.showExcluded) }
+                SelectChip("وريني المخفي والتحويلات الداخلية", f.showExcluded, NabdColors.TextDim, Icons.Rounded.VisibilityOff) { f = f.copy(showExcluded = !f.showExcluded) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GradientButton("تطبيق", Modifier.weight(1f)) {

@@ -82,8 +82,18 @@ interface NabdDao {
     @Query("SELECT * FROM transactions WHERE accountId = :accountId ORDER BY timestamp DESC")
     fun forAccount(accountId: Long): Flow<List<Txn>>
 
+    @Query("SELECT * FROM transactions WHERE id IN (:ids)")
+    suspend fun txnsByIds(ids: List<Long>): List<Txn>
+
     @Query("SELECT * FROM transactions WHERE accountId = :accountId ORDER BY timestamp")
     suspend fun forAccountOnce(accountId: Long): List<Txn>
+
+    /** عمليات الكاش القديمة (من غير حساب) بتتنقل لحساب الكاش */
+    @Query("UPDATE transactions SET accountId = :to WHERE accountId IS NULL")
+    suspend fun adoptCashTxns(to: Long): Int
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE accountId IS NULL")
+    suspend fun countCashTxns(): Int
 
     @Query("DELETE FROM transactions WHERE accountId = :accountId")
     suspend fun deleteTxnsForAccount(accountId: Long)

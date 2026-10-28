@@ -28,12 +28,13 @@ class NabdApp : Application() {
         Notifier.ensureChannels(this)
         // مرة واحدة بعد التحديث: نلم الكروت والحسابات اللي اتكررت قبل كده
         // وبعد كده: نشيل الإعلانات اللي اتسجلت كأنها عمليات
-        if (settings.accountsTidied < 2) {
+        if (settings.accountsTidied < 3) {
             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                 runCatching {
                     if (settings.accountsTidied < 1) engine.tidyAccounts()
-                    engine.purgeAds()
-                }.onSuccess { settings.accountsTidied = 2 }
+                    if (settings.accountsTidied < 2) engine.purgeAds()
+                    engine.adoptCash()
+                }.onSuccess { settings.accountsTidied = 3 }
             }
         }
         runCatching { DigestWorker.schedule(this) }

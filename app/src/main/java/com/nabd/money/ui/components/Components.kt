@@ -4,6 +4,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -211,18 +214,32 @@ fun PurposeChips(selected: Purpose?, includeAll: Boolean, onSelect: (Purpose?) -
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun TxnRow(t: Txn, accountName: String?, onClick: () -> Unit) {
+fun TxnRow(
+    t: Txn, accountName: String?,
+    selecting: Boolean = false, selected: Boolean = false, onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     val out = t.direction == Direction.OUT
     val muted = t.excluded || t.reimbursable
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
+            .then(if (selected) Modifier.background(NabdColors.Mint.copy(alpha = 0.10f)) else Modifier)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(vertical = 6.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (selecting) {
+            Icon(
+                if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked, null,
+                tint = if (selected) NabdColors.Mint else NabdColors.TextFaint,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+        }
         IconBubble(t.purpose.icon(), t.purpose.color(), 34.dp)
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {

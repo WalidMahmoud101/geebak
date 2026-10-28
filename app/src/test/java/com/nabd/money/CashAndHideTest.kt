@@ -1,0 +1,90 @@
+package com.nabd.money
+
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.nabd.money.agents.AgentEngine
+import com.nabd.money.agents.AgentRegistry
+import com.nabd.money.data.Account
+import com.nabd.money.data.AccountType
+import com.nabd.money.data.Direction
+import com.nabd.money.data.FilterTotals
+import com.nabd.money.data.Purpose
+import com.nabd.money.data.Txn
+import com.nabd.money.data.TxnSource
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+
+@RunWith(AndroidJUnit4::class)
+@Config(sdk = [34])
+class CashAndHideTest {
+    private val app get() = ApplicationProvider.getApplicationContext<NabdApp>()
+    private val now = System.currentTimeMillis()
+
+    @Test
+    fun cashExpenseCreatesCashAccountAndMovesItsBalance() = runBlocking {
+        val dao = app.db.dao()
+        app.engine.addManual(100.0, Direction.OUT, Purpose.HOME, "بقالة", "سوبر ماركت", null, now, null)
+        val cash = dao.findAccount(AgentRegistry.MANUAL_ID, AgentEngine.CASH_KEY)!!
+        assertEquals(AccountType.CASH, cash.type)
+        assertEquals(-100.0, cash.balance, 0.001)
+        assertEquals(cash.id, dao.allTxnsOnce().single().accountId)
+        // إضافة فلوس كاش
+        app.engine.addManual(500.0, Direction.IN, Purpose.HOME, "مصروف البيت", null, cash.id, now, null)
+        assertEquals(400.0, dao.account(cash.id)!!.balance, 0.001)
+        assertEquals(1, dao.accountsOnce().count { it.type == AccountType.CASH })
+    }
+
+    @Test
+    fun oldCashTransactionsAreAdopted() = runBlocking {
+        val dao = app.db.dao()
+        dao.insertTxn(Txn(accountId = null, amount = 50.0, direction = Direction.OUT, category = "بقالة", purpose = Purpose.HOME,
+            timestamp = now, source = TxnSource.MANUAL, agentId = AgentRegistry.MANUAL_ID, fingerprint = "old-cash"))
+        app.engine.adoptCash()
+        val cash = dao.findAccount(AgentRegistry.MANUAL_ID, AgentEngine.CASH_KEY)!!
+        assertEquals(cash.id, dao.allTxnsOnce().single { it.fingerprint == "old-cash" }.accountId)
+        assertEquals(0.0, cash.balance, 0.001) // الرصيد مابيتغيرش بالنقل
+    }
+
+    @Test
+    fun hiddenIsNeitherSpentNorAddedAndCanBeRestored() = runBlocking {
+        val dao = app.db.dao()
+        app.engine.addManual(100.0, Direction.OUT, Purpose.HOME, "بقالة", null, null, now, null)
+        app.engine.addManual(300.0, Direction.IN, Purpose.HOME, "مصروف البيت", null, null, now, null)
+        val cash = dao.findAccount(AgentRegistry.MANUAL_ID, AgentEngine.CASH_KEY)!!
+        assertEquals(200.0, cash.balance, 0.001)
+        val ids = dao.allTxnsOnce().map { it.id }
+
+        app.engine.setHidden(ids, true)
+        assertEquals(0.0, dao.account(cash.id)!!.balance, 0.001)
+        val hidden = dao.allTxnsOnce()
+        assertTrue(hidden.all { it.excluded })
+        val totals = FilterTotals.of(hidden, { it.amount })
+        assertEquals(0.0, totals.income, 0.0)
+        assertEquals(0.0, totals.spent, 0.0)
+
+        app.engine.setHidden(ids, false)
+        assertEquals(200.0, dao.account(cash.id)!!.balance, 0.001)
+        assertFalse(dao.allTxnsOnce().any { it.excluded })
+    }
+
+    @Test
+    fun hidingBankTxnKeepsRealBankBalance() = runBlocking {
+        val dao = app.db.dao()
+        val acc = dao.insertAccount(Account(name = "CIB", type = AccountType.BANK, agentId = "cib", accountKey = "main", balance = 1000.0, balanceKnown = true, balanceAt = now))
+        val id = dao.insertTxn(Txn(accountId = acc, amount = 100.0, direction = Direction.OUT, category = "بقالة", purpose = Purpose.HOME,
+            timestamp = now, source = TxnSource.SMS, agentId = "cib", fingerprint = "bank1"))
+        app.engine.setHidden(listOf(id), true)
+        assertEquals(1000.0, dao.account(acc)!!.balance, 0.001) // رصيد البنك الحقيقي
+        assertTrue(dao.allTxnsOnce().single().excluded)
+        // تحويل داخلي مستبعد لوحده مايتأثرش رصيده لو رجعته
+        val t = dao.allTxnsOnce().single()
+        dao.updateTxn(t.copy(excluded = true))
+        app.engine.setHidden(listOf(id), false)
+        assertEquals(1000.0, dao.account(acc)!!.balance, 0.001)
+    }
+}

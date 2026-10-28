@@ -80,7 +80,7 @@ fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
     val egp: (Account) -> Double = { vm.toEgp(it.balance, it.currency) }
     val total = NetWorth.total(accounts, egp)
     val institutions = NetWorth.institutions(accounts, egp)
-    val needBalance = accounts.filter { NetWorth.exclusion(it, egp(it)) == Exclusion.UNKNOWN }
+    val needBalance = accounts.filter { NetWorth.exclusion(it, egp(it)) == Exclusion.UNKNOWN && it.type != AccountType.CASH }
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {

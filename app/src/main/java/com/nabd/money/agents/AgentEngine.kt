@@ -392,11 +392,12 @@ class AgentEngine(
         currency: String? = null,
         excluded: Boolean = false,
     ) = mutex.withLock {
-        val account = accountId?.let { dao.account(it) }
+        // من غير حساب = دفعت كاش من جيبك: بيتسجل على حساب "كاش (جيبي)"
+        val account = accountId?.let { dao.account(it) } ?: cashAccount()
         val txn = Txn(
-            accountId = account?.id,
+            accountId = account.id,
             amount = amount,
-            currency = currency ?: account?.currency ?: "EGP",
+            currency = currency ?: account.currency,
             direction = direction,
             merchant = merchant?.takeIf { it.isNotBlank() },
             category = category,
@@ -410,11 +411,62 @@ class AgentEngine(
             excluded = excluded,
         )
         val id = dao.insertTxn(txn)
-        if (account != null && (currency == null || currency.equals(account.currency, ignoreCase = true))) {
+        if (currency == null || currency.equals(account.currency, ignoreCase = true)) {
             val delta = if (direction == Direction.IN) amount else -amount
             dao.updateAccount(account.copy(balance = account.balance + delta, updatedAt = now()))
         }
         realtimeInsights(txn.copy(id = id), notify = true)
+    }
+
+    /** حساب الكاش (الجيب): بيتعمل أول مرة تسجل فيها حاجة كاش، ورصيده بتكتبه انت */
+    private suspend fun cashAccount(): Account {
+        dao.findAccount(AgentRegistry.MANUAL_ID, CASH_KEY)?.let { return it }
+        dao.insertAccount(
+            Account(name = "كاش (جيبي)", type = AccountType.CASH, agentId = AgentRegistry.MANUAL_ID, accountKey = CASH_KEY)
+        )
+        return dao.findAccount(AgentRegistry.MANUAL_ID, CASH_KEY)!!
+    }
+
+    /**
+     * إخفاء عمليات من الحساب: مابتتحسبش مصروف ولا دخل في أي إجمالي أو تقرير،
+     * ورصيد الحساب اللي بيتحسب من عملياتك (الكاش، الحسابات اليدوي، والأرصدة التقديرية) بيرجع كأنها ماحصلتش.
+     * رصيد البنك اللي جاي من رسالة البنك نفسها مابيتغيرش لأنه الفلوس الحقيقية.
+     * الرجوع بيعمل العكس بالظبط.
+     */
+    suspend fun setHidden(ids: List<Long>, hide: Boolean): Int = mutex.withLock {
+        if (ids.isEmpty()) return@withLock 0
+        var changed = 0
+        val hiddenSet = settings.userHidden.toMutableSet()
+        for (t in dao.txnsByIds(ids)) {
+            if (hide) {
+                if (t.excluded) continue // مستبعدة أصلاً (تحويل داخلي مثلاً)
+                dao.updateTxn(t.copy(excluded = true))
+                hiddenSet += t.id
+                adjustBalance(t, reverse = true)
+            } else {
+                if (!t.excluded) continue
+                dao.updateTxn(t.copy(excluded = false))
+                // الأثر على الرصيد بيرجع بس لو انت اللي أخفيتها
+                if (hiddenSet.remove(t.id)) adjustBalance(t, reverse = false)
+            }
+            changed++
+        }
+        settings.userHidden = hiddenSet
+        changed
+    }
+
+    private suspend fun adjustBalance(t: Txn, reverse: Boolean) {
+        val a = t.accountId?.let { dao.account(it) } ?: return
+        if (!(t.source == TxnSource.MANUAL || !a.balanceKnown)) return
+        if (!t.currency.equals(a.currency, ignoreCase = true)) return
+        val delta = if (t.direction == Direction.IN) t.amount else -t.amount
+        dao.updateAccount(a.copy(balance = a.balance + if (reverse) -delta else delta, updatedAt = now()))
+    }
+
+    /** مرة واحدة: عمليات الكاش القديمة تتنقل لحساب الكاش (من غير ما تغير رصيده) */
+    suspend fun adoptCash(): Int = mutex.withLock {
+        if (dao.countCashTxns() == 0) return@withLock 0
+        dao.adoptCashTxns(cashAccount().id)
     }
 
     suspend fun deleteTxn(t: Txn) = mutex.withLock {
@@ -580,6 +632,7 @@ class AgentEngine(
     private fun now() = System.currentTimeMillis()
 
     companion object {
+        const val CASH_KEY = "cash"
         const val SALARY_CATEGORY = "مرتب"
         const val REFUND_CATEGORY = "استرداد مصاريف الشركة"
         const val TRANSFER_CATEGORY = "تحويل بين حساباتي"

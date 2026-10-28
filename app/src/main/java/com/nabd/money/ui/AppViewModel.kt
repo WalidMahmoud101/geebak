@@ -175,7 +175,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         amount: Double, direction: Direction, purpose: Purpose, category: String,
         merchant: String?, accountId: Long?, timestamp: Long, note: String?, reimbursable: Boolean,
     ) = viewModelScope.launch(Dispatchers.IO) {
+        settings.lastAccountId = accountId ?: -1L
         engine.addManual(amount, direction, purpose, category, merchant, accountId, timestamp, note, reimbursable)
+    }
+
+    fun hideTxns(ids: Collection<Long>, hide: Boolean) = viewModelScope.launch(Dispatchers.IO) {
+        engine.setHidden(ids.toList(), hide)
     }
 
     // ---------- تصنيفاتك وقواعدك ----------

@@ -191,6 +191,16 @@ class Settings(context: Context) {
         sp.edit().putString("account_aliases", org.json.JSONObject(all as Map<*, *>).toString()).apply()
     }
 
+    /** العمليات اللي انت أخفيتها من الحساب (علشان نفرق بينها وبين التحويلات الداخلية اللي بتتستبعد لوحدها) */
+    var userHidden: Set<Long>
+        get() = sp.getStringSet("user_hidden", emptySet())!!.mapNotNull { it.toLongOrNull() }.toSet()
+        set(v) = sp.edit().putStringSet("user_hidden", v.map { it.toString() }.toSet()).apply()
+
+    /** آخر حساب سجلت عليه عملية يدوي، علشان يتختار لوحده المرة الجاية (-1 = كاش) */
+    var lastAccountId: Long
+        get() = sp.getLong("last_account_id", -1L)
+        set(v) = sp.edit().putLong("last_account_id", v).apply()
+
     /** ترتيب الحسابات المكررة القديمة اتعمل مرة */
     var accountsTidied: Int
         get() = sp.getInt("accounts_tidied", 0)

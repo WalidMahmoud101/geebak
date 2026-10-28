@@ -98,6 +98,7 @@ fun AddTxnSheet(
     initialCompany: Boolean = false,
     draft: Draft? = null,
     onNewCategory: (String, Purpose) -> Unit = { _, _ -> },
+    defaultAccountId: Long? = null,
     onSave: (Double, Direction, Purpose, String, String?, Long?, Long, String?, Boolean) -> Unit,
 ) {
     val draftTime = draft?.let { Dates.toLocal(it.timestamp) }
@@ -120,7 +121,7 @@ fun AddTxnSheet(
             }
         )
     }
-    var accountId by remember { mutableStateOf(draft?.accountId) }
+    var accountId by remember { mutableStateOf(draft?.accountId ?: defaultAccountId?.takeIf { id -> accounts.any { it.id == id } }) }
     var date by remember { mutableStateOf(draftTime?.toLocalDate() ?: LocalDate.now()) }
     var time by remember {
         mutableStateOf((draftTime?.toLocalTime() ?: LocalTime.now()).withSecond(0).withNano(0))
@@ -177,6 +178,8 @@ fun AddTxnSheet(
                 shape = RoundedCornerShape(16.dp),
             )
 
+            AccountPicker(direction, accounts, accountId) { accountId = it }
+
             Label("للبيت ولا للشغل ولا للعربية؟")
             PurposeChips(purpose, includeAll = false) { p ->
                 if (p != null) {
@@ -200,14 +203,6 @@ fun AddTxnSheet(
                     onNewCategory(name, purpose)
                     category = name
                     newCat = false
-                }
-            }
-
-            Label("من أنهي حساب؟")
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SelectChip("كاش / بدون حساب", accountId == null, NabdColors.Gold, AccountType.CASH.icon()) { accountId = null }
-                accounts.forEach { a ->
-                    SelectChip(a.name, accountId == a.id, NabdColors.Gold, a.type.icon()) { accountId = a.id }
                 }
             }
 
@@ -684,4 +679,27 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
     )
+}
+
+
+/** من أنهي حساب؟ الكاش (الجيب) أول اختيار، وبعده حساباتك. بيوري رصيد الحساب المختار */
+@Composable
+private fun AccountPicker(direction: Direction, accounts: List<Account>, selected: Long?, onSelect: (Long?) -> Unit) {
+    val cash = accounts.firstOrNull { it.type == AccountType.CASH && it.agentId == com.nabd.money.agents.AgentRegistry.MANUAL_ID && it.accountKey == com.nabd.money.agents.AgentEngine.CASH_KEY }
+    val shown = accounts.filter { it != cash }
+    val current = accounts.firstOrNull { it.id == selected } ?: cash
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Label(if (direction == Direction.OUT) "دفعت من أنهي حساب؟" else "دخلت في أنهي حساب؟")
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SelectChip("كاش (جيبي)", selected == null || selected == cash?.id, NabdColors.Gold, AccountType.CASH.icon()) { onSelect(cash?.id) }
+            shown.forEach { a ->
+                SelectChip(a.name, selected == a.id, NabdColors.Gold, a.type.icon()) { onSelect(a.id) }
+            }
+        }
+        val hint = when {
+            current == null || !current.balanceKnown -> if (current?.type == AccountType.CASH || current == null) "من فلوس جيبك. اكتب رصيد الكاش من الحسابات علشان يتحسب في إجمالي فلوسك" else null
+            else -> "رصيد ${current.name} دلوقتي ${Money.fmt(current.balance, current.currency)}"
+        }
+        hint?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim) }
+    }
 }
