@@ -38,26 +38,88 @@ object Updater {
         val sizeBytes: Long,
     )
 
-    suspend fun latest(): Release? = withContext(Dispatchers.IO) {
-        runCatching {
-            val c = URL("https://api.github.com/repos/$REPO/releases/latest").openConnection() as HttpURLConnection
-            c.setRequestProperty("Accept", "application/vnd.github+json")
-            c.connectTimeout = 15_000
-            c.readTimeout = 15_000
-            if (c.responseCode != 200) return@runCatching null
-            val o = JSONObject(c.inputStream.bufferedReader().use { it.readText() })
-            val code = o.getString("tag_name").filter { it.isDigit() }.toIntOrNull() ?: return@runCatching null
-            val assets = o.getJSONArray("assets")
-            val apk = (0 until assets.length()).map { assets.getJSONObject(it) }
-                .firstOrNull { it.getString("name").endsWith(".apk") } ?: return@runCatching null
-            Release(
-                versionCode = code,
-                name = o.optString("name").ifBlank { o.getString("tag_name") },
-                notes = o.optString("body"),
-                apkUrl = apk.getString("browser_download_url"),
-                sizeBytes = apk.optLong("size"),
-            )
-        }.getOrNull()
+    /** نتيجة الفحص: نسخة، أو سبب إننا ماقدرناش نوصل (علشان نقولك ليه بالظبط) */
+    data class Check(val release: Release?, val error: String?)
+
+    suspend fun latest(): Release? = check().release
+
+    /**
+     * بيجرب API بتاع GitHub الأول (فيه الحجم وملاحظات النسخة)، ولو فشل (حد الطلبات، حجب، بطء…)
+     * بيجرب صفحة النسخة الأخيرة العادية اللي مالهاش حد طلبات، وبعدها بنزل الملف من رابطه المباشر.
+     */
+    suspend fun check(): Check = withContext(Dispatchers.IO) {
+        var why: String? = null
+        for (attempt in 1..2) {
+            val viaApi = runCatching { fromApi() }
+            viaApi.getOrNull()?.let { return@withContext Check(it, null) }
+            why = viaApi.exceptionOrNull()?.let(::explain) ?: "رد غير متوقع من السيرفر"
+            val viaPage = runCatching { fromReleasePage() }
+            viaPage.getOrNull()?.let { return@withContext Check(it, null) }
+            why = viaPage.exceptionOrNull()?.let(::explain) ?: why
+        }
+        Check(null, why)
+    }
+
+    private class HttpFail(val code: Int) : Exception("HTTP $code")
+
+    private fun open(url: String, redirects: Boolean = true): HttpURLConnection {
+        val c = URL(url).openConnection() as HttpURLConnection
+        c.instanceFollowRedirects = redirects
+        c.connectTimeout = 15_000
+        c.readTimeout = 20_000
+        c.setRequestProperty("User-Agent", "Nabd/${com.nabd.money.BuildConfig.VERSION_NAME} (Android)")
+        return c
+    }
+
+    private fun fromApi(): Release? {
+        val c = open("https://api.github.com/repos/$REPO/releases/latest")
+        c.setRequestProperty("Accept", "application/vnd.github+json")
+        if (c.responseCode != 200) throw HttpFail(c.responseCode)
+        val o = JSONObject(c.inputStream.bufferedReader().use { it.readText() })
+        val code = o.getString("tag_name").filter { it.isDigit() }.toIntOrNull() ?: return null
+        val assets = o.getJSONArray("assets")
+        val apk = (0 until assets.length()).map { assets.getJSONObject(it) }
+            .firstOrNull { it.getString("name").endsWith(".apk") } ?: return null
+        return Release(
+            versionCode = code,
+            name = o.optString("name").ifBlank { o.getString("tag_name") },
+            notes = o.optString("body"),
+            apkUrl = apk.getString("browser_download_url"),
+            sizeBytes = apk.optLong("size"),
+        )
+    }
+
+    /** من غير API: github.com/.../releases/latest بيحوّل لصفحة آخر نسخة (v17)، ومنها نعرف رقم النسخة ورابط الملف */
+    private fun fromReleasePage(): Release? {
+        val c = open("https://github.com/$REPO/releases/latest", redirects = false)
+        c.requestMethod = "HEAD"
+        if (c.responseCode !in 300..399) throw HttpFail(c.responseCode)
+        return releaseFromLocation(c.getHeaderField("Location"))
+    }
+
+    fun releaseFromLocation(location: String?): Release? {
+        val tag = location?.substringAfter("/releases/tag/", "")?.substringBefore('?')?.trim('/').orEmpty()
+        val code = tag.filter { it.isDigit() }.toIntOrNull() ?: return null
+        return Release(
+            versionCode = code,
+            name = "نبض (النسخة $code)",
+            notes = "",
+            apkUrl = "https://github.com/$REPO/releases/download/$tag/nabd.apk",
+            sizeBytes = 0,
+        )
+    }
+
+    /** السبب بالعربي، علشان تعرف المشكلة من النت ولا من السيرفر ولا من الموبايل */
+    fun explain(e: Throwable): String = when (e) {
+        is java.net.UnknownHostException -> "مفيش اتصال بالنت، أو موقع GitHub محجوب على شبكتك"
+        is java.net.SocketTimeoutException -> "النت بطيء أو بيقطع"
+        is javax.net.ssl.SSLException -> "مشكلة أمان في الاتصال، اتأكد إن تاريخ وساعة الموبايل صح"
+        is HttpFail -> when (e.code) {
+            403, 429 -> "السيرفر رفض مؤقتاً (كتير طلبات)، جرب بعد شوية"
+            404 -> "ماوجدتش النسخة على السيرفر"
+            else -> "السيرفر رد بخطأ ${e.code}"
+        }
+        else -> e.javaClass.simpleName
     }
 
     private fun dir(ctx: Context) = File(ctx.cacheDir, "updates").apply { mkdirs() }
@@ -85,7 +147,12 @@ object Updater {
         }
     }
 
-    suspend fun download(ctx: Context, r: Release, onProgress: (Float) -> Unit): File? = withContext(Dispatchers.IO) {
+    suspend fun download(ctx: Context, r: Release, onProgress: (Float) -> Unit): File? {
+        // مرتين: النت ساعات بيقطع في نص التحميل
+        return downloadOnce(ctx, r, onProgress) ?: downloadOnce(ctx, r, onProgress)
+    }
+
+    private suspend fun downloadOnce(ctx: Context, r: Release, onProgress: (Float) -> Unit): File? = withContext(Dispatchers.IO) {
         runCatching {
             val dir = dir(ctx)
             dir.listFiles()?.forEach { it.delete() }
@@ -100,6 +167,7 @@ object Updater {
                 c.instanceFollowRedirects = false
                 c.connectTimeout = 20_000
                 c.readTimeout = 60_000
+                c.setRequestProperty("User-Agent", "Nabd/${com.nabd.money.BuildConfig.VERSION_NAME} (Android)")
                 if (c.responseCode in 300..399) {
                     url = URL(url, c.getHeaderField("Location")); c.disconnect(); continue
                 }
@@ -120,7 +188,8 @@ object Updater {
                     }
                 }
             }
-            if (r.sizeBytes > 0 && out.length() != r.sizeBytes) { out.delete(); return@runCatching null }
+            val expected = if (r.sizeBytes > 0) r.sizeBytes else total
+            if (expected > 0 && out.length() != expected) { out.delete(); return@runCatching null }
             if (!out.renameTo(final)) return@runCatching null
             final
         }.getOrNull()

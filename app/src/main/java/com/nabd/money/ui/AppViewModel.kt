@@ -112,12 +112,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             update.value = UpdateState.Checking
             val app = getApplication<Application>()
-            val r = Updater.latest()
+            val check = Updater.check()
+            val r = check.release
             // لو النسخة دي اتنزلت قبل كده وسليمة، نروح على التثبيت علطول من غير تنزيل
             val cached = r?.takeIf { it.versionCode > BuildConfig.VERSION_CODE }?.let { Updater.cached(app, it) }
             if (r != null && r.versionCode <= BuildConfig.VERSION_CODE) Updater.cleanup(app, BuildConfig.VERSION_CODE)
             update.value = when {
-                r == null -> if (manual) UpdateState.Error("مقدرتش أوصل لسيرفر التحديثات، اتأكد من النت") else UpdateState.Idle
+                r == null -> if (manual) UpdateState.Error("مقدرتش أوصل لسيرفر التحديثات: ${check.error ?: "السبب غير معروف"}") else UpdateState.Idle
                 cached != null -> UpdateState.Ready(r, cached)
                 r.versionCode > BuildConfig.VERSION_CODE -> UpdateState.Available(r)
                 else -> if (manual) UpdateState.UpToDate else UpdateState.Idle

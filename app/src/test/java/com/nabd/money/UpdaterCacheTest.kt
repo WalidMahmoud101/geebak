@@ -47,4 +47,20 @@ class UpdaterCacheTest {
         assertEquals(listOf("nabd-12.apk"), dir().listFiles()!!.map { it.name })
         assertTrue(true)
     }
+
+    @Test
+    fun fallsBackToReleasePageWithoutApi() {
+        val r = Updater.releaseFromLocation("https://github.com/WalidMahmoud101/nabd/releases/tag/v17")!!
+        assertEquals(17, r.versionCode)
+        assertEquals("https://github.com/WalidMahmoud101/nabd/releases/download/v17/nabd.apk", r.apkUrl)
+        assertNull(Updater.releaseFromLocation(null))
+        assertNull(Updater.releaseFromLocation("https://github.com/x/y/releases"))
+    }
+
+    @Test
+    fun explainsWhyTheServerCouldNotBeReached() {
+        assertTrue(Updater.explain(java.net.UnknownHostException()).contains("النت"))
+        assertTrue(Updater.explain(java.net.SocketTimeoutException()).contains("بطيء"))
+        assertTrue(Updater.explain(javax.net.ssl.SSLHandshakeException("x")).contains("تاريخ"))
+    }
 }
