@@ -1,5 +1,6 @@
 package com.nabd.money.ui.screens
 
+import androidx.compose.material3.HorizontalDivider
 import com.nabd.money.ui.components.agentTint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -608,37 +609,8 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
         containerColor = NabdColors.Surface,
         title = { Text("الإعدادات", style = MaterialTheme.typography.titleMedium) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = usd, onValueChange = { usd = it }, label = { Text("سعر الدولار بالجنيه") },
-                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    shape = RoundedCornerShape(14.dp)
-                )
-                OutlinedTextField(
-                    value = low, onValueChange = { low = it }, label = { Text("حارس الرصيد: نبهني لو الرصيد أقل من") },
-                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(14.dp)
-                )
-                OutlinedTextField(
-                    value = large, onValueChange = { large = it }, label = { Text("كاشف المصاريف: مبلغ كبير لو أكتر من") },
-                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(14.dp)
-                )
-                PillButton("التصنيفات والقواعد", Icons.Rounded.Category, NabdColors.Mint, Modifier.fillMaxWidth()) { categories = true }
-                PillButton("النسخة الاحتياطية", Icons.Rounded.CloudDone, NabdColors.Mint, Modifier.fillMaxWidth()) { backup = true }
-                PillButton("ابدأ من جديد", Icons.Rounded.RestartAlt, NabdColors.Danger, Modifier.fillMaxWidth()) { reset = true }
-                Text("الشكل", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
-                val mode by vm.themeMode.collectAsState()
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    com.nabd.money.ui.theme.ThemeMode.entries.forEach { m ->
-                        SelectChip(m.ar, m == mode) { vm.setTheme(m) }
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("إشعار مع كل عملية ملتقطة", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    Switch(checked = notify, onCheckedChange = { notify = it })
-                }
-                Spacer(Modifier.height(2.dp))
+            // بيتحرك لتحت على الشاشات الصغيرة، والتحديث فوق علشان يبان على طول
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val update by vm.update.collectAsState()
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -659,9 +631,41 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                     val u = update
                     if (u is com.nabd.money.util.UpdateState.Available) {
                         TextButton(onClick = { vm.downloadAndInstall(u.release) }) { Text("حدّث") }
+                    } else if (u is com.nabd.money.util.UpdateState.Ready) {
+                        TextButton(onClick = { com.nabd.money.util.Updater.install(vm.getApplication(), u.file) }) { Text("ثبّت") }
                     } else {
                         TextButton(onClick = { vm.checkForUpdate(manual = true) }) { Text("اتحقق") }
                     }
+                }
+                HorizontalDivider(color = NabdColors.Stroke)
+                OutlinedTextField(
+                    value = usd, onValueChange = { usd = it }, label = { Text("سعر الدولار بالجنيه") },
+                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                OutlinedTextField(
+                    value = low, onValueChange = { low = it }, label = { Text("حارس الرصيد: نبهني لو الرصيد أقل من") },
+                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                OutlinedTextField(
+                    value = large, onValueChange = { large = it }, label = { Text("كاشف المصاريف: مبلغ كبير لو أكتر من") },
+                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                PillButton("التصنيفات والقواعد", Icons.Rounded.Category, NabdColors.Mint, Modifier.fillMaxWidth()) { categories = true }
+                PillButton("النسخة الاحتياطية", Icons.Rounded.CloudDone, NabdColors.Mint, Modifier.fillMaxWidth()) { backup = true }
+                PillButton("ابدأ من جديد", Icons.Rounded.RestartAlt, NabdColors.Danger, Modifier.fillMaxWidth()) { reset = true }
+                Text("الشكل", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+                val mode by vm.themeMode.collectAsState()
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.nabd.money.ui.theme.ThemeMode.entries.forEach { m ->
+                        SelectChip(m.ar, m == mode) { vm.setTheme(m) }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("إشعار مع كل عملية ملتقطة", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = notify, onCheckedChange = { notify = it })
                 }
                 Text(
                     "بياناتك المالية على الموبايل بس. النت بيستخدم للتحديثات وبس.",
