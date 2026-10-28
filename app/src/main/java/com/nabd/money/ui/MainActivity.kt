@@ -231,7 +231,7 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
                     onAdd = { addRequest = AddRequest(Direction.OUT, Purpose.WORK, company = true) },
                     onEdit = onEdit,
                 )
-                1 -> LedgerScreen(vm, onAdd = onAdd, onEdit = onEdit)
+                1 -> LedgerScreen(vm, onAdd = onAdd, onEdit = onEdit, onCompany = { tab = COMPANY_TAB })
                 2 -> AccountsScreen(vm, onEdit = onEdit)
                 3 -> AgentsScreen(vm, perms)
                 else -> ReportsScreen(vm)
@@ -291,7 +291,7 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
             txn = t,
             accountName = accounts.firstOrNull { it.id == t.accountId }?.name,
             onDismiss = { editing = null },
-            onSave = { vm.updateTxn(it); editing = null },
+            onSave = { t2, hide -> vm.updateTxn(t2, hide); editing = null },
             onDelete = { vm.deleteTxn(it); editing = null },
             onNewCategory = { name, p -> vm.addCategory(name, p) },
             onRule = { k, c, p -> vm.addRule(k, c, p) },

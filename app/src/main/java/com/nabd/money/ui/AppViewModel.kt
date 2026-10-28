@@ -62,7 +62,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setAccountHidden(a: Account, hidden: Boolean) = settings.setAccountHidden(a.id, hidden)
 
-    val recent = dao.recent(60).visible().map { it.take(40) }.state(emptyList())
+    // مصاريف الشركة ليها خانتها، فمابتظهرش هنا
+    val recent = dao.recent(80).visible().map { list -> list.filter { !it.reimbursable }.take(40) }.state(emptyList())
 
     // ---------- الفلتر (مشترك بين المصاريف والتقارير) ----------
     val filter = MutableStateFlow(TxnFilter())
@@ -403,7 +404,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
 
-    fun updateTxn(t: Txn) = viewModelScope.launch(Dispatchers.IO) { dao.updateTxn(t) }
+    fun updateTxn(t: Txn, hide: Boolean? = null) = viewModelScope.launch(Dispatchers.IO) {
+        dao.updateTxn(t)
+        if (hide != null) engine.setHidden(listOf(t.id), hide)
+    }
     fun deleteTxn(t: Txn) = viewModelScope.launch(Dispatchers.IO) { engine.deleteTxn(t) }
 
     fun addAccount(name: String, type: AccountType, currency: String, balance: Double, agentId: String? = null, last4: String? = null) =

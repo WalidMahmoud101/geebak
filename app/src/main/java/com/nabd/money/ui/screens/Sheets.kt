@@ -363,7 +363,7 @@ fun EditTxnSheet(
     txn: Txn,
     accountName: String?,
     onDismiss: () -> Unit,
-    onSave: (Txn) -> Unit,
+    onSave: (Txn, hide: Boolean?) -> Unit,
     onDelete: (Txn) -> Unit,
     onNewCategory: (String, Purpose) -> Unit = { _, _ -> },
     onRule: (keyword: String, category: String, purpose: Purpose) -> Unit = { _, _, _ -> },
@@ -459,11 +459,12 @@ fun EditTxnSheet(
                 ) { applyAll = it }
             }
             if (out) CompanyToggle(company) { company = it; if (it) purpose = Purpose.WORK }
+            // إخفاء من الحساب: مابتتحسبش خصم ولا إضافة، ورصيد الكاش والحسابات اليدوي بيرجع كأنها ماحصلتش
             ToggleRow(
-                "يتحسب في الإجمالي",
-                if (counted) "داخلة في الدخل والمصروف" else "برا الإجمالي (تحويل بين حساباتك أو حاجة مش مصروف حقيقي)",
-                counted
-            ) { counted = it }
+                "اخفيها من الحساب",
+                if (counted) "العملية دي داخلة في الدخل والمصروف" else "مخفية: مابتتحسبش خصم ولا إضافة. ترجعها من هنا أو من الفلتر",
+                !counted
+            ) { counted = !it }
             OutlinedTextField(
                 value = note, onValueChange = { note = it }, label = { Text("ملاحظة") },
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)
@@ -479,9 +480,10 @@ fun EditTxnSheet(
                             purpose = purpose, category = category,
                             merchant = merchant.trim().ifBlank { null }, note = note.trim().ifBlank { null },
                             reimbursable = company && out,
-                            excluded = !counted,
                             reimbursedAt = if (company && out) txn.reimbursedAt else null,
-                        )
+                        ),
+                        // الإخفاء بيتنفذ بعد الحفظ علشان رصيد الحساب يتظبط
+                        if (counted != !txn.excluded) !counted else null
                     )
                 }
                 PillButton("حذف", Icons.Rounded.Delete, NabdColors.Danger, Modifier.weight(0.6f)) { confirmDelete = true }

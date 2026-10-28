@@ -27,6 +27,7 @@ object FilterCodec {
                 f.maxAmount?.let { put("max", it) }
                 put("company", f.companyOnly)
                 put("excluded", f.showExcluded)
+                put("showCompany", f.showCompany)
             })
         }
     }.toString()
@@ -53,6 +54,7 @@ object FilterCodec {
                     maxAmount = if (o.has("max")) o.getDouble("max") else null,
                     companyOnly = o.optBoolean("company"),
                     showExcluded = o.optBoolean("excluded"),
+                    showCompany = o.optBoolean("showCompany"),
                 )
             )
         }

@@ -49,6 +49,8 @@ data class TxnFilter(
     val companyOnly: Boolean = false,
     /** إظهار التحويلات بين حساباتك والحاجات المستبعدة من الإجمالي */
     val showExcluded: Boolean = false,
+    /** مصاريف الشركة بتظهر في خانة الشركة بس، ومابتتخلطش بالعمليات إلا لو طلبت */
+    val showCompany: Boolean = false,
 ) {
     private val zone: ZoneId get() = ZoneId.systemDefault()
 
@@ -148,7 +150,7 @@ data class TxnFilter(
     val activeCount: Int
         get() = listOf(
             direction != null, purposes.isNotEmpty(), categories.isNotEmpty(), accountIds.isNotEmpty(),
-            sources.isNotEmpty(), query.isNotBlank(), minAmount != null || maxAmount != null, companyOnly, showExcluded,
+            sources.isNotEmpty(), query.isNotBlank(), minAmount != null || maxAmount != null, companyOnly, showExcluded, showCompany,
         ).count { it }
 
     fun clearedFilters() = TxnFilter(period = period, month = month, fromDay = fromDay, toDay = toDay)

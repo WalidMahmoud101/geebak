@@ -1,5 +1,6 @@
 package com.nabd.money.ui.screens
 
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.navigationBarsPadding
 import com.nabd.money.ui.components.PillButton
 import androidx.compose.runtime.setValue
@@ -65,9 +66,13 @@ import com.nabd.money.util.Money
  * لما تختار غرض واحد (البيت مثلاً) الملخص بيبقى "صندوق": اتضاف كام، اتصرف كام، والباقي.
  */
 @Composable
-fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit: (Txn) -> Unit) {
+fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit: (Txn) -> Unit, onCompany: () -> Unit = {}) {
+    val companyPending by vm.companyPending.collectAsStateWithLifecycle()
     val filter by vm.filter.collectAsStateWithLifecycle()
-    val list by vm.filtered.collectAsStateWithLifecycle()
+    val all by vm.filtered.collectAsStateWithLifecycle()
+    // مصاريف الشركة ليها خانتها لوحدها، فمابتظهرش هنا إلا لو طلبتها من الفلتر (التقارير بتفضل شايفاها)
+    val filterNow by vm.filter.collectAsStateWithLifecycle()
+    val list = if (filterNow.showCompany || filterNow.companyOnly) all else all.filter { !it.reimbursable }
     val prev by vm.previousTotals.collectAsStateWithLifecycle()
     val accounts by vm.accounts.collectAsStateWithLifecycle()
     val categories by vm.categoriesInRange.collectAsStateWithLifecycle()
@@ -89,8 +94,17 @@ fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit:
     LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             ScreenTitle("العمليات", if (selecting) "اختار العمليات اللي عايز تخفيها" else "${totals.count} عملية") {
-                IconButton(onClick = { selecting = !selecting; if (!selecting) selected = emptySet() }) {
-                    Icon(Icons.Rounded.Checklist, "تحديد", tint = if (selecting) NabdColors.Mint else NabdColors.TextDim)
+                // زرار واضح بكلمة، علشان الإخفاء مايستخباش
+                Row(
+                    Modifier.clip(RoundedCornerShape(12.dp))
+                        .background(if (selecting) NabdColors.Mint.copy(alpha = 0.15f) else NabdColors.SurfaceHigh)
+                        .clickable { selecting = !selecting; if (!selecting) selected = emptySet() }
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Rounded.Checklist, null, tint = if (selecting) NabdColors.Mint else NabdColors.TextDim, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (selecting) "خلصت" else "تحديد وإخفاء", style = MaterialTheme.typography.labelMedium, color = if (selecting) NabdColors.Mint else NabdColors.TextDim)
                 }
                 IconButton(onClick = { onAdd(Direction.OUT, single) }) {
                     Icon(Icons.Rounded.Add, "عملية جديدة", tint = NabdColors.Mint)
@@ -124,12 +138,12 @@ fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit:
                     )
                 }
                 ComparisonLine(totals, prev, filter)
-                if (totals.company > 0 && !filter.companyOnly) {
+                if (companyPending.isNotEmpty() && !filter.companyOnly) {
                     Text(
-                        "مصاريف شركة ${Money.fmt(totals.company, decimals = false)} محسوبة لوحدها",
-                        style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim,
+                        "مصاريف الشركة ${Money.fmt(companyPending.sumOf { vm.txnEgp(it) }, decimals = false)} (${companyPending.size}) في خانتها لوحدها ›",
+                        style = MaterialTheme.typography.labelMedium, color = NabdColors.Cyan,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onCompany).padding(vertical = 4.dp)
                     )
                 }
                 val limit = single?.let { budgets[it.name] }

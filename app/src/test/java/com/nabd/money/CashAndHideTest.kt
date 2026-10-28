@@ -101,4 +101,19 @@ class CashAndHideTest {
         app.settings.reload()
         assertEquals(setOf(a), app.settings.hiddenAccounts.value)
     }
+
+    @Test
+    fun hidingFromEditSheetPathKeepsBalanceConsistent() = runBlocking {
+        val dao = app.db.dao()
+        app.engine.addManual(200.0, Direction.OUT, Purpose.WORK, "أدوات شغل", "طابعة", null, now, null, reimbursable = true)
+        val cash = dao.findAccount(AgentRegistry.MANUAL_ID, AgentEngine.CASH_KEY)!!
+        assertEquals(-200.0, cash.balance, 0.001)
+        val t = dao.allTxnsOnce().single()
+        // نفس مسار زرار "اخفيها" في شاشة التعديل: حفظ ثم إخفاء
+        dao.updateTxn(t.copy(note = "x"))
+        app.engine.setHidden(listOf(t.id), true)
+        assertEquals(0.0, dao.account(cash.id)!!.balance, 0.001)
+        assertEquals("x", dao.allTxnsOnce().single().note)
+        assertTrue(dao.allTxnsOnce().single().reimbursable)
+    }
 }
