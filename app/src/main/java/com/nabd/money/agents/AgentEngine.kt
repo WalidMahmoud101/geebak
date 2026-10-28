@@ -392,6 +392,7 @@ class AgentEngine(
         reimbursable: Boolean = false,
         currency: String? = null,
         excluded: Boolean = false,
+        quantity: Int = 1,
     ) = mutex.withLock {
         // من غير حساب = دفعت كاش من جيبك: بيتسجل على حساب "كاش (جيبي)"
         val account = accountId?.let { dao.account(it) } ?: cashAccount()
@@ -410,6 +411,7 @@ class AgentEngine(
             fingerprint = "manual|" + UUID.randomUUID(),
             reimbursable = reimbursable && direction == Direction.OUT,
             excluded = excluded,
+            quantity = quantity.coerceAtLeast(1),
         )
         val id = dao.insertTxn(txn)
         // عملة العملية غير عملة الحساب (مثلاً دولار من كارت بالجنيه): الرصيد بيتحول بسعر الصرف
@@ -420,6 +422,23 @@ class AgentEngine(
             dao.updateAccount(account.copy(balance = account.balance + delta, updatedAt = now()))
         }
         realtimeInsights(txn.copy(id = id), notify = true)
+    }
+
+    /** تغيير كمية مصروف: سعر الوحدة بيفضل زي ما هو والإجمالي بيتغير، ورصيد الحساب اليدوي/التقديري بيتظبط بالفرق */
+    suspend fun setQuantity(id: Long, quantity: Int): Unit = mutex.withLock {
+        val t = dao.txnsByIds(listOf(id)).firstOrNull() ?: return@withLock
+        val q = quantity.coerceIn(1, 9999)
+        if (q == t.quantity) return@withLock
+        val unit = t.amount / t.quantity.coerceAtLeast(1)
+        val updated = t.copy(quantity = q, amount = unit * q)
+        dao.updateTxn(updated)
+        if (!t.excluded) {
+            val a = t.accountId?.let { dao.account(it) } ?: return@withLock
+            if ((t.source == TxnSource.MANUAL || !a.balanceKnown) && t.currency.equals(a.currency, ignoreCase = true)) {
+                val diff = updated.amount - t.amount
+                dao.updateAccount(a.copy(balance = a.balance + if (t.direction == Direction.IN) diff else -diff, updatedAt = now()))
+            }
+        }
     }
 
     /** حساب الكاش (الجيب): بيتعمل أول مرة تسجل فيها حاجة كاش، ورصيده بتكتبه انت */

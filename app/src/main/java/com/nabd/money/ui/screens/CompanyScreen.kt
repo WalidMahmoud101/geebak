@@ -1,5 +1,6 @@
 package com.nabd.money.ui.screens
 
+import androidx.compose.material.icons.rounded.Print
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -83,6 +84,7 @@ fun CompanyScreen(vm: AppViewModel, onBack: () -> Unit, onAdd: () -> Unit, onEdi
     val salary by vm.salary.collectAsStateWithLifecycle()
     var selected by remember { mutableStateOf(setOf<Long>()) }
     var receiving by remember { mutableStateOf<List<Txn>?>(null) }
+    var invoice by remember { mutableStateOf(false) }
 
     val pendingTotal = pending.sumOf { vm.txnEgp(it) }
     val doneTotal = done.sumOf { vm.txnEgp(it) }
@@ -118,6 +120,10 @@ fun CompanyScreen(vm: AppViewModel, onBack: () -> Unit, onAdd: () -> Unit, onEdi
                         GradientButton("استلمت الفلوس كلها", Modifier.fillMaxWidth(), Icons.Rounded.DoneAll) {
                             receiving = pending
                         }
+                    }
+                    if (pending.isNotEmpty() || done.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        PillButton("فاتورة وطباعة وExcel للمحاسب", Icons.Rounded.Print, NabdColors.Cyan, Modifier.fillMaxWidth()) { invoice = true }
                     }
                     if (salary.enabled) {
                         Text(
@@ -189,6 +195,9 @@ fun CompanyScreen(vm: AppViewModel, onBack: () -> Unit, onAdd: () -> Unit, onEdi
         ) { Icon(Icons.Rounded.Add, "مصروف شركة جديد") }
     }
 
+    if (invoice) {
+        InvoiceSheet(vm, pending, done, chosen, salary.payer, onDismiss = { invoice = false })
+    }
     receiving?.let { items ->
         ReceiveDialog(items, accounts, vm::txnEgp, onDismiss = { receiving = null }) { accountId, record ->
             vm.receiveCompanyMoney(items, accountId, record)
@@ -211,7 +220,7 @@ private fun CompanyRow(
             )
             Column(Modifier.weight(1f)) {
                 Text(
-                    t.merchant ?: t.category,
+                    (t.merchant ?: t.category) + if (t.quantity > 1) "  × ${t.quantity}" else "",
                     style = MaterialTheme.typography.titleSmall,
                     textDecoration = if (done) TextDecoration.LineThrough else null,
                     color = if (done) NabdColors.TextDim else NabdColors.Text,

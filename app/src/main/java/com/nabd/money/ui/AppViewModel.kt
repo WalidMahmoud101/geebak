@@ -187,9 +187,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         amount: Double, direction: Direction, purpose: Purpose, category: String,
         merchant: String?, accountId: Long?, timestamp: Long, note: String?, reimbursable: Boolean,
         currency: String? = null,
+        quantity: Int = 1,
     ) = viewModelScope.launch(Dispatchers.IO) {
         settings.lastAccountId = accountId ?: -1L
-        engine.addManual(amount, direction, purpose, category, merchant, accountId, timestamp, note, reimbursable, currency)
+        engine.addManual(amount, direction, purpose, category, merchant, accountId, timestamp, note, reimbursable, currency, quantity = quantity)
     }
 
     fun hideTxns(ids: Collection<Long>, hide: Boolean) = viewModelScope.launch(Dispatchers.IO) {
@@ -404,8 +405,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
 
-    fun updateTxn(t: Txn, hide: Boolean? = null) = viewModelScope.launch(Dispatchers.IO) {
+    fun updateTxn(t: Txn, hide: Boolean? = null, quantity: Int? = null) = viewModelScope.launch(Dispatchers.IO) {
         dao.updateTxn(t)
+        if (quantity != null && quantity != t.quantity) engine.setQuantity(t.id, quantity)
         if (hide != null) engine.setHidden(listOf(t.id), hide)
     }
     fun deleteTxn(t: Txn) = viewModelScope.launch(Dispatchers.IO) { engine.deleteTxn(t) }

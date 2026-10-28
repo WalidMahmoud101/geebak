@@ -248,8 +248,8 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
             initialCompany = req.company,
             defaultAccountId = vm.settings.lastAccountId.takeIf { it > 0 },
             onNewCategory = { name, p -> vm.addCategory(name, p) },
-            onSave = { amount, dir, purpose, category, merchant, accountId, ts, note, company, cur ->
-                vm.addManual(amount, dir, purpose, category, merchant, accountId, ts, note, company, cur)
+            onSave = { amount, dir, purpose, category, merchant, accountId, ts, note, company, cur, qty ->
+                vm.addManual(amount, dir, purpose, category, merchant, accountId, ts, note, company, cur, qty)
                 addRequest = null
             }
         )
@@ -280,8 +280,8 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
             onDismiss = { editDraft = null },
             draft = d,
             onNewCategory = { name, p -> vm.addCategory(name, p) },
-            onSave = { amount, dir, purpose, category, merchant, accountId, ts, note, company, cur ->
-                vm.addManual(amount, dir, purpose, category, merchant, accountId, ts, note, company, cur)
+            onSave = { amount, dir, purpose, category, merchant, accountId, ts, note, company, cur, qty ->
+                vm.addManual(amount, dir, purpose, category, merchant, accountId, ts, note, company, cur, qty)
                 editDraft = null
             }
         )
@@ -291,7 +291,7 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
             txn = t,
             accountName = accounts.firstOrNull { it.id == t.accountId }?.name,
             onDismiss = { editing = null },
-            onSave = { t2, hide -> vm.updateTxn(t2, hide); editing = null },
+            onSave = { t2, hide, qty -> vm.updateTxn(t2, hide, qty); editing = null },
             onDelete = { vm.deleteTxn(it); editing = null },
             onNewCategory = { name, p -> vm.addCategory(name, p) },
             onRule = { k, c, p -> vm.addRule(k, c, p) },

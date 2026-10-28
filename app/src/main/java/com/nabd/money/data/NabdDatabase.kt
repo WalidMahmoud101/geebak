@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [Account::class, Txn::class, Budget::class, Insight::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class NabdDatabase : RoomDatabase() {
@@ -18,8 +18,15 @@ abstract class NabdDatabase : RoomDatabase() {
     companion object {
         fun build(context: Context): NabdDatabase =
             Room.databaseBuilder(context, NabdDatabase::class.java, "nabd.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
+
+        /** v2.6: كمية مصاريف الشركة */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE transactions ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1")
+            }
+        }
 
         /** v1.2: كروت الائتمان */
         val MIGRATION_2_3 = object : Migration(2, 3) {

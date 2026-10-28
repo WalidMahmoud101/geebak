@@ -67,6 +67,8 @@ data class Txn(
     val reimbursedAt: Long? = null,
     /** مايتحسبش في الإجمالي: تحويل بين حساباتك، استرداد من الشركة، أو المستخدم استبعده */
     @ColumnInfo(defaultValue = "0") val excluded: Boolean = false,
+    /** الكمية (لمصاريف الشركة): amount = سعر الوحدة × الكمية */
+    @ColumnInfo(defaultValue = "1") val quantity: Int = 1,
 )
 
 /** العملية دي تدخل في إجمالي الدخل والمصروف الشخصي؟ مصاريف الشركة ليها إجمالي لوحدها */

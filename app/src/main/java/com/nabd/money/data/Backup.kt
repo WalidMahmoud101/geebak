@@ -102,7 +102,7 @@ object Backup {
         .put("timestamp", t.timestamp).put("source", t.source.name).put("agentId", t.agentId)
         .put("rawText", t.rawText ?: JSONObject.NULL).put("note", t.note ?: JSONObject.NULL)
         .put("fingerprint", t.fingerprint).put("reimbursable", t.reimbursable)
-        .put("reimbursedAt", t.reimbursedAt ?: JSONObject.NULL).put("excluded", t.excluded)
+        .put("reimbursedAt", t.reimbursedAt ?: JSONObject.NULL).put("excluded", t.excluded).put("quantity", t.quantity)
 
     private fun txn(o: JSONObject) = Txn(
         id = o.getLong("id"), accountId = o.optLongOrNull("accountId"), amount = o.getDouble("amount"),
@@ -112,7 +112,7 @@ object Backup {
         timestamp = o.getLong("timestamp"), source = TxnSource.valueOf(o.getString("source")),
         agentId = o.getString("agentId"), rawText = o.optStringOrNull("rawText"), note = o.optStringOrNull("note"),
         fingerprint = o.getString("fingerprint"), reimbursable = o.optBoolean("reimbursable"),
-        reimbursedAt = o.optLongOrNull("reimbursedAt"), excluded = o.optBoolean("excluded"),
+        reimbursedAt = o.optLongOrNull("reimbursedAt"), excluded = o.optBoolean("excluded"), quantity = o.optInt("quantity", 1).coerceAtLeast(1),
     )
 
     private fun insightJson(i: Insight) = JSONObject()

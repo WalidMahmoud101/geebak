@@ -254,6 +254,15 @@ class Settings(context: Context) {
         get() = sp.getStringSet("user_hidden", emptySet())!!.mapNotNull { it.toLongOrNull() }.toSet()
         set(v) = sp.edit().putStringSet("user_hidden", v.map { it.toString() }.toSet()).apply()
 
+    /** بيانات فاتورة الشركة: اسمك واسم الشركة (الافتراضي من شركة المرتب) */
+    var invoiceEmployee: String
+        get() = sp.getString("invoice_employee", "")!!
+        set(v) = sp.edit().putString("invoice_employee", v).apply()
+
+    var invoiceCompany: String
+        get() = sp.getString("invoice_company", "")!!
+        set(v) = sp.edit().putString("invoice_company", v).apply()
+
     /** آخر حساب سجلت عليه عملية يدوي، علشان يتختار لوحده المرة الجاية (-1 = كاش) */
     var lastAccountId: Long
         get() = sp.getLong("last_account_id", -1L)

@@ -1,5 +1,7 @@
 package com.nabd.money.ui.screens
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.rounded.CurrencyExchange
 import androidx.compose.material3.HorizontalDivider
 import com.nabd.money.ui.components.agentTint
@@ -100,8 +102,9 @@ fun AddTxnSheet(
     draft: Draft? = null,
     onNewCategory: (String, Purpose) -> Unit = { _, _ -> },
     defaultAccountId: Long? = null,
-    onSave: (Double, Direction, Purpose, String, String?, Long?, Long, String?, Boolean, String?) -> Unit,
+    onSave: (Double, Direction, Purpose, String, String?, Long?, Long, String?, Boolean, String?, Int) -> Unit,
 ) {
+    var quantity by remember { mutableStateOf(1) }
     val draftTime = draft?.let { Dates.toLocal(it.timestamp) }
     var company by remember { mutableStateOf(draft?.company ?: initialCompany) }
     var direction by remember { mutableStateOf(draft?.direction ?: initialDirection) }
@@ -228,7 +231,11 @@ fun AddTxnSheet(
             if (direction == Direction.OUT) {
                 CompanyToggle(company) {
                     company = it
-                    if (it) { purpose = Purpose.WORK; purposeTouched = true }
+                    if (it) { purpose = Purpose.WORK; purposeTouched = true } else quantity = 1
+                }
+                if (company) {
+                    // الكمية: المبلغ فوق = سعر الوحدة، والإجمالي = السعر × الكمية (بيظهر في فاتورة الشركة)
+                    QuantityStepper(quantity, amount, pickedCurrency ?: accounts.firstOrNull { it.id == accountId }?.currency ?: "EGP") { quantity = it }
                 }
             }
 
@@ -248,9 +255,10 @@ fun AddTxnSheet(
                 val a = amount ?: return@GradientButton
                 if (a <= 0) return@GradientButton
                 val ts = LocalDateTime.of(date, time).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                val q = if (company && direction == Direction.OUT) quantity else 1
                 onSave(
-                    a, direction, purpose, category, merchant.trim().ifBlank { null }, accountId, ts,
-                    note.trim().ifBlank { null }, company && direction == Direction.OUT, pickedCurrency
+                    a * q, direction, purpose, category, merchant.trim().ifBlank { null }, accountId, ts,
+                    note.trim().ifBlank { null }, company && direction == Direction.OUT, pickedCurrency, q
                 )
             }
         }
@@ -363,7 +371,7 @@ fun EditTxnSheet(
     txn: Txn,
     accountName: String?,
     onDismiss: () -> Unit,
-    onSave: (Txn, hide: Boolean?) -> Unit,
+    onSave: (Txn, hide: Boolean?, quantity: Int) -> Unit,
     onDelete: (Txn) -> Unit,
     onNewCategory: (String, Purpose) -> Unit = { _, _ -> },
     onRule: (keyword: String, category: String, purpose: Purpose) -> Unit = { _, _, _ -> },
@@ -377,6 +385,7 @@ fun EditTxnSheet(
     var confirmDelete by remember { mutableStateOf(false) }
     var company by remember { mutableStateOf(txn.reimbursable) }
     var counted by remember { mutableStateOf(!txn.excluded) }
+    var qty by remember { mutableStateOf(txn.quantity.coerceAtLeast(1)) }
     val out = txn.direction == Direction.OUT
     val agent = AgentRegistry.byId(txn.agentId)
 
@@ -459,6 +468,11 @@ fun EditTxnSheet(
                 ) { applyAll = it }
             }
             if (out) CompanyToggle(company) { company = it; if (it) purpose = Purpose.WORK }
+            if (out && company) {
+                // سعر الوحدة ثابت، والإجمالي بيتغير بالكمية
+                val unit = txn.amount / txn.quantity.coerceAtLeast(1)
+                QuantityStepper(qty, unit, txn.currency, totalOnly = true) { qty = it }
+            }
             // إخفاء من الحساب: مابتتحسبش خصم ولا إضافة، ورصيد الكاش والحسابات اليدوي بيرجع كأنها ماحصلتش
             ToggleRow(
                 "اخفيها من الحساب",
@@ -483,7 +497,8 @@ fun EditTxnSheet(
                             reimbursedAt = if (company && out) txn.reimbursedAt else null,
                         ),
                         // الإخفاء بيتنفذ بعد الحفظ علشان رصيد الحساب يتظبط
-                        if (counted != !txn.excluded) !counted else null
+                        if (counted != !txn.excluded) !counted else null,
+                        if (company && out) qty else 1
                     )
                 }
                 PillButton("حذف", Icons.Rounded.Delete, NabdColors.Danger, Modifier.weight(0.6f)) { confirmDelete = true }
@@ -750,4 +765,39 @@ private fun AccountPicker(direction: Direction, accounts: List<Account>, selecte
         }
         hint?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim) }
     }
+}
+
+
+/** الكمية 1، 2، 3…: بتضرب سعر الوحدة وتوريك الإجمالي */
+@Composable
+fun QuantityStepper(quantity: Int, unitPrice: Double?, currency: String, totalOnly: Boolean = false, onChange: (Int) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(NabdColors.SurfaceTop).padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("الكمية", style = MaterialTheme.typography.titleSmall)
+            Text(
+                if (unitPrice != null && unitPrice > 0)
+                    "${Money.plain("", unitPrice, currency)} × $quantity = ${Money.plain("", unitPrice * quantity, currency)}"
+                else if (totalOnly) "" else "المبلغ فوق = سعر الوحدة الواحدة",
+                style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StepButton("−", enabled = quantity > 1) { onChange(quantity - 1) }
+            Text("$quantity", style = MaterialTheme.typography.titleMedium, modifier = Modifier.widthIn(min = 24.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            StepButton("+", enabled = quantity < 999) { onChange(quantity + 1) }
+        }
+    }
+}
+
+@Composable
+private fun StepButton(label: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.size(34.dp).clip(RoundedCornerShape(10.dp))
+            .background(if (enabled) NabdColors.Mint.copy(alpha = 0.15f) else NabdColors.Stroke.copy(alpha = 0.4f))
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center
+    ) { Text(label, style = MaterialTheme.typography.titleMedium, color = if (enabled) NabdColors.Mint else NabdColors.TextFaint) }
 }

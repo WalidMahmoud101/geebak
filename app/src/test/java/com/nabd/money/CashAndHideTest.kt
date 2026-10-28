@@ -116,4 +116,33 @@ class CashAndHideTest {
         assertEquals("x", dao.allTxnsOnce().single().note)
         assertTrue(dao.allTxnsOnce().single().reimbursable)
     }
+
+    @Test
+    fun quantityScalesTotalAndBalance() = runBlocking {
+        val dao = app.db.dao()
+        // 2 قطع بـ 150 للواحدة = 300
+        app.engine.addManual(300.0, Direction.OUT, Purpose.WORK, "أدوات شغل", "ورق", null, now, null, reimbursable = true, quantity = 2)
+        val cash = dao.findAccount(AgentRegistry.MANUAL_ID, AgentEngine.CASH_KEY)!!
+        val t = dao.allTxnsOnce().single()
+        assertEquals(2, t.quantity)
+        assertEquals(-300.0, cash.balance, 0.001)
+        app.engine.setQuantity(t.id, 5)
+        val t2 = dao.allTxnsOnce().single()
+        assertEquals(5, t2.quantity)
+        assertEquals(750.0, t2.amount, 0.001) // سعر الوحدة 150 ثابت
+        assertEquals(-750.0, dao.account(cash.id)!!.balance, 0.001)
+        app.engine.setQuantity(t.id, 1)
+        assertEquals(150.0, dao.allTxnsOnce().single().amount, 0.001)
+        assertEquals(-150.0, dao.account(cash.id)!!.balance, 0.001)
+    }
+
+    @Test
+    fun quantitySurvivesBackup() = runBlocking {
+        val dao = app.db.dao()
+        app.engine.addManual(90.0, Direction.OUT, Purpose.WORK, "ورق", null, null, now, null, reimbursable = true, quantity = 3)
+        val json = com.nabd.money.data.Backup.export(app.db, app.settings, "t")
+        dao.clearTxns()
+        com.nabd.money.data.Backup.restore(app.db, app.settings, json)
+        assertEquals(3, dao.allTxnsOnce().single().quantity)
+    }
 }
