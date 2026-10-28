@@ -138,13 +138,13 @@ fun HomeScreen(
         item {
             QuickActions(
                 companyCount = companyPending.size,
-                salaryLabel = salaryShort(salary),
                 onExpense = { onAdd(Direction.OUT, null) },
                 onIncome = { onAdd(Direction.IN, null) },
-                onSalary = { salaryDialog = true },
                 onCompany = { onNavigate(COMPANY_TAB) },
             )
         }
+        // خانة المرتب: ميعاد القبض، متأخر كام يوم، وآخر مرتب. دوس عليها تظبط الشركة والمبلغ
+        item { SalaryCard(salary) { salaryDialog = true } }
         if (!perms.allGranted) item { PermissionCard(perms) }
         if (unread.isNotEmpty()) {
             items(unread.take(2).size) { i -> InsightRow(unread[i]) { vm.dismissInsight(unread[i]) } }
@@ -183,15 +183,6 @@ fun HomeScreen(
                 }
             }
         }
-    }
-}
-
-private fun salaryShort(cfg: com.nabd.money.data.SalaryConfig): String {
-    val st = SalaryWatch.status(cfg) ?: return if (cfg.enabled) "مستني" else "المرتب"
-    return when {
-        st.daysLate > 0 -> "متأخر ${st.daysLate} يوم"
-        st.daysLeft == 0 -> "النهاردة"
-        else -> "بعد ${st.daysLeft} يوم"
     }
 }
 
@@ -253,17 +244,14 @@ private fun BalanceCard(total: Double, counted: Int, pending: Int, onClick: () -
 @Composable
 private fun QuickActions(
     companyCount: Int,
-    salaryLabel: String,
     onExpense: () -> Unit,
     onIncome: () -> Unit,
-    onSalary: () -> Unit,
     onCompany: () -> Unit,
 ) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         QuickAction("مصروف", Icons.Rounded.Remove, Modifier.weight(1f), onExpense)
-        QuickAction("إضافة", Icons.Rounded.Add, Modifier.weight(1f), onIncome)
-        QuickAction(salaryLabel, Icons.Rounded.Paid, Modifier.weight(1.2f), onSalary)
-        QuickAction(if (companyCount > 0) "الشركة ($companyCount)" else "الشركة", Icons.Rounded.BusinessCenter, Modifier.weight(1.2f), onCompany)
+        QuickAction("إضافة فلوس", Icons.Rounded.Add, Modifier.weight(1f), onIncome)
+        QuickAction(if (companyCount > 0) "الشركة ($companyCount)" else "الشركة", Icons.Rounded.BusinessCenter, Modifier.weight(1f), onCompany)
     }
 }
 
