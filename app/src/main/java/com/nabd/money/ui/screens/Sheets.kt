@@ -1,5 +1,6 @@
 package com.nabd.money.ui.screens
 
+import androidx.compose.material.icons.rounded.CurrencyExchange
 import androidx.compose.material3.HorizontalDivider
 import com.nabd.money.ui.components.agentTint
 import androidx.compose.foundation.background
@@ -99,7 +100,7 @@ fun AddTxnSheet(
     draft: Draft? = null,
     onNewCategory: (String, Purpose) -> Unit = { _, _ -> },
     defaultAccountId: Long? = null,
-    onSave: (Double, Direction, Purpose, String, String?, Long?, Long, String?, Boolean) -> Unit,
+    onSave: (Double, Direction, Purpose, String, String?, Long?, Long, String?, Boolean, String?) -> Unit,
 ) {
     val draftTime = draft?.let { Dates.toLocal(it.timestamp) }
     var company by remember { mutableStateOf(draft?.company ?: initialCompany) }
@@ -121,6 +122,7 @@ fun AddTxnSheet(
             }
         )
     }
+    var pickedCurrency by remember { mutableStateOf(draft?.currency?.takeIf { it != "EGP" }) }
     var accountId by remember { mutableStateOf(draft?.accountId ?: defaultAccountId?.takeIf { id -> accounts.any { it.id == id } }) }
     var date by remember { mutableStateOf(draftTime?.toLocalDate() ?: LocalDate.now()) }
     var time by remember {
@@ -162,13 +164,20 @@ fun AddTxnSheet(
                 value = amountText,
                 onValueChange = { amountText = it },
                 label = { Text("المبلغ") },
-                suffix = { Text(accounts.firstOrNull { it.id == accountId }?.currency ?: "ج.م") },
+                suffix = { Text(pickedCurrency ?: accounts.firstOrNull { it.id == accountId }?.currency ?: "EGP") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 textStyle = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Bold, color = color),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
             )
+            // العملة: افتراضياً عملة الحساب، وتقدر تغيرها (والرصيد بيتحول بسعر الصرف)
+            val accCur = accounts.firstOrNull { it.id == accountId }?.currency ?: "EGP"
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("EGP" to "جنيه ج.م", "USD" to "دولار \$", "USDT" to "USDT", "EUR" to "يورو €").forEach { (c, label) ->
+                    SelectChip(label, (pickedCurrency ?: accCur) == c, NabdColors.Gold) { pickedCurrency = if (c == accCur) null else c }
+                }
+            }
             OutlinedTextField(
                 value = merchant,
                 onValueChange = { merchant = it },
@@ -241,7 +250,7 @@ fun AddTxnSheet(
                 val ts = LocalDateTime.of(date, time).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
                 onSave(
                     a, direction, purpose, category, merchant.trim().ifBlank { null }, accountId, ts,
-                    note.trim().ifBlank { null }, company && direction == Direction.OUT
+                    note.trim().ifBlank { null }, company && direction == Direction.OUT, pickedCurrency
                 )
             }
         }
@@ -538,31 +547,58 @@ fun ConfirmDialog(title: String, body: String, onDismiss: () -> Unit, onConfirm:
     )
 }
 
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun AddAccountDialog(onDismiss: () -> Unit, onConfirm: (String, AccountType, String, Double) -> Unit) {
+fun AddAccountDialog(onDismiss: () -> Unit, onConfirm: (String, AccountType, String, Double, String?, String?) -> Unit) {
+    var preset by remember { mutableStateOf<com.nabd.money.agents.AccountPreset?>(null) }
     var name by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf(AccountType.CASH) }
+    var type by remember { mutableStateOf(AccountType.BANK) }
     var currency by remember { mutableStateOf("EGP") }
     var balance by remember { mutableStateOf("") }
+    var last4 by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = NabdColors.Surface,
         title = { Text("حساب جديد", style = MaterialTheme.typography.titleMedium) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("اختار حساب جاهز", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    com.nabd.money.agents.AccountPresets.all.forEach { p ->
+                        SelectChip(p.label, preset == p, NabdColors.Mint, p.type.icon()) {
+                            if (preset == p) { preset = null } else {
+                                preset = p; name = p.label; type = p.type; currency = p.currency
+                            }
+                        }
+                    }
+                }
+                preset?.let { Text(it.note, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim) }
                 OutlinedTextField(
-                    value = name, onValueChange = { name = it }, label = { Text("الاسم (مثلاً: كاش البيت)") },
+                    value = name, onValueChange = { name = it }, label = { Text("الاسم (مثلاً: بنك تاني، كاش البيت)") },
                     singleLine = true, shape = RoundedCornerShape(14.dp)
                 )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    AccountType.entries.forEach { t -> SelectChip(t.ar, t == type, NabdColors.Mint, t.icon()) { type = t } }
+                if (preset == null) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        AccountType.entries.forEach { t -> SelectChip(t.ar, t == type, NabdColors.Mint, t.icon()) { type = t } }
+                    }
                 }
+                Text("العملة", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("EGP", "USD", "USDT").forEach { c -> SelectChip(c, c == currency, NabdColors.Gold) { currency = c } }
+                    listOf("EGP" to "جنيه ج.م", "USD" to "دولار \$", "USDT" to "USDT", "EUR" to "يورو €").forEach { (c, label) ->
+                        SelectChip(label, c == currency, NabdColors.Gold) { currency = c }
+                    }
+                }
+                if (preset?.askLast4 == true) {
+                    OutlinedTextField(
+                        value = last4, onValueChange = { v -> last4 = v.filter { it.isDigit() }.take(4) },
+                        label = { Text("آخر 4 أرقام الكارت (علشان نربط الإشعارات)") },
+                        singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(14.dp)
+                    )
                 }
                 OutlinedTextField(
-                    value = balance, onValueChange = { balance = it }, label = { Text("الرصيد الحالي") },
+                    value = balance, onValueChange = { balance = it }, label = { Text("المبلغ اللي معاك فيه دلوقتي ($currency)") },
                     singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     shape = RoundedCornerShape(14.dp)
                 )
@@ -570,7 +606,11 @@ fun AddAccountDialog(onDismiss: () -> Unit, onConfirm: (String, AccountType, Str
         },
         confirmButton = {
             TextButton(onClick = {
-                if (name.isNotBlank()) onConfirm(name.trim(), type, currency, Money.parseInput(balance) ?: 0.0)
+                if (name.isNotBlank()) {
+                    val l4 = last4.takeIf { it.length == 4 }
+                    val label = if (l4 != null && !name.contains(l4)) "${name.trim()} •••• $l4" else name.trim()
+                    onConfirm(label, type, currency, Money.parseInput(balance) ?: 0.0, preset?.agentId, l4)
+                }
             }) { Text("إضافة") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
@@ -582,6 +622,11 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
     var categories by remember { mutableStateOf(false) }
     var backup by remember { mutableStateOf(false) }
     var reset by remember { mutableStateOf(false) }
+    var currencies by remember { mutableStateOf(false) }
+    if (currencies) {
+        CurrencySheet(vm) { currencies = false }
+        return
+    }
     if (reset) {
         ResetSheet(vm) { reset = false }
         return
@@ -595,7 +640,6 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
         return
     }
     val s = vm.settings
-    var usd by remember { mutableStateOf(s.usdRate.value.toString()) }
     var low by remember { mutableStateOf(s.lowBalance.toInt().toString()) }
     var large by remember { mutableStateOf(s.largeSpend.toInt().toString()) }
     var notify by remember { mutableStateOf(s.notifyCaptures) }
@@ -633,11 +677,8 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                     }
                 }
                 HorizontalDivider(color = NabdColors.Stroke)
-                OutlinedTextField(
-                    value = usd, onValueChange = { usd = it }, label = { Text("سعر الدولار بالجنيه") },
-                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    shape = RoundedCornerShape(14.dp)
-                )
+                val rateNow by vm.usdRate.collectAsState()
+                PillButton("العملات وسعر الصرف  (1$ = ${"%.2f".format(java.util.Locale.US, rateNow)} ج.م)", Icons.Rounded.CurrencyExchange, NabdColors.Gold, Modifier.fillMaxWidth()) { currencies = true }
                 OutlinedTextField(
                     value = low, onValueChange = { low = it }, label = { Text("حارس الرصيد: نبهني لو الرصيد أقل من") },
                     singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -651,6 +692,12 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                 PillButton("التصنيفات والقواعد", Icons.Rounded.Category, NabdColors.Mint, Modifier.fillMaxWidth()) { categories = true }
                 PillButton("النسخة الاحتياطية", Icons.Rounded.CloudDone, NabdColors.Mint, Modifier.fillMaxWidth()) { backup = true }
                 PillButton("ابدأ من جديد", Icons.Rounded.RestartAlt, NabdColors.Danger, Modifier.fillMaxWidth()) { reset = true }
+                Text("المبالغ تظهر بـ", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("AUTO" to "عملة كل حساب", "EGP" to "جنيه ج.م", "USD" to "دولار \$").forEach { (k, label) ->
+                        SelectChip(label, Money.mode == k) { s.displayCurrency = k }
+                    }
+                }
                 Text("الشكل", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
                 val mode by vm.themeMode.collectAsState()
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -670,7 +717,6 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = {
-                Money.parseInput(usd)?.takeIf { it > 0 }?.let(vm::setUsdRate)
                 Money.parseInput(low)?.let { s.lowBalance = it }
                 Money.parseInput(large)?.let { s.largeSpend = it }
                 s.notifyCaptures = notify

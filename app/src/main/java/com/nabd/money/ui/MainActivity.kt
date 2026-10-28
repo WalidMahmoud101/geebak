@@ -248,8 +248,8 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
             initialCompany = req.company,
             defaultAccountId = vm.settings.lastAccountId.takeIf { it > 0 },
             onNewCategory = { name, p -> vm.addCategory(name, p) },
-            onSave = { amount, dir, purpose, category, merchant, accountId, ts, note, company ->
-                vm.addManual(amount, dir, purpose, category, merchant, accountId, ts, note, company)
+            onSave = { amount, dir, purpose, category, merchant, accountId, ts, note, company, cur ->
+                vm.addManual(amount, dir, purpose, category, merchant, accountId, ts, note, company, cur)
                 addRequest = null
             }
         )
@@ -280,8 +280,8 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
             onDismiss = { editDraft = null },
             draft = d,
             onNewCategory = { name, p -> vm.addCategory(name, p) },
-            onSave = { amount, dir, purpose, category, merchant, accountId, ts, note, company ->
-                vm.addManual(amount, dir, purpose, category, merchant, accountId, ts, note, company)
+            onSave = { amount, dir, purpose, category, merchant, accountId, ts, note, company, cur ->
+                vm.addManual(amount, dir, purpose, category, merchant, accountId, ts, note, company, cur)
                 editDraft = null
             }
         )

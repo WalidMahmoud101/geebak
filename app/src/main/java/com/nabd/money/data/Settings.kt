@@ -22,7 +22,44 @@ class Settings(context: Context) {
     /** سعر الدولار بالجنيه، علشان نجمع RedotPay و Kast و Binance مع باقي الحسابات */
     val usdRate: StateFlow<Double> = _usdRate
 
+    /** طريقة عرض المبالغ: AUTO (بعملة كل حساب) أو EGP أو USD */
+    var displayCurrency: String
+        get() = sp.getString("display_currency", "AUTO")!!
+        set(v) { sp.edit().putString("display_currency", v).apply(); com.nabd.money.util.Money.mode = v }
+
+    /** مزامنة سعر الصرف لوحدها (الافتراضي شغال). لو قفلتها السعر اللي كتبته بإيدك بيفضل ثابت */
+    var autoRates: Boolean
+        get() = sp.getBoolean("auto_rates", true)
+        set(v) = sp.edit().putBoolean("auto_rates", v).apply()
+
+    var ratesUpdatedAt: Long
+        get() = sp.getLong("rates_updated_at", 0L)
+        set(v) = sp.edit().putLong("rates_updated_at", v).apply()
+
+    private val _ratesAt = MutableStateFlow(sp.getLong("rates_updated_at", 0L))
+    val ratesAt: StateFlow<Long> = _ratesAt
+
+    /** مزامنة من النت: بتحدّث سعر الدولار والعملات التانية. بترجع true لو نجحت */
+    suspend fun syncRates(force: Boolean = false): Boolean {
+        if (!force && (!autoRates || System.currentTimeMillis() - ratesUpdatedAt < 3 * 3_600_000L)) return false
+        val live = com.nabd.money.util.Rates.fetch() ?: return false
+        Fx.perUsd = live.perUsd
+        sp.edit().putString("fx_per_usd", org.json.JSONObject(live.perUsd as Map<*, *>).toString()).apply()
+        live.perUsd["EGP"]?.let { setUsdRate(it) }
+        ratesUpdatedAt = System.currentTimeMillis()
+        _ratesAt.value = ratesUpdatedAt
+        return true
+    }
+
+    private fun loadFx() {
+        Fx.perUsd = runCatching {
+            val o = org.json.JSONObject(sp.getString("fx_per_usd", null) ?: return@runCatching emptyMap())
+            o.keys().asSequence().associateWith { o.getDouble(it) }
+        }.getOrDefault(emptyMap())
+    }
+
     fun setUsdRate(v: Double) {
+        com.nabd.money.util.Money.rate = v
         _usdRate.value = v
         sp.edit().putFloat("usd_rate", v.toFloat()).apply()
     }
@@ -67,6 +104,9 @@ class Settings(context: Context) {
     val taxonomy: StateFlow<UserTaxonomy> = _taxonomy
 
     init {
+        loadFx()
+        com.nabd.money.util.Money.rate = _usdRate.value
+        com.nabd.money.util.Money.mode = sp.getString("display_currency", "AUTO")!!
         com.nabd.money.agents.Categorizer.user = _taxonomy.value
     }
 
@@ -150,6 +190,10 @@ class Settings(context: Context) {
     fun reload() {
         _disabled.value = sp.getStringSet("disabled_agents", emptySet())!!.toSet()
         _usdRate.value = sp.getFloat("usd_rate", 50f).toDouble()
+        com.nabd.money.util.Money.rate = _usdRate.value
+        com.nabd.money.util.Money.mode = displayCurrency
+        loadFx()
+        _ratesAt.value = ratesUpdatedAt
         _theme.value = runCatching { com.nabd.money.ui.theme.ThemeMode.valueOf(sp.getString("theme", "SYSTEM")!!) }
             .getOrDefault(com.nabd.money.ui.theme.ThemeMode.SYSTEM)
         _saved.value = FilterCodec.decode(sp.getString("saved_filters", null))
@@ -271,14 +315,27 @@ data class SalaryConfig(
 }
 
 object Fx {
+    /** أسعار العملات مقابل دولار واحد من المزامنة (EUR = 0.92 يعني 1$ = 0.92€). لو فاضية بنستخدم أسعار تقريبية */
+    @Volatile var perUsd: Map<String, Double> = emptyMap()
+
+    private val fallbackPerUsd = mapOf("EUR" to 1 / 1.08, "GBP" to 1 / 1.27, "SAR" to 3.75, "AED" to 3.6725)
+
+    private fun per(c: String): Double? = perUsd[c] ?: fallbackPerUsd[c]
+
     /** عملات الكريبتو الغير مستقرة (BTC...) مابتتحسبش في الإجمالي */
-    fun toEgp(amount: Double, currency: String, usd: Double): Double = when (currency.uppercase()) {
+    fun toEgp(amount: Double, currency: String, usd: Double): Double = when (val c = currency.uppercase()) {
         "EGP" -> amount
         "USD", "USDT", "USDC" -> amount * usd
-        "EUR" -> amount * usd * 1.08
-        "GBP" -> amount * usd * 1.27
-        "SAR" -> amount * usd / 3.75
-        "AED" -> amount * usd / 3.6725
+        "EUR", "GBP", "SAR", "AED" -> per(c)?.let { amount * usd / it } ?: 0.0
         else -> 0.0
+    }
+
+    /** تحويل بين أي عملتين من اللي بنعرفهم، أو null لو عملة مش معروفة */
+    fun convert(amount: Double, from: String, to: String, usd: Double): Double? {
+        val egp = toEgp(amount, from, usd)
+        if (egp == 0.0 && amount != 0.0) return null
+        val k = to.uppercase()
+        val one = toEgp(1.0, k, usd)
+        return if (one == 0.0) null else egp / one
     }
 }

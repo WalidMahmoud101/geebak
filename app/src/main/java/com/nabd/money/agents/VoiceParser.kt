@@ -37,7 +37,9 @@ object VoiceParser {
 
     private fun rx(p: String) = Regex(p, RegexOption.IGNORE_CASE)
 
-    private val outVerbs = rx("""(صرفت|صرفنا|دفعت|دفعنا|اشتريت|اشترينا|جبت|جبنا|سددت|خلصت|اتخصم|خصم|دافع|حاسبت|ادفع|فاتوره|اكلت|شربت|ركبت|مونت|فولت|شحنت)""")
+    private val outVerbs = rx("""(صرفت|صرفنا|دفعت|دفعنا|اشتريت|اشترينا|جبت|جبنا|سددت|خلصت|اتخصم|خصم|دافع|حاسبت|ادفع|فاتوره|اكلت|شربت|ركبت|مونت|فولت|شحنت|سحبت|ارسلت|حولت|اتسحب|(^|\s)(اتبعت|بعت)(\s|$))""")
+    /** "اتبعتلي" / "اتضافلي": فلوس جاتلي، حتى لو فيها حروف فعل خروج */
+    private val toMeIn = rx("""(اتبعتلي|اتبعتلى|بعتولي|بعتلي|اتضافلي|اتضافلى|اتضاف\s*لي|اتضاف|اتحطلي|اتحط\s*في|وصلني|وصلتني|وصلتلي|وصلي|اتودعلي|اتودع|نزللي|نزلي|اتحولي|اتحول\s*لي|رجعولي|اضافه\s*ل)""")
     private val inWords = rx("""(قبضت|استلمت|جالي|جالى|جاتلي|دخلي|دخل لي|حولولي|حولي|اتحولي|اتحول لي|كسبت|رجعولي|رجعلي|ايداع|المرتب|مرتب|راتب|عموله|بونص|مكافاه)""")
     private val addWords = rx("""(^|\s)(ضيف|اضف|زود|حط|ضيفلي)(\s|$)""")
     private val salaryWords = rx("""(مرتب|راتب|المرتب|الراتب)""")
@@ -68,7 +70,7 @@ object VoiceParser {
     private val stop: Set<String> = setOf(
         "صرفت", "صرفنا", "دفعت", "دفعنا", "اشتريت", "اشترينا", "جبت", "جبنا", "سددت", "خلصت", "اتخصم", "خصم",
         "دافع", "حاسبت", "ادفع", "قبضت", "استلمت", "جالي", "جالى", "جاتلي", "دخلي", "حولولي", "حولي", "كسبت",
-        "رجعولي", "رجعلي", "ضيف", "ضيفلي", "اضف", "زود", "حط", "سجل", "سجلي", "انا", "احنا", "النهارده", "النهاردة",
+        "رجعولي", "رجعلي", "اتبعتلي", "اتبعتلى", "اتضافلي", "اتضاف", "اتحطلي", "وصلني", "اتسحب", "سحبت", "اتبعت", "بعت", "ضيف", "ضيفلي", "اضف", "زود", "حط", "سجل", "سجلي", "انا", "احنا", "النهارده", "النهاردة",
         "امبارح", "اول", "بكره", "الصبح", "صباحا", "الضهر", "الظهر", "العصر", "المغرب", "بالليل", "بليل", "الليل",
         "الليله", "مساء", "الساعه", "ساعه", "ونص", "وربع", "وتلت", "جنيه", "جنيهات", "جنية", "ج", "دولار",
         "usd", "usdt", "بقيمه", "بمبلغ", "مبلغ", "حوالي", "تقريبا", "كده", "يعني", "بس", "يوم", "من", "يومين",
@@ -91,11 +93,34 @@ object VoiceParser {
         "nbe" to listOf("الاهلي", "البنك الاهلي"),
         "banque_misr" to listOf("بنك مصر"),
         "qnb" to listOf("كيو ان بي", "qnb"),
-        "binance" to listOf("بينانس", "باينانس"),
+        "binance" to listOf("بينانس", "باينانس", "بايننس", "بينانص"),
+        "trust_wallet" to listOf("ترست والت", "تراست والت", "ترست", "تراست"),
         "redotpay" to listOf("ريدوت", "ريد دوت"),
         "kast" to listOf("كاست"),
         "wallet_cards" to listOf("والت", "جوجل باي", "سامسونج باي"),
     )
+
+    /** اسم الحساب بالإنجليزي ← إزاي بيتقال بالعربي (للحسابات اللي بتضيفها بإيدك) */
+    private val nameSynonyms = mapOf(
+        "visa" to listOf("فيزا"),
+        "mastercard" to listOf("ماستر كارد", "ماستركارد", "ماستر"),
+        "meeza" to listOf("ميزه", "ميزة"),
+        "google pay" to listOf("جوجل باي"),
+        "apple pay" to listOf("ابل باي", "أبل باي", "ابل"),
+        "paypal" to listOf("باي بال", "بايبال"),
+        "wise" to listOf("وايز"),
+        "payoneer" to listOf("بايونير", "بيونير"),
+        "binance" to listOf("بينانس", "باينانس"),
+        "trust" to listOf("ترست", "تراست"),
+        "redot" to listOf("ريدوت", "ريد دوت"),
+        "kast" to listOf("كاست"),
+    )
+
+    private fun namesOf(a: Account): List<String> {
+        val low = a.name.lowercase()
+        return listOf(a.name) + (accountSynonyms[a.agentId] ?: emptyList()) +
+            nameSynonyms.filterKeys { it in low }.values.flatten()
+    }
 
     /** من نتايج التعرف على الصوت (أكتر من احتمال): اختار أول واحد فيه مبلغ */
     fun pickBest(alternatives: List<String>, accounts: List<Account>): String =
@@ -138,6 +163,7 @@ object VoiceParser {
             if (amount <= 0) return@mapNotNull null
 
             val direction = when {
+                toMeIn.containsMatchIn(sn) -> Direction.IN
                 outVerbs.containsMatchIn(sn) -> Direction.OUT
                 inWords.containsMatchIn(sn) -> Direction.IN
                 addWords.containsMatchIn(sn) -> if (sn.contains("فاتوره")) Direction.OUT else Direction.IN
@@ -148,7 +174,9 @@ object VoiceParser {
             val account = findAccount(sn, accounts) ?: globalAccount
             val currency = when {
                 Regex("usdt|تيثر|يو اس دي تي", RegexOption.IGNORE_CASE).containsMatchIn(sn) -> "USDT"
-                Regex("دولار|\\$|usd", RegexOption.IGNORE_CASE).containsMatchIn(sn) -> "USD"
+                Regex("دولار|\\$|usd", RegexOption.IGNORE_CASE).containsMatchIn(sn) ->
+                    // حساب كريبتو بالدولار = USDT
+                    if (account?.currency in setOf("USDT", "USDC")) account!!.currency else "USD"
                 else -> account?.currency ?: "EGP"
             }
             val desc = describe(seg, account)
@@ -199,7 +227,7 @@ object VoiceParser {
 
     private fun describe(seg: String, account: Account?): String? {
         var tokens = seg.split(Regex("\\s+")).filter { it.isNotBlank() }
-        val accountWords = account?.let { a -> (listOf(a.name) + (accountSynonyms[a.agentId] ?: emptyList())).flatMap { n(it).split(" ") }.toSet() } ?: emptySet()
+        val accountWords = account?.let { a -> namesOf(a).flatMap { n(it).split(" ") }.toSet() } ?: emptySet()
         tokens = tokens.filterNot { tok ->
             val x = n(tok)
             val bare = x.removePrefix("و").removePrefix("ب").removePrefix("ل")
@@ -217,8 +245,7 @@ object VoiceParser {
             accounts.none { n(it.name).contains("كاش") && sn.contains(n(it.name)) }
         ) return null
         return accounts.firstOrNull { a ->
-            val names = listOf(a.name) + (accountSynonyms[a.agentId] ?: emptyList())
-            names.any { name ->
+            namesOf(a).any { name ->
                 val nn = n(name).replace(Regex("[•\\d]"), "").trim()
                 nn.length >= 3 && sn.contains(nn)
             }

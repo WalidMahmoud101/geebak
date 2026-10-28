@@ -162,11 +162,12 @@ object AgentRegistry {
             packages = setOf("com.fawry.myfawry"),
         ),
         SourceAgent(
-            "wallet_cards", "وكيل كروت Wallet", "يقرأ دفعات الكروت اللي على Google Wallet و Samsung Wallet",
+            "wallet_cards", "وكيل كروت Wallet", "يقرأ دفعات الكروت اللي على Google Pay / Google Wallet و Samsung Pay (Apple Pay مش متاح على أندرويد)",
             "card", 0xFF4285F4, AccountType.CARD, "كروت Wallet",
-            keywords = listOf("google wallet", "samsung wallet", "samsung pay", "google pay"),
+            keywords = listOf("google wallet", "samsung wallet", "samsung pay", "google pay", "gpay"),
             packages = setOf(
                 "com.google.android.apps.walletnfcrel",
+                "com.google.android.apps.nbu.paisa.user",
                 "com.samsung.android.spay",
                 "com.samsung.android.samsungpay.gear",
             ),
@@ -188,6 +189,12 @@ object AgentRegistry {
             "crypto", 0xFFF3BA2F, "Binance",
             keywords = listOf("binance", "بينانس"),
             packages = setOf("com.binance.dev", "com.binance.us"),
+        ),
+        CryptoAgent(
+            "trust_wallet", "وكيل Trust Wallet", "يراقب الإرسال والاستلام على محفظة Trust Wallet",
+            "crypto", 0xFF3375BB, "Trust Wallet",
+            keywords = listOf("trust wallet", "trustwallet"),
+            packages = setOf("com.wallet.crypto.trustapp"),
         ),
         SourceAgent(
             "cib", "وكيل CIB", "يقرأ رسائل البنك التجاري الدولي: كروت وحسابات",

@@ -1,5 +1,6 @@
 package com.nabd.money.ui.screens
 
+import androidx.compose.foundation.layout.navigationBarsPadding
 import com.nabd.money.ui.components.PillButton
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
@@ -188,7 +189,7 @@ fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit:
             onHide = { vm.hideTxns(picked, true); selected = emptySet(); selecting = false },
             onRestore = { vm.hideTxns(picked, false); selected = emptySet(); selecting = false },
             onCancel = { selected = emptySet(); selecting = false },
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 64.dp),
         )
     }
     }

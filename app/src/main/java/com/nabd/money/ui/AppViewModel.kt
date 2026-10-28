@@ -158,6 +158,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     init {
         viewModelScope.launch(Dispatchers.IO) { engine.runPeriodicInsights(notify = false) }
         checkForUpdate()
+        viewModelScope.launch { runCatching { settings.syncRates() } }
     }
 
     fun toEgp(amount: Double, currency: String) = settings.toEgp(amount, currency)
@@ -184,9 +185,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun addManual(
         amount: Double, direction: Direction, purpose: Purpose, category: String,
         merchant: String?, accountId: Long?, timestamp: Long, note: String?, reimbursable: Boolean,
+        currency: String? = null,
     ) = viewModelScope.launch(Dispatchers.IO) {
         settings.lastAccountId = accountId ?: -1L
-        engine.addManual(amount, direction, purpose, category, merchant, accountId, timestamp, note, reimbursable)
+        engine.addManual(amount, direction, purpose, category, merchant, accountId, timestamp, note, reimbursable, currency)
     }
 
     fun hideTxns(ids: Collection<Long>, hide: Boolean) = viewModelScope.launch(Dispatchers.IO) {
@@ -404,8 +406,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun updateTxn(t: Txn) = viewModelScope.launch(Dispatchers.IO) { dao.updateTxn(t) }
     fun deleteTxn(t: Txn) = viewModelScope.launch(Dispatchers.IO) { engine.deleteTxn(t) }
 
-    fun addAccount(name: String, type: AccountType, currency: String, balance: Double) =
-        viewModelScope.launch(Dispatchers.IO) { engine.addManualAccount(name, type, currency, balance) }
+    fun addAccount(name: String, type: AccountType, currency: String, balance: Double, agentId: String? = null, last4: String? = null) =
+        viewModelScope.launch(Dispatchers.IO) { engine.addManualAccount(name, type, currency, balance, agentId, last4) }
 
     fun accountEgp(a: Account) = settings.toEgp(a.balance, a.currency)
 
@@ -473,6 +475,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun toggleAgent(id: String, enabled: Boolean) = settings.setEnabled(id, enabled)
     fun setUsdRate(v: Double) = settings.setUsdRate(v)
+
+    // ---------- العملات ----------
+    val ratesAt = settings.ratesAt
+    val rateMessage = MutableStateFlow<String?>(null)
+    val autoRates = MutableStateFlow(settings.autoRates)
+
+    fun setAutoRates(on: Boolean) {
+        settings.autoRates = on
+        autoRates.value = on
+        if (on) syncRatesNow()
+    }
+
+    fun syncRatesNow() = viewModelScope.launch {
+        rateMessage.value = "بيحدّث السعر…"
+        val ok = runCatching { settings.syncRates(force = true) }.getOrDefault(false)
+        rateMessage.value = if (ok) "اتحدّث السعر" else "مقدرتش أوصل للسعر الحي، اتأكد من النت"
+    }
+
+    /** سعر بتكتبه بإيدك: بيقفل المزامنة التلقائية علشان مايتغيرش */
+    fun setManualRate(v: Double) {
+        settings.autoRates = false
+        autoRates.value = false
+        settings.setUsdRate(v)
+        rateMessage.value = "اتحفظ سعرك، والمزامنة التلقائية اتقفلت"
+    }
 
     fun markInsightsRead() = viewModelScope.launch(Dispatchers.IO) { dao.markInsightsRead() }
     fun dismissInsight(i: Insight) = viewModelScope.launch(Dispatchers.IO) { dao.deleteInsight(i) }

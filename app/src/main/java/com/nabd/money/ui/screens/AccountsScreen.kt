@@ -1,5 +1,6 @@
 package com.nabd.money.ui.screens
 
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -89,6 +90,16 @@ fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
         LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
                 ScreenTitle("الحسابات", "إجمالي فلوسك ${Money.fmt(total)}") {
+                    // زرار واضح فوق، مش بس الزرار العايم اللي ممكن يستخبى ورا الشريط
+                    Row(
+                        Modifier.clip(RoundedCornerShape(12.dp)).background(NabdColors.Mint).clickable { adding = true }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.Add, null, tint = NabdColors.OnAccent, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("حساب جديد", style = MaterialTheme.typography.labelLarge, color = NabdColors.OnAccent)
+                    }
                     IconButton(onClick = { settingsOpen = true }) {
                         Icon(Icons.Rounded.Settings, "الإعدادات", tint = NabdColors.TextDim)
                     }
@@ -156,13 +167,13 @@ fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
             onClick = { adding = true },
             containerColor = NabdColors.Mint,
             contentColor = NabdColors.OnAccent,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 28.dp)
+            modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 20.dp, bottom = 84.dp)
         ) { Icon(Icons.Rounded.Add, "إضافة حساب") }
     }
 
     if (adding) {
-        AddAccountDialog(onDismiss = { adding = false }) { name, type, cur, bal ->
-            vm.addAccount(name, type, cur, bal); adding = false
+        AddAccountDialog(onDismiss = { adding = false }) { name, type, cur, bal, agentId, last4 ->
+            vm.addAccount(name, type, cur, bal, agentId, last4); adding = false
         }
     }
     if (settingsOpen) SettingsDialog(vm) { settingsOpen = false }

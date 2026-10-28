@@ -4,6 +4,7 @@ import android.content.Context
 import com.nabd.money.data.Account
 import com.nabd.money.data.AccountType
 import com.nabd.money.data.Direction
+import com.nabd.money.data.Fx
 import com.nabd.money.data.Insight
 import com.nabd.money.data.NabdDao
 import com.nabd.money.data.NetWorth
@@ -411,8 +412,11 @@ class AgentEngine(
             excluded = excluded,
         )
         val id = dao.insertTxn(txn)
-        if (currency == null || currency.equals(account.currency, ignoreCase = true)) {
-            val delta = if (direction == Direction.IN) amount else -amount
+        // عملة العملية غير عملة الحساب (مثلاً دولار من كارت بالجنيه): الرصيد بيتحول بسعر الصرف
+        val inAccountCurrency = if (currency == null || currency.equals(account.currency, ignoreCase = true)) amount
+        else Fx.convert(amount, currency, account.currency, settings.usdRate.value)
+        if (inAccountCurrency != null) {
+            val delta = if (direction == Direction.IN) inAccountCurrency else -inAccountCurrency
             dao.updateAccount(account.copy(balance = account.balance + delta, updatedAt = now()))
         }
         realtimeInsights(txn.copy(id = id), notify = true)
@@ -479,19 +483,37 @@ class AgentEngine(
         }
     }
 
-    suspend fun addManualAccount(name: String, type: AccountType, currency: String, balance: Double) {
+    /**
+     * حساب بتضيفه بإيدك. لو ليه وكيل (Binance، Trust Wallet، كارت Wallet…) بيتسجل بنفس مفتاح الوكيل،
+     * فأي إشعار جاي منه بيروح على نفس الحساب بدل ما يعمل حساب مكرر، ورصيدك اللي كتبته هو نقطة البداية.
+     */
+    suspend fun addManualAccount(
+        name: String, type: AccountType, currency: String, balance: Double,
+        agentId: String? = null, last4: String? = null,
+    ): Account = mutex.withLock {
+        val agent = agentId?.let(AgentRegistry::byId) as? SourceAgent
+        val key = when {
+            agent == null -> UUID.randomUUID().toString()
+            agent is CryptoAgent -> currency.uppercase()
+            last4 != null -> last4
+            else -> "main"
+        }
+        val agentKey = agent?.id ?: AgentRegistry.MANUAL_ID
+        val existing = dao.findAccount(agentKey, key)
+        // نفس الحساب متضاف قبل كده: نحدّث رصيده بس
+        val finalKey = if (existing != null && last4 == null && agent != null && agent !is CryptoAgent) UUID.randomUUID().toString() else key
+        if (existing != null && finalKey == key) {
+            val u = existing.copy(balance = balance, balanceKnown = true, balanceAt = now(), updatedAt = now(), includeInTotal = true, name = name)
+            dao.updateAccount(u)
+            return@withLock u
+        }
         dao.insertAccount(
             Account(
-                name = name,
-                type = type,
-                agentId = AgentRegistry.MANUAL_ID,
-                accountKey = UUID.randomUUID().toString(),
-                balance = balance,
-                currency = currency,
-                balanceKnown = true,
-                balanceAt = now(),
+                name = name, type = type, agentId = agentKey, accountKey = finalKey,
+                balance = balance, currency = currency.uppercase(), balanceKnown = true, balanceAt = now(),
             )
         )
+        dao.findAccount(agentKey, finalKey)!!
     }
 
     // ------------------------------------------------------------------ وكلاء التحليل

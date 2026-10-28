@@ -122,7 +122,7 @@ class MoneyParserTest {
         assertEquals("redotpay", route("com.redotpay", "You spent \$5", TxnSource.NOTIFICATION, "RedotPay"))
         assertEquals("kast", route("xyz.kast.app", "Card payment \$5", TxnSource.NOTIFICATION, "Kast"))
         assertEquals("other_banks", route("HSBC", "Your account was debited with EGP 100"))
-        assertEquals(21, AgentRegistry.all.size)
+        assertEquals(22, AgentRegistry.all.size)
     }
 
     @Test

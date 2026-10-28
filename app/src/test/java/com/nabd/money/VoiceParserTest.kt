@@ -109,4 +109,45 @@ class VoiceParserTest {
         assertEquals("USD", d.currency)
         assertEquals("اشتراكات", d.category)
     }
+
+    private val crypto = listOf(
+        Account(id = 10, name = "Binance USDT", type = AccountType.CRYPTO, agentId = "binance", accountKey = "USDT", currency = "USDT"),
+        Account(id = 11, name = "Trust Wallet USDT", type = AccountType.CRYPTO, agentId = "trust_wallet", accountKey = "USDT", currency = "USDT"),
+        Account(id = 12, name = "Visa •••• 4242", type = AccountType.CARD, agentId = "wallet_cards", accountKey = "4242"),
+        Account(id = 13, name = "Apple Pay", type = AccountType.CARD, agentId = "manual", accountKey = "ap"),
+    )
+
+    @Test
+    fun addToSpecificAccount() {
+        val d = VoiceParser.parse("ضيف في حساب بينانس 100 دولار", crypto, now).single()
+        assertEquals(Direction.IN, d.direction)
+        assertEquals(10L, d.accountId)
+        assertEquals(100.0, d.amount, 0.001)
+        assertEquals("USDT", d.currency) // دولار على حساب كريبتو = USDT
+    }
+
+    @Test
+    fun deductedAndSentToMe() {
+        val out = VoiceParser.parse("اتخصم 250 من الفيزا", crypto, now).single()
+        assertEquals(Direction.OUT, out.direction)
+        assertEquals(12L, out.accountId)
+        assertEquals(250.0, out.amount, 0.001)
+
+        val inA = VoiceParser.parse("اتبعتلي 300 على ترست والت", crypto, now).single()
+        assertEquals(Direction.IN, inA.direction)
+        assertEquals(11L, inA.accountId)
+
+        val inB = VoiceParser.parse("اتضافلي 80 دولار في بينانس", crypto, now).single()
+        assertEquals(Direction.IN, inB.direction)
+        assertEquals(10L, inB.accountId)
+
+        val applePay = VoiceParser.parse("دفعت 120 بابل باي", crypto, now).single()
+        assertEquals(Direction.OUT, applePay.direction)
+        assertEquals(13L, applePay.accountId)
+        assertEquals(120.0, applePay.amount, 0.001)
+
+        val sent = VoiceParser.parse("بعت 500 من بينانس", crypto, now).single()
+        assertEquals(Direction.OUT, sent.direction)
+        assertEquals(10L, sent.accountId)
+    }
 }
