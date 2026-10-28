@@ -83,7 +83,7 @@ fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
     val needBalance = accounts.filter { NetWorth.exclusion(it, egp(it)) == Exclusion.UNKNOWN }
 
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
                 ScreenTitle("الحسابات", "إجمالي فلوسك ${Money.fmt(total)}") {
                     IconButton(onClick = { settingsOpen = true }) {
@@ -173,15 +173,15 @@ private fun InstitutionCard(
     onSetBalance: (Account) -> Unit,
 ) {
     val first = inst.accounts.first()
-    GlassCard(Modifier.fillMaxWidth(), padding = 14.dp) {
+    GlassCard(Modifier.fillMaxWidth(), padding = 10.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Brush.linearGradient(first.colors())),
+                Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(Brush.linearGradient(first.colors())),
                 contentAlignment = Alignment.Center
-            ) { Icon(first.type.icon(), null, tint = Color.White, modifier = Modifier.size(22.dp)) }
-            Spacer(Modifier.width(12.dp))
+            ) { Icon(first.type.icon(), null, tint = Color.White, modifier = Modifier.size(18.dp)) }
+            Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(inst.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(inst.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     if (inst.accounts.size == 1) first.type.ar else "${inst.accounts.size} حسابات وكروت",
                     style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim
@@ -190,7 +190,7 @@ private fun InstitutionCard(
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     if (inst.countedCount > 0) Money.fmt(inst.total) else "—",
-                    fontWeight = FontWeight.Bold, fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold, fontSize = 15.sp,
                     color = if (inst.total < 0) NabdColors.Danger else NabdColors.Text
                 )
                 Text(
@@ -200,18 +200,20 @@ private fun InstitutionCard(
                 )
             }
         }
-        Spacer(Modifier.height(10.dp))
-        inst.accounts.forEach { a ->
+        // بنك بحساب واحد: الإجمالي فوق كفاية، إلا لو محتاج رصيده
+        val showRows = inst.accounts.size > 1 || NetWorth.exclusion(first, egp(first)) == Exclusion.UNKNOWN
+        if (showRows) Spacer(Modifier.height(4.dp))
+        if (showRows) inst.accounts.forEach { a ->
             val ex = NetWorth.exclusion(a, egp(a))
             Row(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .clickable { onOpen(a) }
-                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                    .padding(vertical = 5.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(a.type.icon(), null, tint = NabdColors.TextDim, modifier = Modifier.size(18.dp))
+                Icon(a.type.icon(), null, tint = NabdColors.TextDim, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(a.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -234,7 +236,7 @@ private fun InstitutionCard(
                             .clip(RoundedCornerShape(50))
                             .background(NabdColors.Gold.copy(alpha = 0.12f))
                             .clickable { onSetBalance(a) }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 } else {
                     Column(horizontalAlignment = Alignment.End) {

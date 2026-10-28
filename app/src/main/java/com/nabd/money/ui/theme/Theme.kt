@@ -119,21 +119,21 @@ val NabdFont = FontFamily(
     Font(R.font.ibm_plex_arabic_bold, FontWeight.Bold),
 )
 
-private fun style(size: Int, weight: FontWeight, line: Int = (size * 1.45).toInt()) =
+private fun style(size: Int, weight: FontWeight, line: Int = (size * 1.4).toInt()) =
     TextStyle(fontFamily = NabdFont, fontSize = size.sp, fontWeight = weight, lineHeight = line.sp)
 
 private val typography = Typography(
-    displaySmall = style(32, FontWeight.Bold, 40),
-    headlineSmall = style(22, FontWeight.Bold),
-    titleLarge = style(19, FontWeight.Bold),
-    titleMedium = style(16, FontWeight.SemiBold),
-    titleSmall = style(14, FontWeight.SemiBold),
-    bodyLarge = style(16, FontWeight.Normal),
-    bodyMedium = style(14, FontWeight.Normal),
-    bodySmall = style(12, FontWeight.Normal),
-    labelLarge = style(14, FontWeight.Medium),
-    labelMedium = style(12, FontWeight.Medium),
-    labelSmall = style(11, FontWeight.Medium),
+    displaySmall = style(28, FontWeight.Bold, 36),
+    headlineSmall = style(20, FontWeight.Bold),
+    titleLarge = style(17, FontWeight.Bold),
+    titleMedium = style(15, FontWeight.SemiBold),
+    titleSmall = style(13, FontWeight.SemiBold),
+    bodyLarge = style(15, FontWeight.Normal),
+    bodyMedium = style(13, FontWeight.Normal),
+    bodySmall = style(11, FontWeight.Normal),
+    labelLarge = style(13, FontWeight.Medium),
+    labelMedium = style(11, FontWeight.Medium),
+    labelSmall = style(10, FontWeight.Medium),
 )
 
 enum class ThemeMode(val ar: String) { SYSTEM("تلقائي"), LIGHT("فاتح"), DARK("داكن") }

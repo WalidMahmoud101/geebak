@@ -124,7 +124,7 @@ fun HomeScreen(
     }
     if (breakdown) NetWorthSheet(vm, accounts, onDismiss = { breakdown = false }, onOpenAccounts = { breakdown = false; onNavigate(2) })
 
-    LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             HomeHeader(
                 unread = unread.size,
@@ -158,7 +158,7 @@ fun HomeScreen(
                     Text("هتظهر لوحدها مع أول رسالة من البنك أو المحفظة.", style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim)
                 }
             } else {
-                GlassCard(Modifier.fillMaxWidth(), padding = 8.dp) {
+                GlassCard(Modifier.fillMaxWidth(), padding = 4.dp) {
                     institutions.filter { inst -> inst.accounts.any { NetWorth.exclusion(it, accEgp(it)) != Exclusion.INTERMEDIATE } }
                         .forEachIndexed { i, inst ->
                         if (i > 0) HorizontalDivider(color = NabdColors.Stroke, modifier = Modifier.padding(horizontal = 8.dp))
@@ -178,7 +178,7 @@ fun HomeScreen(
             if (recent.isEmpty()) {
                 EmptyState(Icons.Rounded.Add, "مافيش عمليات لسه", "هتتسجل لوحدها، أو دوس المايك وقول المصروف.")
             } else {
-                GlassCard(Modifier.fillMaxWidth(), padding = 8.dp) {
+                GlassCard(Modifier.fillMaxWidth(), padding = 4.dp) {
                     recent.take(6).forEach { t -> TxnRow(t, names[t.accountId]) { onEdit(t) } }
                 }
             }
@@ -197,17 +197,18 @@ private fun salaryShort(cfg: com.nabd.money.data.SalaryConfig): String {
 
 @Composable
 private fun HomeHeader(unread: Int, onAgents: () -> Unit, onSettings: () -> Unit, onBell: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(greeting(), style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim)
+    Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
             Text("نبض", style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.width(8.dp))
+            Text(greeting(), style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim, modifier = Modifier.padding(bottom = 3.dp))
         }
-        IconButton(onClick = onAgents) { Icon(Icons.Rounded.SmartToy, "الوكلاء", tint = NabdColors.TextDim) }
-        IconButton(onClick = onSettings) { Icon(Icons.Rounded.Settings, "الإعدادات", tint = NabdColors.TextDim) }
+        IconButton(onClick = onAgents, modifier = Modifier.size(36.dp)) { Icon(Icons.Rounded.SmartToy, "الوكلاء", tint = NabdColors.TextDim, modifier = Modifier.size(20.dp)) }
+        IconButton(onClick = onSettings, modifier = Modifier.size(36.dp)) { Icon(Icons.Rounded.Settings, "الإعدادات", tint = NabdColors.TextDim, modifier = Modifier.size(20.dp)) }
         Box {
-            IconButton(onClick = onBell) { Icon(Icons.Rounded.Notifications, "التنبيهات", tint = NabdColors.TextDim) }
+            IconButton(onClick = onBell, modifier = Modifier.size(36.dp)) { Icon(Icons.Rounded.Notifications, "التنبيهات", tint = NabdColors.TextDim, modifier = Modifier.size(20.dp)) }
             if (unread > 0) {
-                Box(Modifier.align(Alignment.TopEnd).padding(10.dp).size(8.dp).clip(CircleShape).background(NabdColors.Danger))
+                Box(Modifier.align(Alignment.TopEnd).padding(8.dp).size(7.dp).clip(CircleShape).background(NabdColors.Danger))
             }
         }
     }
@@ -222,34 +223,30 @@ private fun greeting(): String = when (java.time.LocalTime.now().hour) {
 /** الكارت الأساسي: إجمالي فلوسك في كل الحسابات */
 @Composable
 private fun BalanceCard(total: Double, counted: Int, pending: Int, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(18.dp)
     val onCard = Color.White
-    Column(
+    Row(
         Modifier
             .fillMaxWidth()
             .clip(shape)
             .background(HeroGradient)
             .clickable(onClick = onClick)
-            .padding(20.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("إجمالي فلوسك", style = MaterialTheme.typography.labelLarge, color = onCard.copy(alpha = 0.75f), modifier = Modifier.weight(1f))
-            Icon(Icons.Rounded.ChevronLeft, null, tint = onCard.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
+        Column(Modifier.weight(1f)) {
+            Text("إجمالي فلوسك", style = MaterialTheme.typography.labelMedium, color = onCard.copy(alpha = 0.75f))
+            Text(
+                Money.fmt(total, decimals = false),
+                fontSize = 26.sp, fontWeight = FontWeight.Bold, color = onCard, maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                if (pending > 0) "من $counted حساب • $pending محتاج رصيده" else "من $counted حساب مؤكد",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (pending > 0) Color(0xFFFFE08A) else onCard.copy(alpha = 0.7f)
+            )
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            Money.fmt(total),
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            color = onCard,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            if (pending > 0) "من $counted حساب • $pending محتاج رصيده" else "من $counted حساب مؤكد",
-            style = MaterialTheme.typography.labelMedium,
-            color = if (pending > 0) Color(0xFFFFE08A) else onCard.copy(alpha = 0.7f)
-        )
+        Icon(Icons.Rounded.ChevronLeft, null, tint = onCard.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
     }
 }
 
@@ -262,50 +259,47 @@ private fun QuickActions(
     onSalary: () -> Unit,
     onCompany: () -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        QuickAction("مصروف", Icons.Rounded.Remove, onExpense)
-        QuickAction("إضافة فلوس", Icons.Rounded.Add, onIncome)
-        QuickAction(salaryLabel, Icons.Rounded.Paid, onSalary)
-        QuickAction(if (companyCount > 0) "الشركة ($companyCount)" else "الشركة", Icons.Rounded.BusinessCenter, onCompany)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        QuickAction("مصروف", Icons.Rounded.Remove, Modifier.weight(1f), onExpense)
+        QuickAction("إضافة", Icons.Rounded.Add, Modifier.weight(1f), onIncome)
+        QuickAction(salaryLabel, Icons.Rounded.Paid, Modifier.weight(1.2f), onSalary)
+        QuickAction(if (companyCount > 0) "الشركة ($companyCount)" else "الشركة", Icons.Rounded.BusinessCenter, Modifier.weight(1.2f), onCompany)
     }
 }
 
 @Composable
-private fun QuickAction(label: String, icon: ImageVector, onClick: () -> Unit) {
-    Column(
-        Modifier
-            .width(80.dp)
-            .clip(RoundedCornerShape(16.dp))
+private fun QuickAction(label: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
+    Row(
+        modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(NabdColors.SurfaceHigh)
             .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            Modifier.size(52.dp).clip(RoundedCornerShape(18.dp)).background(NabdColors.SurfaceHigh),
-            contentAlignment = Alignment.Center
-        ) { Icon(icon, null, tint = NabdColors.Mint, modifier = Modifier.size(24.dp)) }
-        Spacer(Modifier.height(6.dp))
-        Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, textAlign = TextAlign.Center)
+        Icon(icon, null, tint = NabdColors.Mint, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 /**
- * كل حاجة في حسابها لوحده: الدخل في خانة، والبيت في خانة، والشغل في خانة…
+ * كل حاجة في حسابها لوحده: الدخل سطر، والبيت سطر، والشغل سطر…
  * الدخل (مرتب، تحويلات جاتلك) مابيدخلش في صندوق البيت أو الشغل.
  */
 @Composable
 private fun MonthBoxes(month: List<Txn>, egp: (Txn) -> Double, onOpen: (TxnFilter) -> Unit) {
     val counted = month.filter { it.countsInTotals() }
     val income = counted.filter { it.isIncome() }
-    val topIncome = income.groupBy { it.category }.maxByOrNull { (_, l) -> l.sumOf(egp) }
-    val boxes = mutableListOf<@Composable (Modifier) -> Unit>()
-    boxes += { m ->
-        MoneyBox(
+    val rows = mutableListOf<@Composable () -> Unit>()
+    rows += {
+        MoneyRow(
             "الدخل", Icons.Rounded.Paid, NabdColors.Mint,
             income.sumOf(egp).let { if (it > 0) Money.signed("+", it, decimals = false) else Money.fmt(0.0, decimals = false) },
-            topIncome?.let { (cat, l) -> if (income.size > l.size) "منه $cat ${Money.fmt(l.sumOf(egp), decimals = false)}" else cat }
-                ?: "لسه مافيش دخل",
-            m,
+            income.groupBy { it.category }.maxByOrNull { (_, l) -> l.sumOf(egp) }?.key ?: "لسه مافيش دخل",
+            NabdColors.Mint,
         ) { onOpen(TxnFilter(direction = Direction.IN)) }
     }
     Purpose.entries.forEach { p ->
@@ -313,40 +307,41 @@ private fun MonthBoxes(month: List<Txn>, egp: (Txn) -> Double, onOpen: (TxnFilte
         if (mine.isEmpty() && p != Purpose.HOME && p != Purpose.WORK) return@forEach
         val spent = mine.filter { it.direction == Direction.OUT }.sumOf(egp)
         val added = mine.filter { it.direction == Direction.IN }.sumOf(egp)
-        boxes += { m ->
-            MoneyBox(
+        rows += {
+            MoneyRow(
                 p.ar, p.icon(), p.color(),
                 if (spent > 0) Money.signed("−", spent, decimals = false) else Money.fmt(0.0, decimals = false),
                 when {
-                    added > 0 -> if (added >= spent) "باقي ${Money.fmt(added - spent, decimals = false)} من ${Money.fmt(added, decimals = false)}" else "زاد ${Money.fmt(spent - added, decimals = false)} عن اللي اتحط"
+                    added > 0 && added >= spent -> "باقي ${Money.fmt(added - spent, decimals = false)} من ${Money.fmt(added, decimals = false)}"
+                    added > 0 -> "زاد ${Money.fmt(spent - added, decimals = false)} عن اللي اتحط"
                     mine.isEmpty() -> "مافيش مصاريف"
                     else -> "${mine.size} عملية"
                 },
-                m,
+                NabdColors.Text,
             ) { onOpen(TxnFilter(purposes = setOf(p))) }
         }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        boxes.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                row.forEach { it(Modifier.weight(1f)) }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
-            }
+    GlassCard(Modifier.fillMaxWidth(), padding = 4.dp) {
+        rows.forEachIndexed { i, r ->
+            if (i > 0) HorizontalDivider(color = NabdColors.Stroke, modifier = Modifier.padding(horizontal = 8.dp))
+            r()
         }
     }
 }
 
 @Composable
-private fun MoneyBox(title: String, icon: ImageVector, color: Color, value: String, sub: String, modifier: Modifier, onClick: () -> Unit) {
-    GlassCard(modifier, padding = 14.dp, onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconBubble(icon, color, 30.dp)
-            Spacer(Modifier.width(8.dp))
-            Text(title, style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim, maxLines = 1)
+private fun MoneyRow(title: String, icon: ImageVector, color: Color, value: String, sub: String, valueColor: Color, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconBubble(icon, color, 28.dp)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+            Text(sub, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Spacer(Modifier.height(10.dp))
-        Text(value, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(sub, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, style = MaterialTheme.typography.titleSmall, color = valueColor, maxLines = 1)
     }
 }
 
@@ -360,14 +355,14 @@ private fun InstitutionLine(inst: Institution, egp: (Account) -> Double, onClick
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 10.dp)
+            .padding(horizontal = 8.dp, vertical = 7.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(Brush.linearGradient(first.colors())),
+                Modifier.size(30.dp).clip(RoundedCornerShape(10.dp)).background(Brush.linearGradient(first.colors())),
                 contentAlignment = Alignment.Center
-            ) { Icon(first.type.icon(), null, tint = Color.White, modifier = Modifier.size(19.dp)) }
-            Spacer(Modifier.width(12.dp))
+            ) { Icon(first.type.icon(), null, tint = Color.White, modifier = Modifier.size(16.dp)) }
+            Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(inst.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
@@ -390,7 +385,7 @@ private fun InstitutionLine(inst: Institution, egp: (Account) -> Double, onClick
         if (shown.size > 1) {
             shown.forEach { a ->
                 val ex = NetWorth.exclusion(a, egp(a))
-                Row(Modifier.padding(start = 50.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.padding(start = 40.dp, top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(6.dp).clip(CircleShape).background(if (ex == null) NabdColors.Mint else NabdColors.TextFaint))
                     Spacer(Modifier.width(8.dp))
                     Text(a.name, style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim, maxLines = 1,

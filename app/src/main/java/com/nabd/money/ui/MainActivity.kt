@@ -316,7 +316,7 @@ private fun BottomBar(selected: Int, onMic: () -> Unit, onSelect: (Int) -> Unit)
             Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(horizontal = 8.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             navItems.forEachIndexed { i, item ->
@@ -327,15 +327,15 @@ private fun BottomBar(selected: Int, onMic: () -> Unit, onSelect: (Int) -> Unit)
                         .weight(1f)
                         .clip(RoundedCornerShape(14.dp))
                         .clickable { onSelect(item.tab) }
-                        .padding(vertical = 6.dp),
+                        .padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Icon(
                         item.icon, item.label,
                         tint = if (active) NabdColors.Mint else NabdColors.TextFaint,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(1.dp))
                     Text(
                         item.label,
                         style = MaterialTheme.typography.labelSmall,
@@ -354,12 +354,12 @@ private fun MicButton(onClick: () -> Unit) {
     Box(
         Modifier
             .padding(horizontal = 6.dp)
-            .size(52.dp)
+            .size(44.dp)
             .clip(CircleShape)
             .background(NabdColors.Mint)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(Icons.Rounded.Mic, "سجّل بصوتك", tint = NabdColors.OnAccent, modifier = Modifier.size(26.dp))
+        Icon(Icons.Rounded.Mic, "سجّل بصوتك", tint = NabdColors.OnAccent, modifier = Modifier.size(22.dp))
     }
 }

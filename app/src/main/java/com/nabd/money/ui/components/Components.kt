@@ -61,12 +61,12 @@ import java.time.YearMonth
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    padding: Dp = 16.dp,
+    padding: Dp = 12.dp,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     // كارت هادي: من غير إطار في الفاتح، وإطار خفيف جداً في الداكن
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(16.dp)
     Column(
         modifier
             .clip(shape)
@@ -80,7 +80,7 @@ fun GlassCard(
 
 @Composable
 fun ScreenTitle(title: String, subtitle: String? = null, trailing: @Composable RowScope.() -> Unit = {}) {
-    Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 0.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.headlineSmall)
             if (subtitle != null) {
@@ -93,21 +93,21 @@ fun ScreenTitle(title: String, subtitle: String? = null, trailing: @Composable R
 
 @Composable
 fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
-    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
         if (action != null && onAction != null) {
             Text(
                 action,
                 style = MaterialTheme.typography.labelLarge,
                 color = NabdColors.TextDim,
-                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onAction).padding(6.dp)
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onAction).padding(horizontal = 6.dp, vertical = 2.dp)
             )
         }
     }
 }
 
 @Composable
-fun IconBubble(icon: ImageVector, color: Color, size: Dp = 42.dp) {
+fun IconBubble(icon: ImageVector, color: Color, size: Dp = 36.dp) {
     // مربع بحواف ناعمة وخلفية هادية بنفس لون الأيقونة: شكل واحد في كل التطبيق
     Box(
         Modifier
@@ -125,8 +125,8 @@ fun GradientButton(text: String, modifier: Modifier = Modifier, icon: ImageVecto
     // الزرار الأساسي: لون واحد سادة
     Row(
         modifier
-            .height(48.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .height(42.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(NabdColors.Mint)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp),
@@ -152,7 +152,7 @@ fun PillButton(
     // زرار تاني: خلفية رمادي خفيف من غير إطار
     Row(
         modifier
-            .height(48.dp)
+            .height(40.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(NabdColors.SurfaceTop)
             .clickable(onClick = onClick)
@@ -220,11 +220,11 @@ fun TxnRow(t: Txn, accountName: String?, onClick: () -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 10.dp, horizontal = 4.dp),
+            .padding(vertical = 6.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconBubble(t.purpose.icon(), t.purpose.color(), 40.dp)
-        Spacer(Modifier.width(12.dp))
+        IconBubble(t.purpose.icon(), t.purpose.color(), 34.dp)
+        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 t.merchant ?: t.category,
@@ -421,4 +421,4 @@ fun StatColumn(label: String, value: String, color: Color, modifier: Modifier = 
     }
 }
 
-val ScreenPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp)
+val ScreenPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 104.dp)

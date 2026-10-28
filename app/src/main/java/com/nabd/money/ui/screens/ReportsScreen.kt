@@ -86,7 +86,7 @@ fun ReportsScreen(vm: AppViewModel) {
     val flow = CashFlow.of(list, vm::txnEgp)
     val totals = FilterTotals.of(list, vm::txnEgp, filter.companyOnly)
 
-    LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             ScreenTitle("التقارير") {
                 IconButton(onClick = {

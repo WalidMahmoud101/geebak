@@ -66,7 +66,7 @@ fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit:
     val byDay = list.groupBy { Dates.dayKey(it.timestamp) }.toSortedMap(compareByDescending { it })
     val single = filter.purposes.singleOrNull()
 
-    LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             ScreenTitle("العمليات", "${totals.count} عملية") {
                 IconButton(onClick = { onAdd(Direction.OUT, single) }) {
