@@ -3,7 +3,7 @@ package com.nabd.money.agents
 import com.nabd.money.data.Direction
 import com.nabd.money.data.Purpose
 
-data class Classification(val category: String, val purpose: Purpose)
+data class Classification(val category: String, val purpose: Purpose, val name: String? = null)
 
 object Categorizer {
     const val ID = "categorizer"
@@ -21,10 +21,8 @@ object Categorizer {
         if (user.rules.isEmpty()) return null
         val hay = ArabicNumbers.norm((merchant ?: "") + " " + text)
         // الكلمة الأطول الأول: "costa maadi" قبل "costa"
-        val rule = user.rules.sortedByDescending { it.keyword.length }
-            .firstOrNull { r -> ArabicNumbers.norm(r.keyword).trim().let { k -> k.isNotEmpty() && hay.contains(k) } }
-            ?: return null
-        return Classification(rule.category, rule.purpose ?: purposeOf(rule.category) ?: Purpose.OTHER)
+        val rule = user.rules.sortedByDescending { it.keyword.length }.firstOrNull { it.matches(hay) } ?: return null
+        return Classification(rule.category, rule.purpose ?: purposeOf(rule.category) ?: Purpose.OTHER, rule.name)
     }
 
     /** الغرض الثابت للتصنيف: اللي انت حددته، وإلا الافتراضي */

@@ -1,5 +1,6 @@
 package com.nabd.money.ui
 
+import kotlinx.coroutines.sync.withLock
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -244,20 +245,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** قاعدة جديدة: بتتطبق على كل العمليات اللي فاتت ولوحدها على الجاية */
-    fun addRule(keyword: String, category: String, purpose: Purpose?) = viewModelScope.launch(Dispatchers.IO) {
+    fun addRule(keyword: String, category: String, purpose: Purpose?, name: String? = null) = viewModelScope.launch(Dispatchers.IO) {
         val k = keyword.trim()
         if (k.isEmpty()) return@launch
+        val rule = UserRule(k, category, purpose, name?.trim()?.takeIf { it.isNotEmpty() })
         settings.updateTaxonomy { t ->
             t.copy(
-                rules = t.rules.filterNot { ArabicNumbers.norm(it.keyword) == ArabicNumbers.norm(k) } + UserRule(k, category, purpose),
+                rules = t.rules.filterNot { ArabicNumbers.norm(it.keyword) == ArabicNumbers.norm(k) } + rule,
                 customCategories = if (category in Categorizer.allCategories()) t.customCategories else t.customCategories + category,
             )
         }
         val p = purpose ?: Categorizer.purposeOf(category) ?: Purpose.OTHER
-        val nk = ArabicNumbers.norm(k)
-        dao.allTxnsOnce()
-            .filter { t -> !t.excluded && ArabicNumbers.norm(listOfNotNull(t.merchant, t.rawText, t.note).joinToString(" ")).contains(nk) }
-            .forEach { t -> dao.updateTxn(t.copy(category = category, purpose = if (t.reimbursable) Purpose.WORK else p)) }
+        // العمليات اللي فاتت اللي فيها الجزء ده: التصنيف والغرض والاسم.
+        // بنقرا كل عملية من جديد جوه القفل، علشان ماننزلش نسخة قديمة فوق تعديل لسه حصل (زي "على حساب الشركة")
+        txnWrites.withLock {
+            dao.allTxnsOnce()
+                .filter { t -> !t.excluded && rule.matchesRaw(t.merchant, t.rawText, t.note) }
+                .forEach { old ->
+                    val t = dao.txnsByIds(listOf(old.id)).firstOrNull() ?: return@forEach
+                    dao.updateTxn(t.copy(category = category, purpose = if (t.reimbursable) Purpose.WORK else p, merchant = rule.name ?: t.merchant))
+                }
+        }
     }
 
     fun deleteRule(r: UserRule) = viewModelScope.launch(Dispatchers.IO) {
@@ -406,10 +414,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
 
+    /** كل كتابة على العمليات من الشاشة بتمشي واحدة ورا التانية، علشان تعديلين مايدوسوش على بعض */
+    private val txnWrites = kotlinx.coroutines.sync.Mutex()
+
     fun updateTxn(t: Txn, hide: Boolean? = null, quantity: Int? = null) = viewModelScope.launch(Dispatchers.IO) {
-        dao.updateTxn(t)
-        if (quantity != null && quantity != t.quantity) engine.setQuantity(t.id, quantity)
-        if (hide != null) engine.setHidden(listOf(t.id), hide)
+        txnWrites.withLock {
+            dao.updateTxn(t)
+            if (quantity != null && quantity != t.quantity) engine.setQuantity(t.id, quantity)
+            if (hide != null) engine.setHidden(listOf(t.id), hide)
+        }
     }
     fun deleteTxn(t: Txn) = viewModelScope.launch(Dispatchers.IO) { engine.deleteTxn(t) }
 

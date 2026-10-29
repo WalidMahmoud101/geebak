@@ -90,7 +90,8 @@ class AgentEngine(
             currency = p.currency,
             direction = dir,
             balanceAfter = p.balance,
-            merchant = p.merchant ?: mirrorMerchant,
+            // الاسم اللي حددته في قاعدتك بيغلب اسم التاجر اللي اتقرا من الرسالة
+            merchant = cls.name ?: p.merchant ?: mirrorMerchant,
             category = cls.category,
             purpose = cls.purpose,
             timestamp = m.timestamp,

@@ -295,6 +295,7 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
             onDelete = { vm.deleteTxn(it); editing = null },
             onNewCategory = { name, p -> vm.addCategory(name, p) },
             onRule = { k, c, p -> vm.addRule(k, c, p) },
+            onMessageRule = { k, c, p, n -> vm.addRule(k, c, p, n); editing = null },
         )
     }
 }

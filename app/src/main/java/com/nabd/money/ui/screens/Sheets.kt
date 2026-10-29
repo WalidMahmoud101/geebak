@@ -375,6 +375,7 @@ fun EditTxnSheet(
     onDelete: (Txn) -> Unit,
     onNewCategory: (String, Purpose) -> Unit = { _, _ -> },
     onRule: (keyword: String, category: String, purpose: Purpose) -> Unit = { _, _, _ -> },
+    onMessageRule: (keyword: String, category: String, purpose: Purpose, name: String?) -> Unit = { _, _, _, _ -> },
 ) {
     var purpose by remember { mutableStateOf(txn.purpose) }
     var applyAll by remember { mutableStateOf(true) }
@@ -458,7 +459,9 @@ fun EditTxnSheet(
                 }
             }
             // التعديل يبقى قاعدة ثابتة: كل عمليات المكان ده تتصنف كده
-            val changed = category != txn.category || purpose != txn.purpose
+            // لما تعلّم "على حساب الشركة" الغرض بيتحول لـ "الشغل" لوحده، وده مش تعديل منك يستاهل قاعدة لكل المكان
+            val purposeByCompany = company != txn.reimbursable
+            val changed = category != txn.category || (purpose != txn.purpose && !purposeByCompany)
             val keyword = merchant.trim()
             if (changed && keyword.length >= 2) {
                 ToggleRow(
@@ -483,10 +486,13 @@ fun EditTxnSheet(
                 value = note, onValueChange = { note = it }, label = { Text("ملاحظة") },
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)
             )
+            txn.rawText?.takeIf { it.isNotBlank() }?.let { raw ->
+                MessageRuleSection(raw, merchant.trim(), category, purpose, onMessageRule)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GradientButton("حفظ", Modifier.weight(1f), Icons.Rounded.Check) {
                     val kw = merchant.trim()
-                    if (applyAll && kw.length >= 2 && (category != txn.category || purpose != txn.purpose)) {
+                    if (applyAll && kw.length >= 2 && changed) {
                         onRule(kw, category, purpose)
                     }
                     onSave(
@@ -800,4 +806,84 @@ private fun StepButton(label: String, enabled: Boolean, onClick: () -> Unit) {
             .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center
     ) { Text(label, style = MaterialTheme.typography.titleMedium, color = if (enabled) NabdColors.Mint else NabdColors.TextFaint) }
+}
+
+
+/**
+ * الرسالة الأصلية: حدد جزء منها (اضغط مطولاً واسحب)، وحط له اسم وتصنيف.
+ * كل رسالة فيها الجزء ده، اللي فاتت واللي جاية، بتاخد الاسم والتصنيف لوحدها.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MessageRuleSection(
+    raw: String, merchant: String, category: String, purpose: Purpose,
+    onRule: (keyword: String, category: String, purpose: Purpose, name: String?) -> Unit,
+) {
+    var field by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(raw)) }
+    var dialog by remember { mutableStateOf(false) }
+    val picked = field.text.substring(field.selection.min.coerceIn(0, field.text.length), field.selection.max.coerceIn(0, field.text.length)).trim()
+
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(NabdColors.SurfaceTop).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("الرسالة الأصلية", style = MaterialTheme.typography.titleSmall)
+        Text("اضغط مطولاً على كلمة واسحب علشان تحدد الجزء اللي بيميّز العملية دي.", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
+        OutlinedTextField(
+            value = field, onValueChange = { field = it.copy(text = raw) }, readOnly = true,
+            modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+            textStyle = MaterialTheme.typography.bodyMedium,
+        )
+        PillButton(
+            if (picked.isEmpty()) "حدد جزء من الرسالة الأول" else "اعمل قاعدة من «${picked.take(24)}${if (picked.length > 24) "…" else ""}»",
+            Icons.Rounded.Check, if (picked.isEmpty()) NabdColors.TextFaint else NabdColors.Mint, Modifier.fillMaxWidth()
+        ) { if (picked.length >= 2) dialog = true }
+    }
+
+    if (dialog) {
+        var snippet by remember { mutableStateOf(picked) }
+        var anyNumber by remember { mutableStateOf(false) }
+        var name by remember { mutableStateOf(merchant) }
+        var cat by remember { mutableStateOf(category) }
+        var purp by remember { mutableStateOf(purpose) }
+        val hasDigits = snippet.any { it.isDigit() }
+        val keyword = if (anyNumber && hasDigits) snippet.replace(Regex("""\d+(?:[.,]\d+)*"""), "#") else snippet
+        AlertDialog(
+            onDismissRequest = { dialog = false },
+            containerColor = NabdColors.Surface,
+            title = { Text("قاعدة من الرسالة", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = snippet, onValueChange = { snippet = it }, label = { Text("لو الرسالة فيها") },
+                        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)
+                    )
+                    if (hasDigits) {
+                        ToggleRow("الأرقام بتتغير", "مثلاً رقم التليفون أو المبلغ: القاعدة بتشتغل مع أي رقم ($keyword)", anyNumber) { anyNumber = it }
+                    }
+                    OutlinedTextField(
+                        value = name, onValueChange = { name = it }, label = { Text("اسمها يبقى") },
+                        singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)
+                    )
+                    Text("التصنيف", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Categorizer.allCategories().forEach { c -> SelectChip(c, c == cat, NabdColors.Cyan) { cat = c } }
+                    }
+                    Text("الغرض", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+                    PurposeChips(purp, includeAll = false) { p -> if (p != null) purp = p }
+                    Text(
+                        "هتتطبق على كل العمليات اللي فاتت اللي فيها الجزء ده، وعلى الرسايل الجاية.",
+                        style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (keyword.trim().length >= 2) onRule(keyword.trim(), cat, purp, name.trim().ifBlank { null })
+                    dialog = false
+                }) { Text("احفظ القاعدة") }
+            },
+            dismissButton = { TextButton(onClick = { dialog = false }) { Text("إلغاء") } },
+        )
+    }
 }
