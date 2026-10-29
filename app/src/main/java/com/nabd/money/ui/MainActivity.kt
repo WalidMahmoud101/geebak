@@ -287,6 +287,7 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
         )
     }
     editing?.let { t ->
+        val allTxns by vm.everything.collectAsStateWithLifecycle()
         EditTxnSheet(
             txn = t,
             accountName = accounts.firstOrNull { it.id == t.accountId }?.name,
@@ -294,8 +295,10 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
             onSave = { t2, hide, qty -> vm.updateTxn(t2, hide, qty); editing = null },
             onDelete = { vm.deleteTxn(it); editing = null },
             onNewCategory = { name, p -> vm.addCategory(name, p) },
-            onRule = { k, c, p -> vm.addRule(k, c, p) },
-            onMessageRule = { k, c, p, n -> vm.addRule(k, c, p, n); editing = null },
+            // القاعدة بتتحفظ للدخل بس أو للمصروف بس حسب العملية، علشان تصنيف دخل مايبوظش مصروف بنفس الاسم
+            onRule = { k, c, p -> vm.addRule(k, c, p, dir = t.direction, onMessage = false) },
+            ruleMatchCount = { kw -> val nk = com.nabd.money.agents.ArabicNumbers.norm(kw.trim()); allTxns.count { x -> x.id != t.id && x.direction == t.direction && !x.excluded && com.nabd.money.agents.ArabicNumbers.norm(x.merchant.orEmpty()).contains(nk) } },
+            onMessageRule = { k, c, p, n -> vm.addRule(k, c, p, n, t.direction); editing = null },
         )
     }
 }

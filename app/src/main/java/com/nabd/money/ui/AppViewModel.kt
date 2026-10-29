@@ -91,6 +91,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val savedFilters = settings.savedFilters
 
+    /** كل العمليات (للعدّاد في شاشة التعديل: القاعدة هتغيّر كام عملية) */
+    val everything = dao.between(0, Long.MAX_VALUE).state(emptyList())
+
     fun setFilter(f: TxnFilter) { filter.value = f }
     fun updateFilter(transform: (TxnFilter) -> TxnFilter) { filter.value = transform(filter.value) }
 
@@ -245,13 +248,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** قاعدة جديدة: بتتطبق على كل العمليات اللي فاتت ولوحدها على الجاية */
-    fun addRule(keyword: String, category: String, purpose: Purpose?, name: String? = null) = viewModelScope.launch(Dispatchers.IO) {
+    fun addRule(keyword: String, category: String, purpose: Purpose?, name: String? = null, dir: Direction? = null, onMessage: Boolean = true) = viewModelScope.launch(Dispatchers.IO) {
         val k = keyword.trim()
         if (k.isEmpty()) return@launch
-        val rule = UserRule(k, category, purpose, name?.trim()?.takeIf { it.isNotEmpty() })
+        val rule = UserRule(k, category, purpose, name?.trim()?.takeIf { it.isNotEmpty() }, dir, onMessage)
         settings.updateTaxonomy { t ->
             t.copy(
-                rules = t.rules.filterNot { ArabicNumbers.norm(it.keyword) == ArabicNumbers.norm(k) } + rule,
+                rules = t.rules.filterNot { ArabicNumbers.norm(it.keyword) == ArabicNumbers.norm(k) && it.dir == dir } + rule,
                 customCategories = if (category in Categorizer.allCategories()) t.customCategories else t.customCategories + category,
             )
         }
@@ -260,7 +263,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // بنقرا كل عملية من جديد جوه القفل، علشان ماننزلش نسخة قديمة فوق تعديل لسه حصل (زي "على حساب الشركة")
         txnWrites.withLock {
             dao.allTxnsOnce()
-                .filter { t -> !t.excluded && rule.matchesRaw(t.merchant, t.rawText, t.note) }
+                .filter { t -> !t.excluded && (dir == null || t.direction == dir) && rule.appliesTo(t.merchant, t.rawText, t.note) }
                 .forEach { old ->
                     val t = dao.txnsByIds(listOf(old.id)).firstOrNull() ?: return@forEach
                     dao.updateTxn(t.copy(category = category, purpose = if (t.reimbursable) Purpose.WORK else p, merchant = rule.name ?: t.merchant))

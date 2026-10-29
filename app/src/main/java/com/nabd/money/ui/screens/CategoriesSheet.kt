@@ -168,7 +168,7 @@ private fun RuleRow(r: UserRule, onDelete: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text("«${r.keyword}»", style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                (r.name?.let { "اسمها «$it» • " } ?: "") + r.category + (p?.let { " • ${it.ar}" } ?: ""),
+                (r.name?.let { "اسمها «$it» • " } ?: "") + (r.dir?.let { if (it == com.nabd.money.data.Direction.IN) "للدخل بس • " else "للمصروف بس • " } ?: "") + r.category + (p?.let { " • ${it.ar}" } ?: ""),
                 style = MaterialTheme.typography.labelMedium, color = p?.color() ?: NabdColors.TextDim
             )
         }

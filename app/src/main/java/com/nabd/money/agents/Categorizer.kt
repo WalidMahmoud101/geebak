@@ -17,16 +17,26 @@ object Categorizer {
         (CATEGORIES.filter { it != "أخرى" } + user.customCategories + "أخرى").distinct()
 
     /** قاعدة من عندك تنطبق على العملية دي؟ */
-    fun userMatch(merchant: String?, text: String): Classification? {
+    fun userMatch(merchant: String?, text: String, dir: Direction? = null): Classification? {
         if (user.rules.isEmpty()) return null
-        val hay = ArabicNumbers.norm((merchant ?: "") + " " + text)
         // الكلمة الأطول الأول: "costa maadi" قبل "costa"
-        val rule = user.rules.sortedByDescending { it.keyword.length }.firstOrNull { it.matches(hay) } ?: return null
+        val rule = user.rules.sortedByDescending { it.keyword.length }
+            .firstOrNull { (it.dir == null || dir == null || it.dir == dir) && it.appliesTo(merchant, text) } ?: return null
         return Classification(rule.category, rule.purpose ?: purposeOf(rule.category) ?: Purpose.OTHER, rule.name)
     }
 
     /** الغرض الثابت للتصنيف: اللي انت حددته، وإلا الافتراضي */
     fun purposeOf(category: String): Purpose? = user.categoryPurpose[category] ?: suggestPurposeBuiltIn(category)
+
+    private val INCOME_ONLY = setOf("مرتب", "دخل", "استرداد مصاريف الشركة")
+    private val INCOME_CATEGORIES = listOf("دخل", "مرتب", "مصروف البيت", "تحويلات", "كريبتو", "تحويل بين حساباتي", "استرداد مصاريف الشركة")
+
+    /** التصنيفات المناسبة للعملية: الدخل ليه تصنيفاته، والمصروف ليه تصنيفاته (من غير مرتب ودخل واسترداد) */
+    fun categoriesFor(dir: Direction): List<String> {
+        val custom = user.customCategories
+        return if (dir == Direction.IN) (INCOME_CATEGORIES + custom + "أخرى").distinct()
+        else allCategories().filter { it !in INCOME_ONLY }
+    }
 
     val CATEGORIES = listOf(
         "بقالة", "فواتير", "إيجار", "مصروف البيت", "وقود", "صيانة عربية", "مطاعم وكافيهات", "ترفيه",
@@ -110,7 +120,7 @@ object Categorizer {
     }
 
     fun classify(merchant: String?, text: String, dir: Direction, agentId: String, builtIn: Boolean = true): Classification {
-        userMatch(merchant, text)?.let { return it }
+        userMatch(merchant, text, dir)?.let { return it }
         if (!builtIn) return Classification(if (dir == Direction.IN) "دخل" else "أخرى", Purpose.OTHER)
         val c = classifyBuiltIn(merchant, text, dir, agentId)
         // لو انت مثبت غرض للتصنيف ده، هو اللي يمشي

@@ -202,7 +202,8 @@ fun AddTxnSheet(
             Label("التصنيف")
             var newCat by remember { mutableStateOf(false) }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                (Categorizer.allCategories() + listOfNotNull(category.takeIf { it !in Categorizer.allCategories() })).forEach { c ->
+                val options = Categorizer.categoriesFor(direction).let { l -> if (category in l) l else l + category }
+                options.forEach { c ->
                     SelectChip(c, c == category, NabdColors.Cyan) {
                         category = c
                         if (!purposeTouched) Categorizer.suggestPurpose(c)?.let { purpose = it }
@@ -376,9 +377,11 @@ fun EditTxnSheet(
     onNewCategory: (String, Purpose) -> Unit = { _, _ -> },
     onRule: (keyword: String, category: String, purpose: Purpose) -> Unit = { _, _, _ -> },
     onMessageRule: (keyword: String, category: String, purpose: Purpose, name: String?) -> Unit = { _, _, _, _ -> },
+    ruleMatchCount: (String) -> Int = { 0 },
 ) {
     var purpose by remember { mutableStateOf(txn.purpose) }
-    var applyAll by remember { mutableStateOf(true) }
+    // مقفولة من الأول: التعديل بيشمل العملية دي بس، إلا لو انت طلبت تطبقه على كل نفس الاسم
+    var applyAll by remember { mutableStateOf(false) }
     var newCat by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf(txn.category) }
     var merchant by remember { mutableStateOf(txn.merchant.orEmpty()) }
@@ -441,12 +444,20 @@ fun EditTxnSheet(
             )
             Label("الغرض")
             PurposeChips(purpose, includeAll = false) { p -> if (p != null) purpose = p }
+            if (!out && txn.source != TxnSource.MANUAL) {
+                Text(
+                    "ده دخل ملتقط: بيتحسب دخل مش فلوس في صندوق البيت أو الشغل. الصناديق بتتملى بس لما تضيف فلوس بإيدك.",
+                    style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint
+                )
+            }
             Label("التصنيف")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                (Categorizer.allCategories() + listOfNotNull(category.takeIf { it !in Categorizer.allCategories() })).forEach { c ->
+                val options = Categorizer.categoriesFor(txn.direction).let { l -> if (category in l) l else l + category }
+                options.forEach { c ->
                     SelectChip(c, c == category, NabdColors.Cyan) {
                         category = c
-                        Categorizer.suggestPurpose(c)?.let { if (!company) purpose = it }
+                        // الغرض بيتقترح من التصنيف للمصروف بس، الدخل غرضه "أخرى" إلا لو حطيته في صندوق بإيدك
+                        if (out) Categorizer.suggestPurpose(c)?.let { if (!company) purpose = it }
                     }
                 }
                 SelectChip("+ تصنيف جديد", false, NabdColors.Mint) { newCat = true }
@@ -464,9 +475,14 @@ fun EditTxnSheet(
             val changed = category != txn.category || (purpose != txn.purpose && !purposeByCompany)
             val keyword = merchant.trim()
             if (changed && keyword.length >= 2) {
+                val others = ruleMatchCount(keyword)
                 ToggleRow(
                     "طبّق على كل «$keyword»",
-                    "اللي فات واللي جاي هيتصنف $category • ${purpose.ar}",
+                    when {
+                        others == 0 -> "مفيش عمليات تانية بنفس الاسم. الجاي (${if (out) "مصروف" else "دخل"} بس) هيتصنف $category • ${purpose.ar}"
+                        else -> "هتتغير $others عملية تانية بنفس الاسم واللي جاي هيتصنف $category • ${purpose.ar}" +
+                            if (others > 15) "\nده رقم كبير، اتأكد إن الاسم مميز" else ""
+                    },
                     applyAll
                 ) { applyAll = it }
             }
@@ -487,7 +503,7 @@ fun EditTxnSheet(
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)
             )
             txn.rawText?.takeIf { it.isNotBlank() }?.let { raw ->
-                MessageRuleSection(raw, merchant.trim(), category, purpose, onMessageRule)
+                MessageRuleSection(raw, merchant.trim(), category, purpose, Categorizer.categoriesFor(txn.direction).let { l -> if (category in l) l else l + category }, onMessageRule)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GradientButton("حفظ", Modifier.weight(1f), Icons.Rounded.Check) {
@@ -816,7 +832,7 @@ private fun StepButton(label: String, enabled: Boolean, onClick: () -> Unit) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MessageRuleSection(
-    raw: String, merchant: String, category: String, purpose: Purpose,
+    raw: String, merchant: String, category: String, purpose: Purpose, categories: List<String>,
     onRule: (keyword: String, category: String, purpose: Purpose, name: String?) -> Unit,
 ) {
     var field by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(raw)) }
@@ -867,7 +883,7 @@ private fun MessageRuleSection(
                     )
                     Text("التصنيف", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Categorizer.allCategories().forEach { c -> SelectChip(c, c == cat, NabdColors.Cyan) { cat = c } }
+                        categories.forEach { c -> SelectChip(c, c == cat, NabdColors.Cyan) { cat = c } }
                     }
                     Text("الغرض", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
                     PurposeChips(purp, includeAll = false) { p -> if (p != null) purp = p }

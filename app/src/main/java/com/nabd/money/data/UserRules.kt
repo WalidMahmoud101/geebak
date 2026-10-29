@@ -7,7 +7,13 @@ import org.json.JSONObject
  * قاعدة من عندك: أي عملية فيها الجزء ده من الرسالة تتصنف كده لوحدها وتاخد الاسم ده.
  * الجزء ممكن فيه # = أي رقم (مثلاً "تحويل الى 010#" بتطابق أي رقم تليفون).
  */
-data class UserRule(val keyword: String, val category: String, val purpose: Purpose?, val name: String? = null) {
+data class UserRule(
+    val keyword: String, val category: String, val purpose: Purpose?, val name: String? = null,
+    /** للدخل بس أو للمصروف بس (null = الاتنين) */
+    val dir: Direction? = null,
+    /** true = الجزء بيتدور عليه في الرسالة كلها، false = في اسم التاجر بس (قاعدة "كل «اسم»" من شاشة التعديل) */
+    val onMessage: Boolean = true,
+) {
     private val matcher: (String) -> Boolean by lazy {
         val k = com.nabd.money.agents.ArabicNumbers.norm(keyword).trim()
         if ('#' in k) {
@@ -23,6 +29,10 @@ data class UserRule(val keyword: String, val category: String, val purpose: Purp
 
     fun matchesRaw(vararg parts: String?): Boolean =
         matches(com.nabd.money.agents.ArabicNumbers.norm(parts.filterNotNull().joinToString(" ")))
+
+    /** قاعدة الاسم بتشوف اسم التاجر بس، وقاعدة الرسالة بتشوف الاسم والرسالة */
+    fun appliesTo(merchant: String?, text: String?, note: String? = null): Boolean =
+        if (onMessage) matchesRaw(merchant, text, note) else merchant != null && matchesRaw(merchant)
 }
 
 /** تصنيفاتك وقواعدك: محفوظة JSON في الإعدادات */
@@ -37,7 +47,7 @@ data class UserTaxonomy(
         put("purposes", JSONObject().apply { categoryPurpose.forEach { (k, v) -> put(k, v.name) } })
         put("rules", JSONArray().apply {
             rules.forEach { r ->
-                put(JSONObject().put("k", r.keyword).put("c", r.category).put("p", r.purpose?.name ?: "").put("n", r.name ?: ""))
+                put(JSONObject().put("k", r.keyword).put("c", r.category).put("p", r.purpose?.name ?: "").put("n", r.name ?: "").put("d", r.dir?.name ?: "").put("m", r.onMessage))
             }
         })
     }.toString()
@@ -51,7 +61,7 @@ data class UserTaxonomy(
             } ?: emptyMap()
             val rules = o.optJSONArray("rules")?.let { a ->
                 (0 until a.length()).map { a.getJSONObject(it) }.map { r ->
-                    UserRule(r.getString("k"), r.getString("c"), r.optString("p").takeIf { it.isNotBlank() }?.let(Purpose::valueOf), r.optString("n").takeIf { it.isNotBlank() })
+                    UserRule(r.getString("k"), r.getString("c"), r.optString("p").takeIf { it.isNotBlank() }?.let(Purpose::valueOf), r.optString("n").takeIf { it.isNotBlank() }, r.optString("d").takeIf { it.isNotBlank() }?.let(Direction::valueOf), r.optBoolean("m", true))
                 }
             } ?: emptyList()
             UserTaxonomy(custom, purposes, rules)
