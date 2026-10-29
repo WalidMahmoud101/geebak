@@ -106,7 +106,7 @@ fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit:
                 ) {
                     Icon(Icons.Rounded.Checklist, null, tint = if (selecting) NabdColors.Mint else NabdColors.TextDim, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text(if (selecting) "خلصت" else "تحديد وإخفاء", style = MaterialTheme.typography.labelMedium, color = if (selecting) NabdColors.Mint else NabdColors.TextDim)
+                    Text(if (selecting) "خلصت" else "تحديد: إخفاء أو شركة", style = MaterialTheme.typography.labelMedium, color = if (selecting) NabdColors.Mint else NabdColors.TextDim)
                 }
                 IconButton(onClick = { onAdd(Direction.OUT, single) }) {
                     Icon(Icons.Rounded.Add, "عملية جديدة", tint = NabdColors.Mint)
@@ -255,14 +255,15 @@ private fun SelectionBar(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (showingHidden) {
                 PillButton("رجّعها", Icons.Rounded.Visibility, NabdColors.Mint, Modifier.weight(1f)) { if (count > 0) onRestore() }
-                PillButton("للشركة", Icons.Rounded.BusinessCenter, NabdColors.Cyan, Modifier.weight(1f)) { if (count > 0) onCompany() }
             } else {
-                PillButton("اخفيها من الحساب", Icons.Rounded.VisibilityOff, NabdColors.Danger, Modifier.weight(1f)) { if (count > 0) onHide() }
+                PillButton("اخفيها", Icons.Rounded.VisibilityOff, NabdColors.Danger, Modifier.weight(1f)) { if (count > 0) onHide() }
             }
+            // على حساب الشركة: دايماً ظاهر، من أي عمليات حددتها (المصروف بس)
+            PillButton("على حساب الشركة", Icons.Rounded.BusinessCenter, NabdColors.Cyan, Modifier.weight(1.4f)) { if (count > 0) onCompany() }
         }
         Text(
-            if (showingHidden) "«رجّعها» بترجعها تتحسب وتظهر في العمليات. «للشركة» بتنقل المصروف لخانة مصاريف الشركة (الدخل مابيتنقلش)."
-            else "المخفي مابيتحسبش خصم ولا إضافة. تلاقيه بسطر «مخفي» فوق، ومن هناك ترجّعه أو تنقله للشركة.",
+            if (showingHidden) "«رجّعها» بترجعها تتحسب وتظهر في العمليات. «على حساب الشركة» بتنقل المصروف لخانة مصاريف الشركة (الدخل مابيتنقلش)."
+            else "«على حساب الشركة» بتشيل المصروف من العمليات وتنقله لخانة الشركة. «اخفيها» مابتتحسبش خصم ولا إضافة، وتلاقيها بسطر «مخفي» فوق.",
             style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint
         )
     }

@@ -444,6 +444,18 @@ fun EditTxnSheet(
                 value = merchant, onValueChange = { merchant = it }, label = { Text("الوصف / التاجر") },
                 singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)
             )
+            // على حساب الشركة: فوق علشان يبان، مش في آخر الشاشة
+            if (out) CompanyToggle(company) {
+                company = it
+                if (it) { purpose = Purpose.WORK; counted = true } // مصروف الشركة بيتحسب في خانته، مش مخفي
+            } else {
+                Text("مصاريف الشركة للمصروف بس. الدخل مابيتنقلش لخانة الشركة.", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint)
+            }
+            if (out && company) {
+                // سعر الوحدة ثابت، والإجمالي بيتغير بالكمية
+                val unit = txn.amount / txn.quantity.coerceAtLeast(1)
+                QuantityStepper(qty, unit, txn.currency, totalOnly = true) { qty = it }
+            }
             Label("الغرض")
             PurposeChips(purpose, includeAll = false) { p -> if (p != null) purpose = p }
             if (!out && txn.source != TxnSource.MANUAL) {
@@ -487,15 +499,6 @@ fun EditTxnSheet(
                     },
                     applyAll
                 ) { applyAll = it }
-            }
-            if (out) CompanyToggle(company) {
-                company = it
-                if (it) { purpose = Purpose.WORK; counted = true } // مصروف الشركة بيتحسب في خانته، مش مخفي
-            }
-            if (out && company) {
-                // سعر الوحدة ثابت، والإجمالي بيتغير بالكمية
-                val unit = txn.amount / txn.quantity.coerceAtLeast(1)
-                QuantityStepper(qty, unit, txn.currency, totalOnly = true) { qty = it }
             }
             // إخفاء من الحساب: مابتتحسبش خصم ولا إضافة، ورصيد الكاش والحسابات اليدوي بيرجع كأنها ماحصلتش
             ToggleRow(
