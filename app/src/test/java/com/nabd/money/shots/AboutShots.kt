@@ -34,7 +34,7 @@ class AboutShots {
         rule.setContent {
             NabdTheme(mode) {
                 AboutContent(
-                    versionName = "3.9", versionCode = 30,
+                    versionName = "4.0", versionCode = 31,
                     stats = AboutStats(transactions = 1066, auto = 1034, manual = 32, accounts = 6, since = System.currentTimeMillis() - 120L * 86_400_000),
                     agentNames = AgentRegistry.all.map { it.name.removePrefix("وكيل ").trim() },
                     updateText = "عندك آخر نسخة ✓", onCheckUpdate = {}, onOpen = {},
