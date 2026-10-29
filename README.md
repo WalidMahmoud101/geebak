@@ -13,7 +13,7 @@
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material3-4285F4?logo=jetpackcompose&logoColor=white)
 
-[**⬇️ نزّل آخر نسخة**](https://github.com/WalidMahmoud101/nabd/releases/latest)
+[**⬇️ نزّل آخر نسخة**](https://github.com/WalidMahmoud101/nabd/releases/latest) · [**🌐 صفحة التطبيق**](https://walidmahmoud101.github.io/nabd/about.html)
 
 </div>
 
@@ -130,7 +130,9 @@
 **التقنيات:** Kotlin · Jetpack Compose (Material 3) · Room · WorkManager · Robolectric.
 
 ## الترخيص
-[MIT](LICENSE): مفتوح المصدر، تقدر تستخدمه وتعدّل عليه وتوزّعه، مع الإبقاء على إشعار الحقوق. البرنامج بيتقدّم «زي ما هو» من غير ضمان، وانت المسؤول عن فلوسك وقراراتك.
+[MIT](LICENSE) © 2026 Walid Elsayed: مفتوح المصدر، تقدر تستخدمه وتعدّل عليه وتوزّعه، مع الإبقاء على إشعار الحقوق. البرنامج بيتقدّم «زي ما هو» من غير ضمان، وانت المسؤول عن فلوسك وقراراتك.
+
+المكتبات والخط والخدمات اللي نبض بيستخدمها وتراخيصها كلها في [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)، والخط تحت [SIL OFL 1.1](LICENSES/OFL-IBM-Plex-Sans-Arabic.txt). وفي التطبيق: الإعدادات ← عن نبض ← التراخيص.
 
 ---
 

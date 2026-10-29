@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>نبض — نبض فلوسك لحظة بلحظة</title>
+<meta name="description" content="نبض: تطبيق أندرويد بالعربي بيقرا رسايل البنك والمحافظ ويسجل فلوسك لوحده. حسابات، مصاريف شركة، فاتورة وExcel، سعر الدولار والدهب، تسجيل بالصوت. مفتوح المصدر وبياناتك على موبايلك.">
+<meta name="theme-color" content="#0F6B4F">
+<meta property="og:title" content="نبض — نبض فلوسك لحظة بلحظة">
+<meta property="og:description" content="يقرا رسايل البنك والمحافظ ويسجل لوحده. بياناتك على موبايلك، والكود مفتوح.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://walidmahmoud101.github.io/nabd/screenshots/1_home_light.png">
+<script>document.documentElement.classList.add("js")</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230F6B4F'/%3E%3Cpath d='M8 34h12l6-16 10 28 7-16h13' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+@font-face{font-family:"Plex";src:url(fonts/ibm_plex_arabic_regular.ttf) format("truetype");font-weight:400;font-display:swap}
+@font-face{font-family:"Plex";src:url(fonts/ibm_plex_arabic_semibold.ttf) format("truetype");font-weight:600;font-display:swap}
+@font-face{font-family:"Plex";src:url(fonts/ibm_plex_arabic_bold.ttf) format("truetype");font-weight:700;font-display:swap}
+:root{
+  --bg:#F3F5FA; --surface:#FFFFFF; --text:#16202E; --dim:#5E6B7C; --faint:#8A95A5; --line:#E1E6EE;
+  --mint:#0F9D75; --mint-soft:#0F9D7518; --deep:#0F6B4F; --gold:#D9A21B; --shadow:0 10px 40px #1b2a4014;
+  --hero:linear-gradient(135deg,#0B4A38 0%,#0F6B4F 55%,#14956f 100%);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#080C17;--surface:#10172A;--text:#EAF0FA;--dim:#9AA7BC;--faint:#6D7A90;--line:#1E2740;--mint:#3DD6A5;--mint-soft:#3DD6A51c;--shadow:0 10px 40px #00000066}
+}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{overflow-x:clip;font-family:"Plex",system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;background:var(--bg);color:var(--text);line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+/* الهيدر */
+header{position:sticky;top:0;z-index:20;backdrop-filter:blur(14px);background:color-mix(in srgb,var(--bg) 82%,transparent);border-bottom:1px solid var(--line)}
+.nav{display:flex;align-items:center;gap:20px;height:64px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px}
+.logo svg{width:34px;height:34px}
+.nav nav{display:flex;gap:6px;margin-inline-start:auto}
+.nav nav a{padding:6px 12px;border-radius:999px;color:var(--dim);font-size:15px}
+.nav nav a:hover{background:var(--mint-soft);color:var(--mint)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border-radius:14px;background:var(--mint);color:#fff;font-weight:600;font-size:16px;box-shadow:0 8px 24px #0f9d7540;transition:.2s}
+.btn:hover{transform:translateY(-2px)}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line);box-shadow:none}
+.nav .btn{padding:8px 16px;font-size:14px}
+@media(max-width:760px){.nav nav{display:none}.nav .btn{margin-inline-start:auto}}
+/* الهيرو */
+.hero{background:var(--hero);color:#fff;border-radius:0 0 40px 40px;overflow:hidden;position:relative}
+.hero .wrap{display:grid;grid-template-columns:1.1fr .9fr;gap:30px;align-items:center;padding-top:56px;padding-bottom:0}
+.hero h1{font-size:clamp(34px,6vw,58px);line-height:1.2;font-weight:700}
+.hero p.lead{margin:18px 0 28px;font-size:19px;color:#e2f4ec;max-width:520px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.hero .btn{background:#fff;color:var(--deep);box-shadow:0 10px 30px #00000033}
+.hero .btn.ghost{background:#ffffff1f;color:#fff;border-color:#ffffff40}
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin:26px 0 40px}
+.chips span{background:#ffffff1f;border:1px solid #ffffff2e;padding:6px 14px;border-radius:999px;font-size:14px}
+.pulse{position:absolute;inset-inline-start:-80px;top:-60px;width:420px;opacity:.12}
+.phones{display:flex;justify-content:center;gap:18px;align-items:flex-end;min-height:420px}
+.phone{width:210px;border-radius:30px;background:#0b1220;padding:7px;box-shadow:0 30px 70px #00000055;transform:translateY(34px)}
+.phone.b{transform:translateY(70px) scale(.92);opacity:.9}
+.phone img{display:block;width:100%;height:440px;object-fit:cover;object-position:top;border-radius:24px;background:#fff}
+@media(max-width:860px){.hero .wrap{grid-template-columns:1fr;text-align:center}.hero p.lead{margin-inline:auto}.cta,.chips{justify-content:center}.phone.b{display:none}}
+/* الأقسام */
+section{padding:72px 0}
+h2{font-size:clamp(26px,4vw,38px);line-height:1.3;margin-bottom:10px}
+.sub{color:var(--dim);max-width:640px;margin-bottom:34px;font-size:17px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:var(--shadow);transition:.25s}
+.card:hover{transform:translateY(-4px)}
+.ic{width:46px;height:46px;border-radius:14px;background:var(--mint-soft);display:grid;place-items:center;font-size:23px;margin-bottom:12px}
+.card h3{font-size:19px;margin-bottom:6px}
+.card p{color:var(--dim);font-size:15.5px}
+/* الشريط */
+.logos{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:8px}
+.logos span{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 16px;font-size:14.5px;color:var(--dim)}
+/* الخطوات */
+.steps{counter-reset:s;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+.step{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:26px 22px 22px}
+.step::before{counter-increment:s;content:counter(s);position:absolute;top:-16px;inset-inline-start:20px;width:34px;height:34px;border-radius:50%;background:var(--mint);color:#fff;display:grid;place-items:center;font-weight:700}
+.step h3{margin-bottom:6px}.step p{color:var(--dim);font-size:15.5px}
+/* المعرض */
+.gallery{display:flex;gap:18px;overflow-x:auto;padding:10px 4px 30px;scroll-snap-type:x mandatory}
+.gallery figure{flex:0 0 auto;width:230px;scroll-snap-align:center;text-align:center}
+.gallery .phone{width:100%;transform:none}
+.gallery img{height:470px}
+.gallery figcaption{margin-top:12px;font-size:14.5px;color:var(--dim)}
+.lightonly,.darkonly{display:block}
+.darkonly{display:none}
+@media(prefers-color-scheme:dark){.lightonly{display:none}.darkonly{display:block}}
+/* الخصوصية والتراخيص */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:26px;padding:30px;box-shadow:var(--shadow)}
+.panel ul{padding-inline-start:20px;color:var(--dim)}.panel li{margin:8px 0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:800px){.two{grid-template-columns:1fr}}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{padding:11px 10px;text-align:start;border-bottom:1px solid var(--line)}
+th{color:var(--faint);font-weight:600;font-size:13.5px}
+.tablewrap{overflow-x:auto}
+td:last-child{white-space:nowrap}
+@media(max-width:600px){td:last-child{white-space:normal}th,td{padding:9px 6px;font-size:14px}.panel{padding:20px}}
+.tag{white-space:nowrap;background:var(--mint-soft);color:var(--mint);padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600}
+.tag.ext{background:#d9a21b22;color:var(--gold)}
+code{background:var(--mint-soft);padding:1px 7px;border-radius:7px;font-size:14px;direction:ltr;unicode-bidi:embed}
+/* FAQ */
+details{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px 20px;margin-bottom:10px}
+summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:10px}
+summary::after{content:"+";color:var(--mint);font-size:22px;line-height:1}
+details[open] summary::after{content:"–"}
+details p{color:var(--dim);margin-top:10px;font-size:15.5px}
+/* الفوتر */
+footer{padding:40px 0 60px;border-top:1px solid var(--line);color:var(--dim);font-size:15px}
+footer .row{display:flex;flex-wrap:wrap;gap:14px 26px;align-items:center;justify-content:space-between}
+footer a:hover{color:var(--mint)}
+.js .reveal{opacity:0;transform:translateY(18px);transition:.7s}.js .reveal.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.js .reveal{opacity:1;transform:none;transition:none}.card:hover,.btn:hover{transform:none}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="logo" href="#top" aria-label="نبض">
+      <svg viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#0F6B4F"/><path d="M8 34h12l6-16 10 28 7-16h13" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      نبض
+    </a>
+    <nav>
+      <a href="#features">المميزات</a><a href="#screens">الصور</a><a href="#privacy">الخصوصية</a><a href="#licenses">التراخيص</a><a href="#faq">أسئلة</a>
+    </nav>
+    <a class="btn" href="https://github.com/WalidMahmoud101/nabd/releases/latest">نزّل</a>
+  </div>
+</header>
+
+<main id="top">
+<div class="hero">
+  <svg class="pulse" viewBox="0 0 400 200" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"><path d="M0 110h110l30-80 50 140 40-80h170"/></svg>
+  <div class="wrap">
+    <div>
+      <h1>نبض فلوسك<br>لحظة بلحظة 💚</h1>
+      <p class="lead">تطبيق أندرويد بالعربي بيقرا رسايل البنك والمحافظ وإشعارات التطبيقات ويسجل كل حاجة لوحده، ويقولك فلوسك راحت فين، والشركة مديونالك بكام، وسعر الدولار والدهب النهاردة.</p>
+      <div class="cta">
+        <a class="btn" href="https://github.com/WalidMahmoud101/nabd/releases/latest">⬇️ نزّل آخر نسخة</a>
+        <a class="btn ghost" href="https://github.com/WalidMahmoud101/nabd">الكود على GitHub</a>
+      </div>
+      <div class="chips"><span>22 وكيل شغالين</span><span>بياناتك على موبايلك بس</span><span>مفتوح المصدر (MIT)</span><span>تحديث تلقائي</span></div>
+    </div>
+    <div class="phones" aria-hidden="true">
+      <div class="phone b"><img src="screenshots/2_txns_light.png" alt=""></div>
+      <div class="phone"><img class="lightonly" src="screenshots/1_home_light.png" alt="الرئيسية"><img class="darkonly" src="screenshots/1_home_dark.png" alt="الرئيسية داكن"></div>
+    </div>
+  </div>
+</div>
+
+<section id="features"><div class="wrap">
+  <h2 class="reveal">كل فلوسك في مكان واحد</h2>
+  <p class="sub reveal">من أول رسالة بنك لحد فاتورة المحاسب. نبض بيشتغل في الخلفية وانت بتعيش حياتك.</p>
+  <div class="grid">
+    <div class="card reveal"><div class="ic">📥</div><h3>تسجيل تلقائي بالكامل</h3><p>بيقرا رسايل البنك ويطلّع اتخصم كام، والرصيد الباقي، من أنهي كارت، وعند مين. وبيتجاهل الأكواد السرية والإعلانات ومفيش تكرار.</p></div>
+    <div class="card reveal"><div class="ic">🏦</div><h3>كل حساباتك</h3><p>إجمالي فلوسك، وإجمالي كل بنك ومحفظة وكارت. وتضيف Binance وTrust Wallet وVisa وGoogle Pay بإيدك بالمبلغ اللي معاك، وإشعاراتها بتتسجل عليها.</p></div>
+    <div class="card reveal"><div class="ic">🏢</div><h3>مصاريف الشركة والعهدة</h3><p>اللي دفعته للشغل بالكمية والسعر، وفلوس الشركة اللي معاك، والصافي بينكم. والتحويل منها يقفل المصاريف المستحقة لوحده.</p></div>
+    <div class="card reveal"><div class="ic">🧾</div><h3>فاتورة PDF وExcel</h3><p>فاتورة باسم نبض جاهزة للطباعة وملف Excel للمحاسب بإجمالي بمعادلة، من مصاريف الشركة بضغطة.</p></div>
+    <div class="card reveal"><div class="ic">🎙️</div><h3>سجّل بصوتك</h3><p>«ضيف في بينانس 100 دولار» أو «اتخصم 250 من الفيزا»: بيفهم المصري والأرقام بالكلام والوقت والحساب.</p></div>
+    <div class="card reveal"><div class="ic">💱</div><h3>الدولار والدهب</h3><p>سعر الدولار بيتحدث لوحده، واضغط على إجمالي فلوسك يتحول للدولار. وسعر الدهب بالجنيه لعيار 24 و21 و18 و14 والجنيه الدهب.</p></div>
+    <div class="card reveal"><div class="ic">💵</div><h3>المرتب بيتعلم</h3><p>اكتب اسم الشركة مرة واحدة، وأي تحويل منها يتسجل مرتب. بيتعلم يوم القبض وينبهك لو اتأخر.</p></div>
+    <div class="card reveal"><div class="ic">🗂️</div><h3>تصنيفات وقواعد بتظبطها</h3><p>صناديق للبيت والشغل والعربية، وقواعد من جزء من الرسالة بتعدلها وقت ما تحب، وفلتر قوي وإخفاء عمليات وحسابات.</p></div>
+    <div class="card reveal"><div class="ic">☁️</div><h3>نسخ احتياطي وتحديث</h3><p>نسخة على Google Drive أو الموبايل ورجوع منها، و«ابدأ من جديد» بزرار تراجع، وتحديث تلقائي من GitHub بنفس بياناتك.</p></div>
+  </div>
+  <p class="sub reveal" style="margin-top:34px;text-align:center">بيفهم رسايل</p>
+  <div class="logos reveal"><span>البنك الأهلي</span><span>CIB</span><span>بنك مصر</span><span>QNB</span><span>أي بنك تاني</span><span>InstaPay</span><span>فودافون كاش</span><span>أورنج كاش</span><span>e&amp; كاش</span><span>WE Pay</span><span>فوري</span><span>Google Pay</span><span>Binance</span><span>Trust Wallet</span><span>RedotPay</span><span>Kast</span></div>
+</div></section>
+
+<section><div class="wrap">
+  <h2 class="reveal">تبدأ في 3 خطوات</h2>
+  <p class="sub reveal">من غير حساب ولا تسجيل دخول.</p>
+  <div class="steps">
+    <div class="step reveal"><h3>نزّل وثبّت</h3><p>نزّل <code>nabd.apk</code> من صفحة آخر نسخة وثبّته (اسمح بالتثبيت من المصدر).</p></div>
+    <div class="step reveal"><h3>ادي الصلاحيات</h3><p>صلاحية الرسايل، وفعّل «الوصول للإشعارات» لنبض علشان يلقط إشعارات InstaPay وBinance وغيرها.</p></div>
+    <div class="step reveal"><h3>سيبه يشتغل</h3><p>بيفحص رسايل آخر 4 شهور ويبني تاريخك، وكل عملية جديدة بتتسجل لحظتها حتى والتطبيق مقفول.</p></div>
+  </div>
+</div></section>
+
+<section id="screens" style="padding-top:20px"><div class="wrap">
+  <h2 class="reveal">شكل التطبيق</h2>
+  <p class="sub reveal">فاتح وداكن وتلقائي، بخط IBM Plex Sans Arabic وتصميم هادي. الصور من بيانات تجريبية.</p>
+  <div class="gallery reveal">
+    <figure><div class="phone"><img src="screenshots/1_home_light.png" alt="الرئيسية"></div><figcaption>الرئيسية</figcaption></figure>
+    <figure><div class="phone"><img src="screenshots/2_txns_light.png" alt="العمليات"></div><figcaption>العمليات</figcaption></figure>
+    <figure><div class="phone"><img src="screenshots/3_reports_light.png" alt="التقارير"></div><figcaption>التقارير</figcaption></figure>
+    <figure><div class="phone"><img src="screenshots/4_accounts_light.png" alt="الحسابات"></div><figcaption>الحسابات</figcaption></figure>
+    <figure><div class="phone"><img src="screenshots/5_company_dark.png" alt="مصاريف الشركة"></div><figcaption>مصاريف الشركة</figcaption></figure>
+    <figure><div class="phone"><img src="screenshots/invoice.png" alt="الفاتورة"></div><figcaption>فاتورة PDF للمحاسب</figcaption></figure>
+    <figure><div class="phone"><img src="screenshots/about_light.png" alt="عن نبض"></div><figcaption>عن نبض</figcaption></figure>
+  </div>
+</div></section>
+
+<section id="privacy" style="padding-top:20px"><div class="wrap">
+  <div class="panel reveal">
+    <h2>بياناتك على موبايلك بس 🔐</h2>
+    <p class="sub" style="margin-bottom:14px">مفيش حساب ولا سيرفر ولا تتبّع. اللي بيتقرا بيفضل عندك.</p>
+    <div class="two">
+      <ul>
+        <li>الرسايل والإشعارات بتتقرا على الموبايل ومابتتبعتش لأي مكان.</li>
+        <li>قاعدة البيانات على موبايلك، والنسخة الاحتياطية ملف بتحفظه في المكان اللي انت تختاره.</li>
+        <li>الكود كله مفتوح تقدر تراجعه بنفسك.</li>
+      </ul>
+      <ul>
+        <li><b>النت بيُستخدم لتلات حاجات بس:</b> تحديثات التطبيق من GitHub، وسعر الدولار، وسعر الدهب.</li>
+        <li>مفيش بيانات مالية بتطلع في أي طلب.</li>
+        <li>الصلاحيات: قراءة الرسايل، الإشعارات، وإشعارات التطبيق.</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<section id="licenses" style="padding-top:20px"><div class="wrap">
+  <h2 class="reveal">التراخيص</h2>
+  <p class="sub reveal">نبض مفتوح المصدر. وبيستخدم مكتبات وخط وخدمات تانية تحت تراخيصها، دي كلها.</p>
+  <div class="panel reveal" style="margin-bottom:16px">
+    <h3 style="margin-bottom:6px">نبض · <span class="tag">MIT</span></h3>
+    <p style="color:var(--dim)">© 2026 Walid Elsayed. تقدر تستخدم الكود وتعدّل عليه وتوزّعه، بشرط تسيب إشعار الحقوق. البرنامج «زي ما هو» من غير ضمان. <a style="color:var(--mint)" href="https://github.com/WalidMahmoud101/nabd/blob/main/LICENSE">النص الكامل</a></p>
+  </div>
+  <div class="panel reveal">
+    <div class="tablewrap"><table>
+      <thead><tr><th>المكوّن</th><th>بيستخدم في</th><th>الترخيص</th></tr></thead>
+      <tbody>
+        <tr><td>Kotlin · Coroutines</td><td>اللغة والتزامن</td><td><span class="tag">Apache 2.0</span></td></tr>
+        <tr><td>Jetpack Compose · Material 3</td><td>الواجهة</td><td><span class="tag">Apache 2.0</span></td></tr>
+        <tr><td>AndroidX (Core، Activity، Lifecycle)</td><td>أساسيات أندرويد</td><td><span class="tag">Apache 2.0</span></td></tr>
+        <tr><td>Room</td><td>قاعدة البيانات على الموبايل</td><td><span class="tag">Apache 2.0</span></td></tr>
+        <tr><td>WorkManager</td><td>المراجعة الدورية في الخلفية</td><td><span class="tag">Apache 2.0</span></td></tr>
+        <tr><td>IBM Plex Sans Arabic · © 2019 IBM Corp.</td><td>الخط (في التطبيق وفي الصفحة دي)</td><td><span class="tag">SIL OFL 1.1</span></td></tr>
+        <tr><td>JUnit 4 · Robolectric · AndroidX Test</td><td>الاختبارات فقط</td><td><span class="tag">EPL 1.0 · MIT · Apache 2.0</span></td></tr>
+        <tr><td><a href="https://www.exchangerate-api.com" style="color:var(--mint)">Rates By Exchange Rate API</a></td><td>سعر الدولار والعملات</td><td><span class="tag ext">خدمة خارجية</span></td></tr>
+        <tr><td>gold-api.com</td><td>سعر الأوقية العالمي للدهب</td><td><span class="tag ext">خدمة خارجية</span></td></tr>
+        <tr><td>GitHub Releases</td><td>التحديث التلقائي</td><td><span class="tag ext">خدمة خارجية</span></td></tr>
+      </tbody>
+    </table></div>
+    <p style="color:var(--faint);font-size:14px;margin-top:14px">النصوص الكاملة: <a style="color:var(--mint)" href="https://github.com/WalidMahmoud101/nabd/blob/main/THIRD_PARTY_LICENSES.md">THIRD_PARTY_LICENSES.md</a> · <a style="color:var(--mint)" href="fonts/OFL.txt">ترخيص الخط</a>. أسعار الدولار والدهب للمعلومة فقط وليست نصيحة استثمارية.</p>
+  </div>
+</div></section>
+
+<section id="faq" style="padding-top:20px"><div class="wrap" style="max-width:780px">
+  <h2 class="reveal">أسئلة بتتكرر</h2><p class="sub reveal">&nbsp;</p>
+  <details class="reveal"><summary>هل نبض بيبعت بياناتي لأي مكان؟</summary><p>لأ. كل حاجة على موبايلك. النت بيُستخدم لتحديث التطبيق وسعر الدولار وسعر الدهب بس، ومفيش بيانات مالية بتتبعت.</p></details>
+  <details class="reveal"><summary>ليه محتاج صلاحية الرسايل والإشعارات؟</summary><p>علشان يقرا رسايل البنك والمحافظ ويسجل العمليات لوحده. التطبيقات زي InstaPay وBinance مابتدّيش API، فنبض بيقرا إشعاراتها اللي بتظهر على الموبايل.</p></details>
+  <details class="reveal"><summary>ينفع على آيفون؟ وApple Pay؟</summary><p>نبض أندرويد بس. وApple Pay مابيبعتش إشعارات لأندرويد، فعملياته بتتسجل بإيدك أو بالصوت.</p></details>
+  <details class="reveal"><summary>هو على Google Play؟</summary><p>لأ، بسبب صلاحية الرسايل. بتنزّله من صفحة GitHub وبيتحدث لوحده من جوا التطبيق.</p></details>
+  <details class="reveal"><summary>التحديث بيمسح بياناتي؟</summary><p>لأ. التحديث بيتثبّت فوق القديم بنفس المفتاح، والبيانات بتفضل. وتقدر تعمل نسخة احتياطية قبلها.</p></details>
+  <details class="reveal"><summary>سعر الدهب ده سعر المحلات؟</summary><p>ده السعر العالمي × سعر الدولار. محلات الصاغة بتزود المصنعية والدمغة، فيه خانة علاوة أو خصم السوق المحلي تضبطها.</p></details>
+  <details class="reveal"><summary>لقيت مشكلة أو عايز ميزة؟</summary><p>افتح <a style="color:var(--mint)" href="https://github.com/WalidMahmoud101/nabd/issues">Issue على GitHub</a> وهنبص عليها.</p></details>
+</div></section>
+</main>
+
+<footer><div class="wrap row">
+  <div>اتعمل بحب في مصر 🇪🇬 · © 2026 Walid Elsayed · ترخيص MIT</div>
+  <div style="display:flex;gap:18px;flex-wrap:wrap">
+    <a href="https://github.com/WalidMahmoud101/nabd">GitHub</a>
+    <a href="https://github.com/WalidMahmoud101/nabd/releases/latest">آخر نسخة</a>
+    <a href="https://github.com/WalidMahmoud101/nabd/issues">بلّغ عن مشكلة</a>
+    <a href="https://github.com/WalidMahmoud101/nabd/blob/main/THIRD_PARTY_LICENSES.md">التراخيص</a>
+  </div>
+</div></footer>
+
+<script>
+(function(){
+  var els=[].slice.call(document.querySelectorAll('.reveal'));
+  function show(e){e.classList.add('in')}
+  function check(){var h=window.innerHeight;els=els.filter(function(e){var r=e.getBoundingClientRect();if(r.top<h*0.92){show(e);return false}return true})}
+  window.addEventListener('scroll',check,{passive:true});window.addEventListener('resize',check);window.addEventListener('load',check);check();
+  // لو أي حاجة اتأخرت (متصفح قديم أو قفزة سكرول): نظهر الباقي بعد 3 ثواني علشان مافيش محتوى يفضل مخفي
+  setTimeout(function(){els.forEach(show)},3000);
+})();
+</script>
+</body>
+</html>

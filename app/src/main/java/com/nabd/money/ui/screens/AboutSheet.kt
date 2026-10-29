@@ -90,6 +90,22 @@ data class AboutStats(val transactions: Int, val auto: Int, val manual: Int, val
     val autoPercent get() = if (transactions == 0) 0 else auto * 100 / transactions
 }
 
+/** مكتبات وخط وخدمات نبض بيستخدمها وتراخيصها (نفس اللي في THIRD_PARTY_LICENSES.md) */
+data class LicenseItem(val name: String, val use: String, val license: String)
+
+val licenseItems = listOf(
+    LicenseItem("نبض", "التطبيق نفسه", "MIT"),
+    LicenseItem("Kotlin و Coroutines", "اللغة والتزامن", "Apache 2.0"),
+    LicenseItem("Jetpack Compose + Material 3", "الواجهة", "Apache 2.0"),
+    LicenseItem("AndroidX (Core، Activity، Lifecycle)", "أساسيات أندرويد", "Apache 2.0"),
+    LicenseItem("Room", "قاعدة البيانات على الموبايل", "Apache 2.0"),
+    LicenseItem("WorkManager", "المراجعة الدورية في الخلفية", "Apache 2.0"),
+    LicenseItem("IBM Plex Sans Arabic", "الخط • © 2019 IBM Corp.", "SIL OFL 1.1"),
+    LicenseItem("Exchange Rate API", "سعر الدولار والعملات (Rates By Exchange Rate API)", "خدمة خارجية"),
+    LicenseItem("gold-api.com", "سعر الأوقية العالمي للدهب", "خدمة خارجية"),
+    LicenseItem("GitHub Releases", "التحديث التلقائي", "خدمة خارجية"),
+)
+
 private data class Feature(val icon: ImageVector, val color: Color, val title: String, val body: String)
 
 private val features = listOf(
@@ -205,6 +221,42 @@ fun AboutContent(
                 Text(
                     "اتحقق", style = MaterialTheme.typography.labelLarge, color = NabdColors.Mint,
                     modifier = Modifier.clip(RoundedCornerShape(50)).background(NabdColors.Mint.copy(alpha = 0.12f)).clickable(onClick = onCheckUpdate).padding(horizontal = 14.dp, vertical = 6.dp)
+                )
+            }
+        }
+
+        // التراخيص
+        var licensesOpen by remember { mutableStateOf(false) }
+        GlassCard(Modifier.fillMaxWidth(), padding = 14.dp) {
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { licensesOpen = !licensesOpen }, verticalAlignment = Alignment.CenterVertically) {
+                IconBubble(Icons.Rounded.Verified, NabdColors.Gold, 38.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("التراخيص", style = MaterialTheme.typography.titleSmall)
+                    Text("المكتبات والخط والخدمات اللي نبض شايلها", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
+                }
+                Text(if (licensesOpen) "اقفل" else "افتح", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+            }
+            if (licensesOpen) {
+                Spacer(Modifier.height(10.dp))
+                licenseItems.forEachIndexed { i, l ->
+                    if (i > 0) HorizontalDivider(color = NabdColors.Stroke)
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(l.name, style = MaterialTheme.typography.bodyMedium)
+                            Text(l.use, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
+                        }
+                        Text(
+                            l.license, style = MaterialTheme.typography.labelMedium, color = NabdColors.Mint,
+                            modifier = Modifier.clip(RoundedCornerShape(50)).background(NabdColors.Mint.copy(alpha = 0.12f)).padding(horizontal = 10.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "النص الكامل للتراخيص والخط على GitHub.",
+                    style = MaterialTheme.typography.labelSmall, color = NabdColors.Mint,
+                    modifier = Modifier.clickable { onOpen("$REPO_URL/blob/main/THIRD_PARTY_LICENSES.md") }
                 )
             }
         }

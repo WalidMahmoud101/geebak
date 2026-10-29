@@ -33,7 +33,7 @@ class InvoiceShots {
                 reimbursed = i == 2, note = null,
             )
         }
-        return InvoiceInfo(CompanyInvoice.number(), "ACME LTD", "وليد محمود", now, "المستحقة", items)
+        return InvoiceInfo(CompanyInvoice.number(), "ACME LTD", "محمد أحمد", now, "المستحقة", items)
     }
 
     @Test
