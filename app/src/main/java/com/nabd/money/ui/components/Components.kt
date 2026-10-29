@@ -430,9 +430,9 @@ fun EmptyState(icon: ImageVector, title: String, body: String) {
 }
 
 @Composable
-fun StatColumn(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+fun StatColumn(label: String, value: String, color: Color, modifier: Modifier = Modifier, labelColor: Color = NabdColors.TextDim) {
     Column(modifier) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = NabdColors.TextDim)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = labelColor)
         Spacer(Modifier.height(2.dp))
         Text(value, color = color, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1)
     }

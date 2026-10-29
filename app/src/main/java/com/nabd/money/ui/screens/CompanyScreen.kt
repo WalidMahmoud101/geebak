@@ -1,5 +1,6 @@
 package com.nabd.money.ui.screens
 
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.rounded.Print
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -100,6 +101,16 @@ fun CompanyScreen(vm: AppViewModel, onBack: () -> Unit, onAdd: () -> Unit, onEdi
                         Text("مصاريف الشركة", style = MaterialTheme.typography.headlineSmall)
                         Text("اللي دفعته للشغل وهتسترده", style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim)
                     }
+                    // زرار واضح فوق (الزرار العايم كان بيستخبى ورا الشريط اللي تحت)
+                    Row(
+                        Modifier.clip(RoundedCornerShape(12.dp)).background(NabdColors.Cyan).clickable(onClick = onAdd)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.Add, null, tint = NabdColors.OnAccent, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("مصروف جديد", style = MaterialTheme.typography.labelLarge, color = NabdColors.OnAccent)
+                    }
                 }
             }
             item {
@@ -108,12 +119,12 @@ fun CompanyScreen(vm: AppViewModel, onBack: () -> Unit, onAdd: () -> Unit, onEdi
                     Modifier.fillMaxWidth().clip(shape).background(HeroGradient)
                         .border(1.dp, Color.White.copy(alpha = 0.08f), shape).padding(20.dp)
                 ) {
-                    Text("الشركة مديونالك بـ", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
-                    Text(Money.fmt(pendingTotal), fontSize = 32.sp, fontWeight = FontWeight.Bold, color = NabdColors.Cyan)
+                    Text("الشركة مديونالك بـ", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.8f))
+                    Text(Money.fmt(pendingTotal), fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color(0xFF8FE3FF))
                     Spacer(Modifier.height(12.dp))
                     Row {
-                        StatColumn("عمليات مستحقة", "${pending.size}", NabdColors.Text, Modifier.weight(1f))
-                        StatColumn("اتسلم قبل كده", Money.fmt(doneTotal, decimals = false), NabdColors.Mint, Modifier.weight(1f))
+                        StatColumn("عمليات مستحقة", "${pending.size}", Color.White, Modifier.weight(1f), Color.White.copy(alpha = 0.75f))
+                        StatColumn("اتسلم قبل كده", Money.fmt(doneTotal, decimals = false), Color(0xFF8CF0C4), Modifier.weight(1f), Color.White.copy(alpha = 0.75f))
                     }
                     if (pending.isNotEmpty()) {
                         Spacer(Modifier.height(14.dp))
@@ -129,7 +140,7 @@ fun CompanyScreen(vm: AppViewModel, onBack: () -> Unit, onAdd: () -> Unit, onEdi
                         Text(
                             "لو ${salary.payer} حوّلت نفس المبلغ، القايمة بتتصفر لوحدها.",
                             style = MaterialTheme.typography.labelSmall,
-                            color = NabdColors.TextDim,
+                            color = Color.White.copy(alpha = 0.7f),
                             modifier = Modifier.padding(top = 10.dp)
                         )
                     }
@@ -191,7 +202,7 @@ fun CompanyScreen(vm: AppViewModel, onBack: () -> Unit, onAdd: () -> Unit, onEdi
             onClick = onAdd,
             containerColor = NabdColors.Cyan,
             contentColor = NabdColors.OnAccent,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 28.dp)
+            modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 20.dp, bottom = 84.dp)
         ) { Icon(Icons.Rounded.Add, "مصروف شركة جديد") }
     }
 

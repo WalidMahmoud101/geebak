@@ -125,6 +125,8 @@ class Screens {
         tab("التقارير"); waitText("الداخل والخارج"); shot("3_reports_$suffix")
         rule.onAllNodesWithText("الحسابات")[0].performClick(); waitText("حركة كل حساب"); shot("3b_reports_accounts_$suffix")
         tab("الحسابات"); waitText("CIB"); shot("4_accounts_$suffix")
+        tab("الرئيسية"); waitText("حساباتك")
+        rule.onAllNodesWithText("الشركة", substring = true)[0].performClick(); waitText("الشركة مديونالك"); shot("5_company_$suffix")
         // الشاشات المنبثقة (dialogs/sheets) في window لوحدها ومش بتتصور هنا
     }
 
