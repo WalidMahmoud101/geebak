@@ -51,6 +51,8 @@ object Categorizer {
             "رسوم", "عمولة", "عموله", "اصدار كارت", "اصدار الكارت", "إصدار كارت", "إصدار الكارت", "اصدار بطاقة", "إصدار بطاقة",
             "كارت الدفع", "كارت دفع", "كارت افتراضي", "issuance", "virtual card", "fee", "fees"
         )),
+        // ماكينات ATM وسحب نقدي الأول: "NBE ATM Mall" سحب مش ترفيه. أكواد البنوك الأخرى بتظهر كده "ADCB CAI"
+        Rule("سحب كاش", Purpose.OTHER, listOf("atm", "سحب نقدي", "cash withdrawal", "ماكينة", "صراف", "تم سحب", "سحب مبلغ", "bdc", "adcb", "alxb", "hsbc obo", "hsbc  ", "bank nxt")),
         Rule("بقالة", Purpose.HOME, listOf(
             "carrefour", "كارفور", "kazyon", "كازيون", "spinneys", "سبينيس", "hyper", "هايبر", "seoudi", "سعودي ماركت",
             "metro market", "مترو ماركت", "oscar", "أوسكار", "kheir zaman", "خير زمان", "gourmet", "جورميه", "ragab",
@@ -59,12 +61,13 @@ object Categorizer {
         )),
         Rule("فواتير", Purpose.HOME, listOf(
             "كهرباء", "electricity", "فاتورة غاز", "natural gas", "town gas", "مياه", "water bill", "انترنت",
-            "internet", "we home", "فاتورة", "bill payment", "telecom egypt", "خط أرضي", "كهربا", "الكهربا", "النت", "الانترنت", "غاز", "الغاز", "عداد", "كارت شحن", "شحن رصيد"
+            "internet", "we home", "فاتورة", "bill payment", "telecom egypt", "خط أرضي", "كهربا", "الكهربا", "النت", "الانترنت", "غاز", "الغاز", "عداد", "كارت شحن", "شحن رصيد",
+            "land line", "landline", "mobile recharge", "recharge", "we-fbb", "we-fv", "we data", "we-data", "mobile r", "home i", "e-finance", "ngov"
         )),
         Rule("إيجار", Purpose.HOME, listOf("ايجار", "إيجار", "rent")),
         Rule("وقود", Purpose.CAR, listOf(
             "بنزين", "benzine", "fuel", "petrol", "wataniya", "وطنية", "shell", "totalenergies", "chillout",
-            "emarat misr", "مصر للبترول", "misr petroleum", "سولار", "gas station", "محطة", "بنزينه", "بنزينة", "تفويل"
+            "emarat misr", "gas stat", "gas stai", "betrom", "emarat", "مصر للبترول", "misr petroleum", "سولار", "gas station", "محطة", "بنزينه", "بنزينة", "تفويل"
         )),
         Rule("صيانة عربية", Purpose.CAR, listOf(
             "service center", "مركز خدمة", "ميكانيكي", "tires", "كاوتش", "car wash", "غسيل عربية", "ترخيص",
@@ -97,10 +100,10 @@ object Categorizer {
         )),
         Rule("تسوق", Purpose.PERSONAL, listOf(
             "amazon", "أمازون", "noon", "نون", "jumia", "جوميا", "shein", "temu", "aliexpress", "zara",
-            "h&m", "defacto", "lc waikiki", "max fashion", "b.tech", "بي تك", "هدوم", "لبس", "جزمه", "جزمة", "شنطه", "شنطة"
+            "h&m", "defacto", "lc waikiki", "max fashion", "b.tech", "btech", "dott jeans", "cotton house", "بي تك", "هدوم", "لبس", "جزمه", "جزمة", "شنطه", "شنطة"
         )),
         Rule("كريبتو", Purpose.OTHER, listOf("binance", "usdt", "usdc", "crypto", "p2p", "bybit", "okx")),
-        Rule("سحب كاش", Purpose.OTHER, listOf("atm", "سحب نقدي", "cash withdrawal", "ماكينة", "صراف")),
+        Rule("سحب كاش", Purpose.OTHER, listOf("سحب")),
         Rule("تحويلات", Purpose.OTHER, listOf(
             "instapay", "ipn", "تحويل", "transfer", "sent", "ارسال", "إرسال", "محفظة", "wallet"
         )),
@@ -113,7 +116,7 @@ object Categorizer {
         if (w.length >= 5) return hay.contains(w)
         val rx = synchronized(shortWordRx) {
             shortWordRx.getOrPut(w) {
-                Regex("(?<![\\p{L}\\p{N}])(?:ال)?" + Regex.escape(w) + "(?![\\p{L}\\p{N}])")
+                Regex("(?<![\\p{L}\\p{N}])(?:ال)?" + Regex.escape(w) + "(?![\\p{L}])")
             }
         }
         return rx.containsMatchIn(hay)

@@ -173,6 +173,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun txnsFor(accountId: Long) = dao.forAccount(accountId)
 
 
+    val healMessage = MutableStateFlow<String?>(null)
+
+    /** مراجعة شاملة للرسايل: يصلّح العمليات والأرصدة */
+    fun healAll() = viewModelScope.launch(Dispatchers.IO) {
+        healMessage.value = "بيراجع الرسايل…"
+        healMessage.value = runCatching { InboxScanner.heal(getApplication(), engine) }.getOrElse { "حصل خطأ: ${it.message}" }
+    }
+
     fun scanInbox(days: Int = 120) {
         if (scanning.value) return
         viewModelScope.launch {

@@ -794,6 +794,10 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                 )
                 PillButton("التصنيفات والقواعد", Icons.Rounded.Category, NabdColors.Mint, Modifier.fillMaxWidth()) { categories = true }
                 PillButton("النسخة الاحتياطية", Icons.Rounded.CloudDone, NabdColors.Mint, Modifier.fillMaxWidth()) { backup = true }
+                // مراجعة شاملة للرسايل: بتصلّح العمليات والأرصدة اللي اتسجلت غلط
+                val heal by vm.healMessage.collectAsState()
+                PillButton("راجع كل الرسايل وصلّح", Icons.Rounded.Check, NabdColors.Cyan, Modifier.fillMaxWidth()) { vm.healAll() }
+                heal?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim) }
                 PillButton("ابدأ من جديد", Icons.Rounded.RestartAlt, NabdColors.Danger, Modifier.fillMaxWidth()) { reset = true }
                 Text("المبالغ تظهر بـ", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

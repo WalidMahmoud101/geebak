@@ -13,6 +13,29 @@ import com.nabd.money.data.TxnSource
 object InboxScanner {
     data class Result(val scanned: Int, val captured: Int)
 
+    /**
+     * مراجعة شاملة: يصلّح العمليات اللي اتسجلت غلط، يلقط اللي فاته (شحن الرصيد مثلاً)، ويرجّع الأرصدة من آخر رصيد حقيقي في الرسايل.
+     * بيقرا رسايل الـ120 يوم اللي فاتت بس.
+     */
+    suspend fun heal(ctx: Context, engine: AgentEngine, days: Int = 120): String {
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) return "محتاج إذن الرسايل"
+        val fixes = engine.revalidate()
+        val scanned = scan(ctx, engine, days)
+        val all = mutableListOf<RawMessage>()
+        val since = System.currentTimeMillis() - days * 86_400_000L
+        ctx.contentResolver.query(
+            Telephony.Sms.Inbox.CONTENT_URI,
+            arrayOf(Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.DATE),
+            "${Telephony.Sms.DATE} > ?", arrayOf(since.toString()), "${Telephony.Sms.DATE} ASC"
+        )?.use { c ->
+            while (c.moveToNext()) {
+                all += RawMessage(TxnSource.SMS, c.getString(0) ?: continue, text = c.getString(1) ?: continue, timestamp = c.getLong(2))
+            }
+        }
+        val rebalanced = engine.rebuildBalances(all)
+        return "اتحذف ${fixes.removed} عملية غلط، واتصلح ${fixes.fixed}، واتضاف ${scanned.captured} جديدة، واتظبط رصيد $rebalanced حساب"
+    }
+
     suspend fun scan(ctx: Context, engine: AgentEngine, days: Int, notify: Boolean = false): Result {
         if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
             return Result(0, 0)

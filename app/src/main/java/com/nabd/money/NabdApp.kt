@@ -20,6 +20,10 @@ class NabdApp : Application() {
     lateinit var engine: AgentEngine
         private set
 
+    /** شغل بدء التشغيل (تنضيف الحسابات والمراجعة): الاختبارات بتستناه علشان ماتتلخبطش */
+    var startupJob: kotlinx.coroutines.Job? = null
+        private set
+
     override fun onCreate() {
         super.onCreate()
         db = NabdDatabase.build(this)
@@ -28,14 +32,17 @@ class NabdApp : Application() {
         Notifier.ensureChannels(this)
         // مرة واحدة بعد التحديث: نلم الكروت والحسابات اللي اتكررت قبل كده
         // وبعد كده: نشيل الإعلانات اللي اتسجلت كأنها عمليات
-        if (settings.accountsTidied < 4) {
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        if (settings.accountsTidied < 6) {
+            startupJob = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                 runCatching {
                     if (settings.accountsTidied < 1) engine.tidyAccounts()
                     if (settings.accountsTidied < 2) engine.purgeAds()
                     if (settings.accountsTidied < 3) engine.adoptCash()
-                    engine.fixFeeDirections()
-                }.onSuccess { settings.accountsTidied = 4 }
+                    if (settings.accountsTidied < 4) engine.fixFeeDirections()
+                    engine.collapseBanks()
+                    // مراجعة الرسايل القديمة بالـ parser الجديد وتصليح الأرصدة (مرة واحدة)
+                    if (settings.accountsTidied < 6) runCatching { com.nabd.money.ingest.InboxScanner.heal(this@NabdApp, engine) }
+                }.onSuccess { settings.accountsTidied = 6 }
             }
         }
         runCatching { DigestWorker.schedule(this) }

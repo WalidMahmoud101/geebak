@@ -245,11 +245,22 @@ class AgentEngine(
         }
     }
 
-    private suspend fun resolveAccount(agent: SourceAgent, m: RawMessage, p: ParsedMoney): Account {
-        val key = agent.accountKey(m, p)
-        val found = dao.findAccount(agent.id, key)
+    /** نفس منطق resolveAccount بس من غير ما يعمل حساب جديد: بيرجع الحساب الموجود أو null */
+    private suspend fun lookupAccount(agent: SourceAgent, m: RawMessage, p: ParsedMoney): Account? {
+        val collapse = agent.accountType == AccountType.BANK && !p.isCredit && agent.id !in MIRROR_AGENTS
+        val key = if (collapse) agent.mainKey(m) else agent.accountKey(m, p)
+        return dao.findAccount(agent.id, key)
             ?: settings.accountAlias(agent.id, key)?.let { dao.findAccount(agent.id, it) }
-            ?: sameMoneyAccount(agent, key, p)?.also { settings.setAccountAlias(agent.id, key, it.accountKey) }
+            ?: (if (collapse) primaryBankAccount(agent, key) else sameMoneyAccount(agent, key, p))
+    }
+
+    private suspend fun resolveAccount(agent: SourceAgent, m: RawMessage, p: ParsedMoney): Account {
+        // بنك (حساب/كارت خصم عادي): كله حساب واحد. كروت الائتمان بس بتفضل لوحدها بآخر 4 أرقام
+        val collapse = agent.accountType == AccountType.BANK && !p.isCredit && agent.id !in MIRROR_AGENTS
+        val key = if (collapse) agent.mainKey(m) else agent.accountKey(m, p)
+        val found = lookupAccount(agent, m, p)?.also {
+            if (it.accountKey != key && dao.findAccount(agent.id, key) == null) settings.setAccountAlias(agent.id, key, it.accountKey)
+        }
         found?.let { existing ->
             if (p.isCredit && !existing.isCredit) {
                 val u = existing.copy(isCredit = true, type = AccountType.CARD, includeInTotal = false)
@@ -260,7 +271,7 @@ class AgentEngine(
         }
         dao.insertAccount(
             Account(
-                name = agent.accountLabel(m, p),
+                name = if (collapse) agent.mainLabel(m) else agent.accountLabel(m, p),
                 type = if (p.isCredit) AccountType.CARD else agent.accountType,
                 agentId = agent.id,
                 accountKey = key,
@@ -270,6 +281,108 @@ class AgentEngine(
             )
         )
         return dao.findAccount(agent.id, key)!!
+    }
+
+    // ------------------------------------------------------------------ مراجعة الرسايل القديمة وتصليحها
+
+    private val garbageMerchant = Regex("""http|فودافون كاش|^وجود$|^السحب|^مكانك|^خلال|^التاجر\s""", RegexOption.IGNORE_CASE)
+
+    /**
+     * بيراجع العمليات الملتقطة بالـ parser الحالي: اللي طلعت رسالة مش عملية (كود سري، إعلان، بيانات كارت) بتتحذف،
+     * واللي مبلغها أو اتجاهها كان غلط (مثلاً "وخصم 128.57" اتسجل 90) بتتصلح، والتصنيف الافتراضي "أخرى" و"دخل" بيتحسب من جديد.
+     * اللي انت عدلته بإيدك (تصنيف غير الافتراضي، اسم) مابيتغيرش.
+     */
+    suspend fun revalidate(): Revalidated = mutex.withLock {
+        var removed = 0; var fixed = 0
+        for (t in dao.allTxnsOnce()) {
+            if (t.source == TxnSource.MANUAL) continue
+            val raw = t.rawText ?: continue
+            val agent = AgentRegistry.byId(t.agentId) as? SourceAgent ?: continue
+            val p = agent.parse(RawMessage(t.source, "", text = raw, timestamp = t.timestamp))
+            if (p == null || p.amount == null || p.direction == null || p.amount <= 0.0) {
+                dao.deleteTxn(t); removed++; continue
+            }
+            var u = t
+            if (abs(p.amount - t.amount) > 0.001 && p.currency.equals(t.currency, ignoreCase = true)) u = u.copy(amount = p.amount)
+            if (p.direction != t.direction && !t.excluded) u = u.copy(direction = p.direction)
+            if (t.merchant.isNullOrBlank() || garbageMerchant.containsMatchIn(t.merchant)) {
+                u = u.copy(merchant = p.merchant)
+            }
+            if (!t.excluded && !t.reimbursable && (t.category == "أخرى" || t.category == "دخل")) {
+                val cls = Categorizer.classify(u.merchant, raw, u.direction, agent.id, builtIn = settings.isEnabled(Categorizer.ID))
+                u = u.copy(category = cls.category, purpose = cls.purpose)
+            }
+            if (u != t) { dao.updateTxn(u); fixed++ }
+        }
+        Revalidated(removed, fixed)
+    }
+
+    data class Revalidated(val removed: Int, val fixed: Int)
+
+    /**
+     * يرجّع رصيد كل حساب لآخر رصيد حقيقي جه في رسالة بنك، ويزود عليه العمليات اللي بعده.
+     * بيصلّح الأرصدة اللي اتبوظت من عمليات غلط (إعلان اتسجل 100 جنيه خصم مثلاً).
+     */
+    suspend fun rebuildBalances(messages: List<RawMessage>): Int = mutex.withLock {
+        class Base(val ts: Long, val value: Double)
+        val base = HashMap<Long, Base>()
+        for (m in messages.sortedBy { it.timestamp }) {
+            if (m.timestamp < settings.ignoreBefore) continue
+            val agent = AgentRegistry.sources.firstOrNull { settings.isEnabled(it.id) && it.matches(m) } ?: continue
+            val p = agent.parse(m) ?: continue
+            val bal = p.balance ?: continue
+            val account = lookupAccount(agent, m, p) ?: continue
+            if (account.isCredit) continue
+            val old = base[account.id]
+            if (old == null || m.timestamp >= old.ts) base[account.id] = Base(m.timestamp, bal)
+        }
+        var changed = 0
+        for ((id, b) in base) {
+            val a = dao.account(id) ?: continue
+            val after = dao.forAccountOnce(id).filter { !it.excluded || it.category == TRANSFER_CATEGORY }
+                .filter { it.timestamp > b.ts && it.balanceAfter == null && it.currency.equals(a.currency, ignoreCase = true) }
+            val balance = b.value + after.sumOf { if (it.direction == Direction.IN) it.amount else -it.amount }
+            val at = maxOf(b.ts, after.maxOfOrNull { it.timestamp } ?: 0L)
+            if (abs(balance - a.balance) > 0.005 || !a.balanceKnown) {
+                dao.updateAccount(a.copy(balance = balance, balanceKnown = true, balanceAt = at, updatedAt = now()))
+                changed++
+            }
+        }
+        // حسابات اتعملت من رسايل مش عمليات (زي إعلانات WE) وماعدش فيها حاجة
+        for (a in dao.accountsOnce()) {
+            if (a.agentId == AgentRegistry.MANUAL_ID || a.balanceKnown && base.containsKey(a.id)) continue
+            if (dao.forAccountOnce(a.id).isEmpty() && !a.balanceKnown) dao.deleteAccount(a)
+        }
+        changed
+    }
+
+    /** أحسن حساب عادي (مش ائتمان) موجود لنفس البنك: اللي رصيده مؤكد وأحدث رسالة */
+    private suspend fun primaryBankAccount(agent: SourceAgent, mainKey: String): Account? {
+        val probe = Account(name = "", type = agent.accountType, agentId = agent.id, accountKey = mainKey)
+        return dao.accountsForAgent(agent.id)
+            .filter { !it.isCredit && it.type == AccountType.BANK && NetWorth.institutionKey(it) == NetWorth.institutionKey(probe) }
+            .sortedWith(compareByDescending<Account> { it.balanceKnown }.thenByDescending { it.balanceAt }.thenBy { it.id })
+            .firstOrNull()
+    }
+
+    /**
+     * مرة واحدة: كل حسابات البنك العادية (كارت 9767، حساب 0130، كارت قديم 1845…) تتلم في حساب واحد لكل بنك.
+     * كروت الائتمان والمحافظ مابتتلمش. الرصيد بياخد من اللي رصيده مؤكد وأحدث.
+     */
+    suspend fun collapseBanks(): Int = mutex.withLock {
+        var merged = 0
+        val groups = dao.accountsOnce()
+            .filter { !it.isCredit && it.type == AccountType.BANK && it.agentId != AgentRegistry.MANUAL_ID && it.agentId !in MIRROR_AGENTS }
+            .groupBy { NetWorth.institutionKey(it) to it.currency.uppercase() }
+        for ((_, list) in groups) {
+            if (list.size < 2) continue
+            val target = list.sortedWith(compareByDescending<Account> { it.balanceKnown }.thenByDescending { it.balanceAt }.thenBy { it.id }).first()
+            list.filter { it.id != target.id }.forEach { mergeLocked(it.id, target.id); merged++ }
+            dao.account(target.id)?.let { t ->
+                if (t.name.contains("••••")) dao.updateAccount(t.copy(name = NetWorth.institutionName(t)))
+            }
+        }
+        merged
     }
 
     /**

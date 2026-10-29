@@ -50,6 +50,14 @@ open class SourceAgent(
     open fun parse(m: RawMessage): ParsedMoney? =
         MoneyParser.parse(listOf(m.title, m.text).filter { it.isNotBlank() }.joinToString("\n"), currency)
 
+    /**
+     * البنك: كل الكروت والحسابات العادية (مش الائتمان) في نفس البنك فلوسها واحدة، فبتروح حساب واحد.
+     * رسايل البنك بتيجي مرة بآخر 4 أرقام كارت ومرة برقم الحساب، والرصيد "المتاح" هو رصيد الحساب كله.
+     */
+    open fun mainKey(m: RawMessage): String = "main"
+
+    open fun mainLabel(m: RawMessage): String = accountName
+
     open fun accountKey(m: RawMessage, p: ParsedMoney): String = p.cardLast4 ?: "main"
 
     open fun accountLabel(m: RawMessage, p: ParsedMoney): String =
@@ -98,6 +106,10 @@ class GenericBankAgent : SourceAgent(
         return bankish.containsMatchIn(m.text)
     }
 
+    override fun mainKey(m: RawMessage) = bankKey(m.sender)
+
+    override fun mainLabel(m: RawMessage) = m.sender.trim()
+
     override fun accountKey(m: RawMessage, p: ParsedMoney) =
         bankKey(m.sender) + (p.cardLast4?.let { "-$it" } ?: "")
 
@@ -137,7 +149,8 @@ object AgentRegistry {
         SourceAgent(
             "vodafone_cash", "وكيل فودافون كاش", "يراقب محفظة فودافون كاش: تحويلات، دفع، شحن، سحب",
             "phone", 0xFFE60000, AccountType.WALLET, "فودافون كاش",
-            keywords = listOf("vf-cash", "vfcash", "vodafone cash", "vodafonecash", "فودافون كاش", "vodafone", "فودافون"),
+            // رسايل فودافون العادية (باقات وعروض من "Vodafone") مش حركات محفظة، فمابنطابقش كلمة "فودافون" لوحدها
+            keywords = listOf("vf-cash", "vodafone cash", "vodafonecash", "فودافون كاش"),
             packages = setOf("com.emeint.android.myservices"),
         ),
         SourceAgent(
@@ -153,7 +166,7 @@ object AgentRegistry {
         SourceAgent(
             "we_pay", "وكيل WE Pay", "يراقب محفظة WE Pay ومدفوعات WE",
             "phone", 0xFF8A2BE2, AccountType.WALLET, "WE Pay",
-            keywords = listOf("wepay", "we pay", "we-pay", "وي باي", "we"),
+            keywords = listOf("wepay", "we pay", "we-pay", "وي باي"),
         ),
         SourceAgent(
             "fawry", "وكيل فوري", "يتابع مدفوعات فوري و myFawry: فواتير، شحن، اشتراكات",

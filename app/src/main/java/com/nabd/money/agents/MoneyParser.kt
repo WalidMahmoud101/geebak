@@ -20,7 +20,7 @@ data class ParsedMoney(
 object MoneyParser {
 
     private const val CUR =
-        """EGP|E\.G\.P|L\.E\.?|LE|USDT|USDC|USD|US\$|EUR|GBP|SAR|AED|BTC|ETH|BNB|SOL|\$|€|جنيهات|جني[هة](?:اً|ا)?(?:\s*مصري)?|ج\.\s?م\.?|جم|دولار"""
+        """EGP|E\.G\.P|L\.E\.?|LE|USDT|USDC|USD|US\$|EUR|GBP|SAR|AED|BTC|ETH|BNB|SOL|\$|€|جنيهات|جني[هة](?:اً|ا)?(?:\s*مصري)?|ج\.\s?م\.?|جم|ج(?![\p{L}])|دولار"""
     private const val NUM = """\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?"""
 
     private val curFirst =
@@ -31,28 +31,36 @@ object MoneyParser {
         Regex("""(?:بمبلغ|مبلغ|بقيمة|قيمة|amount(?:\s+of)?|amt)\s*:?\s*($NUM)""", RegexOption.IGNORE_CASE)
 
     private val otp = Regex(
-        """\b(otp|one[- ]time|verification code|passcode|is your code)\b|رمز التحقق|كود التحقق|رمز التفعيل|كود التفعيل|كلمة المرور لمرة واحدة""",
+        """\b(otp|one[- ]time|verification code|passcode|is your code|cvv|pin)\b|رمز التحقق|كود التحقق|رمز التفعيل|كود التفعيل|كلمة المرور لمرة واحدة|""" +
+            // رموز سرية: "هذا الكود سري"، الرقم السري لماكينة ATM، بيانات الكارت الافتراضي (فيها حد السحب مش عملية)
+            """الكود سر[يى]|هذا الكود|الرقم السر[يى]|كلمة السر|بيانات (?:ال)?كارت|بيانات (?:ال)?بطاق[هة]|برجاء عدم مشاركة|يرجى عدم مشاركة|يرجي عدم مشاركة|عدم مشاركته|do not share|confidential""",
         RegexOption.IGNORE_CASE
     )
 
     /** كلام الإعلانات والعروض: "استمتع بكاش باك لحد 100 جنيه"، "اكسب"، "خصم 20%"… */
     private val promo = Regex(
-        """(?<![\p{L}])(?:و|ف|ب)?(?:استمتع|اكسب|إكسب|اربح|إربح|هدية|هديه|عرض|عروض|لحد|لغاية|لغايه|حتى|يصل|بيوصل|استخدم|إستخدم|اطلب|حمّل|حمل|نزّل|نزل|اتصل|اشترك|سارع|فرصة|فرصه|كوبون|برومو|ماتفوتش|متفوتش)(?![\p{L}])""" +
+        """(?<![\p{L}])[وفبتينسل]?(?:كسبت|مبروك|استمتع|اكسب|إكسب|اربح|إربح|هدية|هديه|عرض|عروض|لحد|لغاية|لغايه|حتى|يصل|بيوصل|استخدم|إستخدم|اطلب|حمّل|حمل|نزّل|نزل|اتصل|اشترك|سارع|فرصة|فرصه|كوبون|برومو|ماتفوتش|متفوتش)(?![\p{L}])""" +
             """|لفترة محدودة|لفتره محدوده|متاح الآن|%|up to|\boffer|\benjoy|\bwin\b|\bpromo|don'?t miss|\bdownload|limited time|\bsubscribe|\bdial\b""",
         RegexOption.IGNORE_CASE
     )
     /** علامات إن العملية حصلت فعلاً، علشان الرسالة الحقيقية اللي في آخرها إعلان ماتضيعش */
     private val completed = Regex(
         """(?<![\p{L}])(?:و|ف|و?قد)?(?:تم|تمت|اتخصم|اتحول|اتضاف|استلمت|بنجاح)(?![\p{L}])""" +
-            """|(رصيدك الحالي|رصيدك المتاح|الرصيد المتاح|الرصيد الحالي|رصيدك بعد|رقم العملية|العملية رقم|has been|was |were |successful|debited|charged|available balance|avail\.? bal|new balance|balance is|txn id|ref(?:erence)?\s*(?:no|#|:))""",
+            """|(رصيدك الحالي|رصيدك المتاح|الرصيد المتاح|الرصيد الحالي|رصيدك بعد|رقم العملية|تاريخ العملية|العملية رقم|رصيد (?:حسابك|محفظتك)|المتاح|has been|was |were |successful|debited|charged|available balance|avail\.? bal|new balance|balance is|txn id|ref(?:erence)?\s*(?:no|#|:))""",
         RegexOption.IGNORE_CASE
     )
 
+    /** دعوة لفعل: لينك أو "كلم #…" أو "اطلب *…" أو "زور": رسالة تسويقية لو مافيهاش علامة إن عملية حصلت */
+    private val callToAction = Regex("""(https?://|www\.|vf\.eg|(?:كلم|كلّم|اطلب|اطلب)\s*[#*]|(?:دوس|زور|ادخل علي|اشحن|ادفع)\s)""", RegexOption.IGNORE_CASE)
+
     /** رسالة إعلان أو عرض مافيهاش عملية حصلت */
     fun isPromo(raw: String): Boolean {
-        val t = normalize(raw)
-        return promo.containsMatchIn(t) && !completed.containsMatchIn(t)
+        val tn = ArabicNumbers.norm(normalize(raw))
+        return !completed.containsMatchIn(tn) && (promo.containsMatchIn(tn) || callToAction.containsMatchIn(tn))
     }
+
+    /** أرقام جوه جملة عرض ("لحد 100ج كاش باك") مش مبلغ العملية */
+    private val promoBefore = Regex("""(لحد|لغايه|حتي|ليك|جالك|هيجيلك|كسبت|هتكسب|هدي[هة]|كاش باك)\s*[:\-]?\s*$""")
 
     private val balanceKw = Regex(
         """(الحد المتاح|الحد الائتماني المتاح|حد الائتمان|available limit|avail\.?\s*limit|credit limit|الرصيد المتاح|الرصيد الحالي|الرصيد|رصيدك الحالي|رصيدك|رصيد|المتبقي|المتاح|avail(?:able)?\.?\s*bal(?:ance)?|balance|bal\b\.?)""",
@@ -78,7 +86,7 @@ object MoneyParser {
     )
     /** إصدار كارت أو رسوم وعمولات: دي دايماً خصم (حتى لو الرسالة فيها كلمة زي "بنجاح" أو "إضافة") */
     private val feeRx = Regex(
-        """((?:اصدار|إصدار|اصدرت|أصدرت)\s*(?:ال)?(?:كارت|بطاق[هة])|(?:كارت|بطاق[هة])\s*(?:ال)?(?:دفع\s*)?(?:ال)?(?:اونلاين|أونلاين|online|افتراضي)|(?<![\p{L}])رسوم|عمول[هة]|issuance|card issued|virtual card|\bfees?\b)""",
+        """((?:اصدار|إصدار|اصدرت|أصدرت)\s*(?:ال)?(?:كارت|بطاق[هة])|(?<![\p{L}])رسوم|تكلفة الخدمة|عمول[هة]|issuance|card issued|virtual card|\bfees?\b)""",
         RegexOption.IGNORE_CASE
     )
     /** فلوس اتستلمت فعلاً: بتغلب على الرسوم (مثلاً "تم استلام 500 جنيه بعد خصم رسوم 5") */
@@ -93,13 +101,16 @@ object MoneyParser {
         return feeRx.containsMatchIn(t) && !receivedRx.containsMatchIn(t)
     }
 
+    private val refundRx = Regex("""(تم\s*رد\b|رد\s*مبلغ|تم\s*ارجاع|ارجاع\s*مبلغ|تم\s*عكس|refunded|reversal|reversed)""", RegexOption.IGNORE_CASE)
+
     private val toMe = Regex("""(إليك|اليك|لحسابك|to your account|to you\b)""", RegexOption.IGNORE_CASE)
 
     private const val MERCHANT_BODY =
         """(?:\s+|\s*:\s*)([A-Za-z\u0600-\u06FF][A-Za-z0-9\u0600-\u06FF &'._\-*]{1,40})"""
     // "لدى/عند/at" بتيجي قبل التاجر بالتأكيد، "من/إلى/to" ممكن تيجي قبل "بطاقتك" أو "حسابك"
     private val merchantStrong = Regex(
-        """(?<![\p{L}\p{N}])(?:at|لدى|لدي|عند|merchant)$MERCHANT_BODY""",
+        // "عندBM POLARIS" (من غير مسافة) بتحصل في رسايل البنك: بنقبلها بس لو بعدها حروف إنجليزي
+        """(?<![\p{L}\p{N}])(?:(?:at|لدى|لدي|عند|merchant)(?:\s+|\s*:\s*)|(?:لدى|لدي|عند)(?=[A-Za-z]))([A-Za-z\u0600-\u06FF][A-Za-z0-9\u0600-\u06FF &'._\-*]{1,40})""",
         RegexOption.IGNORE_CASE
     )
     private val merchantWeak = Regex(
@@ -107,13 +118,23 @@ object MoneyParser {
         RegexOption.IGNORE_CASE
     )
     private val merchantStop = Regex(
-        """\s+(on|at|via|using|ref|date|balance|avail|بتاريخ|يوم|في|عبر|بواسطة|الرصيد|رصيد|رصيدك|بمبلغ|مبلغ|بقيمة|رقم|الساعة|برقم)(\s|$).*""",
+        """\s+(on|at|via|using|ref|date|balance|avail|بتاريخ|يوم|في|عبر|بواسطة|الرصيد|رصيد|رصيدك|بمبلغ|مبلغ|بقيمة|رقم|الساعة|برقم|تاريخ)(\s|$|(?=\d)).*""",
         RegexOption.IGNORE_CASE
     )
     private val merchantBlacklist = setOf(
         "حسابك", "حساب", "بطاقتك", "بطاقة", "كارتك", "your", "your account", "your card", "card", "account",
-        "الرصيد", "رصيد", "رصيدك", "محفظتك", "wallet", "تاريخ", "the", "a", "an"
+        "الرصيد", "رصيد", "رصيدك", "محفظتك", "wallet", "تاريخ", "the", "a", "an",
+        "وجود", "مكانك", "خلال", "السحب", "عدم", "هو", "هي", "ده", "دي"
     )
+    // رقم تليفون: "حولت لرقم 010…" أو "استلمت من 010…" بيبقى هو الاسم
+    // "المسجل بإسم Sayed Z Salem" اسم صاحب التحويل (أحسن من رقم التليفون)
+    private val registeredName = Regex("""المسجل\s*باسم\s*([^\n.؛;،]{2,40})""")
+    // "تم دفع 4040 جنيه بنجاح لTelda Cairo": التاجر ملزوق في اللام
+    private val paidTo = Regex("""بنجاح\s*ل\s*([A-Za-z][A-Za-z0-9&'._\-*]*(?: (?! )[A-Za-z0-9&'._\-*]+){0,3})""")
+    private val phoneTo = Regex("""(?:لرقم|الى رقم|إلى رقم|علي رقم|على رقم|لـرقم|من رقم|من)\s*(01[0125]\d{8})(?!\d)""")
+    // "وخصم 128.57ج من محفظتك": ده المبلغ اللي اتخصم فعلاً (مش 90ج قيمة الشحن)
+    private val deductRx = Regex("""(?:خصم|خصمت|خصمنا)\s*(?:مبلغ\s*)?""")
+    private val balanceNum = Regex("""^[^\d]{0,32}?(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)""")
 
     private val cardRx = Regex(
         """(?:\*+|x{2,}|•+|ending(?:\s+(?:in|with))?|المنتهية(?:\s*(?:برقم|بـ|ب))?|رقم)\s*(\d{4})(?!\d)""",
@@ -154,6 +175,8 @@ object MoneyParser {
     private data class M(val start: Int, val end: Int, val value: Double, val cur: String)
 
     fun direction(t: String): Direction? {
+        // "تم رد مبلغ 2000 لبطاقتك الذي تم خصمه": فلوس رجعتلك (مش خصم)
+        if (refundRx.containsMatchIn(ArabicNumbers.norm(t))) return Direction.IN
         if (feeRx.containsMatchIn(t) && !receivedRx.containsMatchIn(t)) return Direction.OUT
         val inM = strongIn.find(t)
         val outM = strongOut.find(t)
@@ -169,7 +192,7 @@ object MoneyParser {
     fun parse(raw: String, defaultCurrency: String = "EGP"): ParsedMoney? {
         val t = normalize(raw)
         if (otp.containsMatchIn(t)) return null
-        if (promo.containsMatchIn(t) && !completed.containsMatchIn(t)) return null
+        if (isPromo(raw)) return null
 
         val found = mutableListOf<M>()
         curFirst.findAll(t).forEach { m ->
@@ -180,22 +203,51 @@ object MoneyParser {
             val v = num(m.groupValues[1]) ?: return@forEach
             found += M(m.range.first, m.range.last + 1, v, normCur(m.groupValues[2], defaultCurrency))
         }
+        val tn = ArabicNumbers.norm(t)
         val money = mutableListOf<M>()
         for (m in found.sortedBy { it.start }) {
+            // "وهيجيلك لحد 100ج كاش باك" في آخر رسالة حقيقية: مش مبلغ العملية
+            if (promoBefore.containsMatchIn(tn.substring((m.start - 14).coerceAtLeast(0), m.start))) continue
             if (money.none { o -> m.start < o.end && o.start < m.end }) money += m
         }
 
         var balance: M? = null
         for (k in balanceKw.findAll(t)) {
+            // "شحن رصيد موبايلك ب 90ج" الرصيد هنا هو الشحنة مش رصيد المحفظة
+            val before = t.substring((k.range.first - 8).coerceAtLeast(0), k.range.first)
+            if (before.contains("شحن") || before.contains("كارت")) continue
             val kEnd = k.range.last + 1
             val m = money.firstOrNull { it.start >= kEnd && it.start - kEnd <= 40 }
             if (m != null) {
                 balance = m; break
             }
         }
+        // رصيد من غير عملة: "رصيد محفظتك الحالي 9312.78." أو "المتاح 17358.04"
+        if (balance == null) {
+            for (k in balanceKw.findAll(t)) {
+                val before = t.substring((k.range.first - 8).coerceAtLeast(0), k.range.first)
+                if (before.contains("شحن") || before.contains("كارت")) continue
+                val kEnd = k.range.last + 1
+                val rest = t.substring(kEnd)
+                val nm = balanceNum.find(rest) ?: continue
+                val gap = rest.substring(0, nm.range.first.coerceAtLeast(0).coerceAtMost(rest.length))
+                if (gap.contains("رقم") || gap.contains("تاريخ")) continue
+                val v = num(nm.groupValues[1]) ?: continue
+                val s0 = kEnd + nm.range.last - nm.groupValues[1].length + 1
+                if (money.any { s0 < it.end && it.start < s0 + nm.groupValues[1].length }) continue
+                balance = M(s0, s0 + nm.groupValues[1].length, v, defaultCurrency)
+                break
+            }
+        }
 
         val dir = direction(t)
         var amountM = money.firstOrNull { it !== balance }
+        // لو فيه "خصم X": X هو المبلغ (مش أول رقم في الرسالة)
+        for (d in deductRx.findAll(t)) {
+            val dEnd = d.range.last + 1
+            val m = money.firstOrNull { it !== balance && it.start >= dEnd && it.start - dEnd <= 3 }
+            if (m != null) { amountM = m; break }
+        }
         if (amountM == null && balance != null && dir != null && fromBalance.containsMatchIn(t)) {
             amountM = balance
             balance = null
@@ -216,7 +268,10 @@ object MoneyParser {
         if (amount == null && balance == null) return null
 
         val merchant = if (amount != null) {
-            findMerchant(merchantStrong, t, anchor) ?: findMerchant(merchantStrong, t, 0)
+            registeredName.find(ArabicNumbers.norm(t).let { normalizedForName(t) })?.groupValues?.get(1)?.trim()
+                ?: paidTo.find(t)?.groupValues?.get(1)?.trim()
+                ?: findMerchant(merchantStrong, t, anchor) ?: findMerchant(merchantStrong, t, 0)
+                ?: phoneTo.find(t)?.groupValues?.get(1)
                 ?: findMerchant(merchantWeak, t, anchor) ?: findMerchant(merchantWeak, t, 0)
         } else null
         val card = cardRx.find(t)?.groupValues?.get(1)
@@ -232,6 +287,9 @@ object MoneyParser {
         )
     }
 
+    /** "بإسم" و "باسم" نفس الحاجة: نوحّد الألف من غير ما نبوّظ الاسم نفسه */
+    private fun normalizedForName(t: String) = t.replace("بإسم", "باسم").replace("بأسم", "باسم")
+
     private fun findMerchant(rx: Regex, t: String, from: Int): String? {
         var m = rx.find(t, from.coerceIn(0, t.length))
         while (m != null) {
@@ -244,6 +302,7 @@ object MoneyParser {
             val lower = cleaned.lowercase()
             val firstWord = lower.substringBefore(' ')
             if (cleaned.length >= 2 && lower !in merchantBlacklist && firstWord !in merchantBlacklist &&
+                !lower.contains("http") && !lower.contains("فودافون كاش") &&
                 cleaned.count { it.isDigit() } < cleaned.length / 2
             ) return cleaned
             m = m.next()

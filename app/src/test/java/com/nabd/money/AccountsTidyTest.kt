@@ -25,6 +25,9 @@ class AccountsTidyTest {
     private val app get() = ApplicationProvider.getApplicationContext<NabdApp>()
     private val now = System.currentTimeMillis()
 
+    @org.junit.Before
+    fun settle() { runBlocking { app.startupJob?.join() } }
+
     private fun sms(sender: String, text: String, minutesAgo: Long) =
         RawMessage(TxnSource.SMS, sender, text = text, timestamp = now - minutesAgo * 60_000)
 
@@ -43,10 +46,23 @@ class AccountsTidyTest {
     }
 
     @Test
-    fun twoRealAccountsWithDifferentBalancesStayApart() = runBlocking {
+    fun allBankCardsAndAccountsAreOneAccount() = runBlocking {
+        val e = app.engine
+        // كارت 1111 وكارت 2222 وحساب 0130: نفس البنك = حساب واحد، والرصيد بيتحدث من آخر رسالة
+        e.ingest(sms("NBE", "تم خصم 100 جنيه من حسابك رقم 1111 الرصيد المتاح 5000 جنيه", 60), notify = false)
+        e.ingest(sms("NBE", "تم خصم 100 جنيه من بطاقتك رقم 2222 الرصيد المتاح 4900 جنيه", 30), notify = false)
+        e.ingest(sms("NBE", "تم خصم 50 جنيه من حسابك رقم 0130", 10), notify = false)
+        val accounts = app.db.dao().accountsOnce()
+        assertEquals(1, accounts.size)
+        assertEquals(4850.0, accounts.single().balance, 0.01)
+        assertEquals(3, app.db.dao().allTxnsOnce().size)
+    }
+
+    @Test
+    fun creditCardsStayApartFromTheMainAccount() = runBlocking {
         val e = app.engine
         e.ingest(sms("NBE", "تم خصم 100 جنيه من حسابك رقم 1111 الرصيد المتاح 5000 جنيه", 60), notify = false)
-        e.ingest(sms("NBE", "تم خصم 100 جنيه من حسابك رقم 2222 الرصيد المتاح 70000 جنيه", 30), notify = false)
+        e.ingest(sms("NBE", "تم خصم 300 جنيه من بطاقتك الائتمانية رقم 7777 الحد المتاح 20000 جنيه", 30), notify = false)
         assertEquals(2, app.db.dao().accountsOnce().size)
     }
 
