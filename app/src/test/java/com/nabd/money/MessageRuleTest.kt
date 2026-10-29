@@ -160,4 +160,52 @@ class MessageRuleTest {
         assertEquals("أخرى", Categorizer.classify("اوبر", "تم خصم 50 جنيه CIB", Direction.OUT, "cib").category.let { if (it == "مواصلات") "أخرى" else it })
         app.settings.updateTaxonomy { UserTaxonomy() }
     }
+
+    private fun await(job: kotlinx.coroutines.Job) {
+        val end = System.currentTimeMillis() + 10_000
+        while (!job.isCompleted && System.currentTimeMillis() < end) { shadowOf(android.os.Looper.getMainLooper()).idle(); Thread.sleep(20) }
+    }
+
+    @Test
+    fun ruleWithSeveralPartsMatchesAnyOfThem() {
+        val r = UserRule("جيم", "ترفيه", Purpose.OUTING, "النادي", extra = listOf("gold gym", "اشتراك نادي #"))
+        assertTrue(r.matchesRaw("دفع لدى جيم الحي"))
+        assertTrue(r.matchesRaw("GOLD GYM branch 5"))
+        assertTrue(r.matchesRaw("اشتراك نادي 7"))
+        assertFalse(r.matchesRaw("سوبر ماركت"))
+        assertEquals(listOf("جيم", "gold gym", "اشتراك نادي #"), r.parts)
+        val back = UserTaxonomy.decode(UserTaxonomy(rules = listOf(r)).encode()).rules.single()
+        assertEquals(r.parts, back.parts)
+        // شيل الأول: التاني يبقى الأساسي، وشيل الكل = null
+        assertEquals("gold gym", r.withParts(listOf("gold gym"))!!.keyword)
+        assertNull(r.withParts(emptyList()))
+    }
+
+    @Test
+    fun addingAndRemovingPartsChangesWhatTheRuleCatches() {
+        val dao = app.db.dao()
+        val acc = runBlocking { dao.insertAccount(Account(name = "CIB", type = AccountType.BANK, agentId = "cib", accountKey = "main", balance = 1000.0, balanceKnown = true)) }
+        fun t(f: String, text: String) = Txn(accountId = acc, amount = 80.0, direction = Direction.OUT, category = "أخرى", purpose = Purpose.OTHER,
+            merchant = null, timestamp = now, source = TxnSource.SMS, agentId = "cib", fingerprint = f, rawText = text)
+        runBlocking { dao.insertTxn(t("a", "خصم 80 لدى HOME FIT")); dao.insertTxn(t("b", "خصم 80 لدى BODYZONE")); dao.insertTxn(t("c", "خصم 80 لدى كارفور")) }
+        val vm = AppViewModel(app)
+        await(vm.addRule("HOME FIT", "ترفيه", Purpose.OUTING, "النادي", Direction.OUT))
+        var all = runBlocking { dao.allTxnsOnce() }.associateBy { it.fingerprint }
+        assertEquals("ترفيه", all.getValue("a").category)
+        assertEquals("أخرى", all.getValue("b").category) // الجزء مش موجود في الرسالة دي
+        // زوّد جزء تاني من رسالة تانية
+        val rule = app.settings.taxonomy.value.rules.single()
+        await(vm.addPartToRule(rule, "BODYZONE"))
+        all = runBlocking { dao.allTxnsOnce() }.associateBy { it.fingerprint }
+        assertEquals("ترفيه", all.getValue("b").category)
+        assertEquals("النادي", all.getValue("b").merchant)
+        assertEquals("أخرى", all.getValue("c").category)
+        assertEquals(2, app.settings.taxonomy.value.rules.single().parts.size)
+        // شيل جزء: الرسايل الجاية بتاعته مابقتش بتتصنف
+        val now2 = app.settings.taxonomy.value.rules.single()
+        await(vm.updateRule(now2, now2.withParts(listOf("HOME FIT"))!!))
+        assertEquals("ترفيه", Categorizer.classify(null, "لدى HOME FIT", Direction.OUT, "cib").category)
+        assertFalse(Categorizer.classify(null, "لدى BODYZONE", Direction.OUT, "cib").category == "ترفيه")
+        app.settings.updateTaxonomy { UserTaxonomy() }
+    }
 }

@@ -13,19 +13,32 @@ data class UserRule(
     val dir: Direction? = null,
     /** true = الجزء بيتدور عليه في الرسالة كلها، false = في اسم التاجر بس (قاعدة "كل «اسم»" من شاشة التعديل) */
     val onMessage: Boolean = true,
+    /** أجزاء تانية للقاعدة: أي واحد منهم يكفي. علشان الجزء المميز مش موجود في كل عمليات نفس المكان */
+    val extra: List<String> = emptyList(),
 ) {
-    private val matcher: (String) -> Boolean by lazy {
-        val k = com.nabd.money.agents.ArabicNumbers.norm(keyword).trim()
-        if ('#' in k) {
-            val rx = Regex(k.split('#').joinToString("\\d+(?:[.,]\\d+)*") { Regex.escape(it) }, RegexOption.IGNORE_CASE)
-            ({ hay: String -> rx.containsMatchIn(hay) })
-        } else {
-            ({ hay: String -> k.isNotEmpty() && hay.contains(k) })
+    /** كل الأجزاء اللي القاعدة بتدور عليها: واحد منهم يكفي */
+    val parts: List<String> get() = (listOf(keyword) + extra).map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+
+    /** نفس القاعدة بأجزاء جديدة (الأول هو الأساسي). من غير أجزاء = null (القاعدة تتحذف) */
+    fun withParts(list: List<String>): UserRule? {
+        val p = list.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        return if (p.isEmpty()) null else copy(keyword = p.first(), extra = p.drop(1))
+    }
+
+    private val matchers: List<(String) -> Boolean> by lazy {
+        parts.map { part ->
+            val k = com.nabd.money.agents.ArabicNumbers.norm(part).trim()
+            if ('#' in k) {
+                val rx = Regex(k.split('#').joinToString("\\d+(?:[.,]\\d+)*") { Regex.escape(it) }, RegexOption.IGNORE_CASE)
+                ({ hay: String -> rx.containsMatchIn(hay) })
+            } else {
+                ({ hay: String -> k.isNotEmpty() && hay.contains(k) })
+            }
         }
     }
 
-    /** hay لازم يكون متنضف بـ ArabicNumbers.norm */
-    fun matches(hay: String): Boolean = matcher(hay)
+    /** hay لازم يكون متنضف بـ ArabicNumbers.norm. أي جزء من أجزاء القاعدة يكفي */
+    fun matches(hay: String): Boolean = matchers.any { it(hay) }
 
     fun matchesRaw(vararg parts: String?): Boolean =
         matches(com.nabd.money.agents.ArabicNumbers.norm(parts.filterNotNull().joinToString(" ")))
@@ -47,7 +60,7 @@ data class UserTaxonomy(
         put("purposes", JSONObject().apply { categoryPurpose.forEach { (k, v) -> put(k, v.name) } })
         put("rules", JSONArray().apply {
             rules.forEach { r ->
-                put(JSONObject().put("k", r.keyword).put("c", r.category).put("p", r.purpose?.name ?: "").put("n", r.name ?: "").put("d", r.dir?.name ?: "").put("m", r.onMessage))
+                put(JSONObject().put("k", r.keyword).put("c", r.category).put("p", r.purpose?.name ?: "").put("n", r.name ?: "").put("d", r.dir?.name ?: "").put("m", r.onMessage).put("x", JSONArray(r.extra)))
             }
         })
     }.toString()
@@ -61,7 +74,8 @@ data class UserTaxonomy(
             } ?: emptyMap()
             val rules = o.optJSONArray("rules")?.let { a ->
                 (0 until a.length()).map { a.getJSONObject(it) }.map { r ->
-                    UserRule(r.getString("k"), r.getString("c"), r.optString("p").takeIf { it.isNotBlank() }?.let(Purpose::valueOf), r.optString("n").takeIf { it.isNotBlank() }, r.optString("d").takeIf { it.isNotBlank() }?.let(Direction::valueOf), r.optBoolean("m", true))
+                    UserRule(r.getString("k"), r.getString("c"), r.optString("p").takeIf { it.isNotBlank() }?.let(Purpose::valueOf), r.optString("n").takeIf { it.isNotBlank() }, r.optString("d").takeIf { it.isNotBlank() }?.let(Direction::valueOf), r.optBoolean("m", true),
+                        r.optJSONArray("x")?.let { x -> (0 until x.length()).map { x.getString(it) } } ?: emptyList())
                 }
             } ?: emptyList()
             UserTaxonomy(custom, purposes, rules)

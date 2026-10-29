@@ -378,6 +378,8 @@ fun EditTxnSheet(
     onRule: (keyword: String, category: String, purpose: Purpose) -> Unit = { _, _, _ -> },
     onMessageRule: (keyword: String, category: String, purpose: Purpose, name: String?) -> Unit = { _, _, _, _ -> },
     ruleMatchCount: (String) -> Int = { 0 },
+    rules: List<com.nabd.money.data.UserRule> = emptyList(),
+    onAddToRule: (com.nabd.money.data.UserRule, String) -> Unit = { _, _ -> },
 ) {
     var purpose by remember { mutableStateOf(txn.purpose) }
     // مقفولة من الأول: التعديل بيشمل العملية دي بس، إلا لو انت طلبت تطبقه على كل نفس الاسم
@@ -503,7 +505,7 @@ fun EditTxnSheet(
                 modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)
             )
             txn.rawText?.takeIf { it.isNotBlank() }?.let { raw ->
-                MessageRuleSection(raw, merchant.trim(), category, purpose, Categorizer.categoriesFor(txn.direction).let { l -> if (category in l) l else l + category }, onMessageRule)
+                MessageRuleSection(raw, merchant.trim(), category, purpose, Categorizer.categoriesFor(txn.direction).let { l -> if (category in l) l else l + category }, rules.filter { it.dir == null || it.dir == txn.direction }, onAddToRule, onMessageRule)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GradientButton("حفظ", Modifier.weight(1f), Icons.Rounded.Check) {
@@ -833,10 +835,12 @@ private fun StepButton(label: String, enabled: Boolean, onClick: () -> Unit) {
 @Composable
 private fun MessageRuleSection(
     raw: String, merchant: String, category: String, purpose: Purpose, categories: List<String>,
+    rules: List<com.nabd.money.data.UserRule>, onAddToRule: (com.nabd.money.data.UserRule, String) -> Unit,
     onRule: (keyword: String, category: String, purpose: Purpose, name: String?) -> Unit,
 ) {
     var field by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(raw)) }
     var dialog by remember { mutableStateOf(false) }
+    var addToRule by remember { mutableStateOf(false) }
     val picked = field.text.substring(field.selection.min.coerceIn(0, field.text.length), field.selection.max.coerceIn(0, field.text.length)).trim()
 
     Column(
@@ -854,6 +858,35 @@ private fun MessageRuleSection(
             if (picked.isEmpty()) "حدد جزء من الرسالة الأول" else "اعمل قاعدة من «${picked.take(24)}${if (picked.length > 24) "…" else ""}»",
             Icons.Rounded.Check, if (picked.isEmpty()) NabdColors.TextFaint else NabdColors.Mint, Modifier.fillMaxWidth()
         ) { if (picked.length >= 2) dialog = true }
+        if (rules.isNotEmpty()) {
+            PillButton(
+                "ضيف الجزء المحدد لقاعدة موجودة",
+                Icons.Rounded.Check, if (picked.length >= 2) NabdColors.Cyan else NabdColors.TextFaint, Modifier.fillMaxWidth()
+            ) { if (picked.length >= 2) addToRule = true }
+        }
+    }
+    if (addToRule) {
+        AlertDialog(
+            onDismissRequest = { addToRule = false },
+            containerColor = NabdColors.Surface,
+            title = { Text("ضيف «${picked.take(30)}» لأنهي قاعدة؟", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    rules.forEach { r ->
+                        Column(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(NabdColors.SurfaceTop)
+                                .clickable { onAddToRule(r, picked); addToRule = false }.padding(12.dp)
+                        ) {
+                            Text(r.name ?: r.parts.first(), style = MaterialTheme.typography.titleSmall)
+                            Text(r.parts.joinToString(" أو ") { "«$it»" }, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
+                            Text(r.category, style = MaterialTheme.typography.labelSmall, color = NabdColors.Cyan)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { addToRule = false }) { Text("إلغاء") } },
+        )
     }
 
     if (dialog) {

@@ -254,19 +254,45 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val rule = UserRule(k, category, purpose, name?.trim()?.takeIf { it.isNotEmpty() }, dir, onMessage)
         settings.updateTaxonomy { t ->
             t.copy(
-                rules = t.rules.filterNot { ArabicNumbers.norm(it.keyword) == ArabicNumbers.norm(k) && it.dir == dir } + rule,
+                // نفس الجزء ونفس النوع: القاعدة الجديدة بتحل محل القديمة
+                rules = t.rules.filterNot { r -> r.dir == dir && r.parts.any { ArabicNumbers.norm(it) == ArabicNumbers.norm(k) } } + rule,
                 customCategories = if (category in Categorizer.allCategories()) t.customCategories else t.customCategories + category,
             )
         }
-        val p = purpose ?: Categorizer.purposeOf(category) ?: Purpose.OTHER
-        // العمليات اللي فاتت اللي فيها الجزء ده: التصنيف والغرض والاسم.
-        // بنقرا كل عملية من جديد جوه القفل، علشان ماننزلش نسخة قديمة فوق تعديل لسه حصل (زي "على حساب الشركة")
+        applyRuleToPast(rule)
+    }
+
+    /** تعديل قاعدة: أجزاءها (تزود وتشيل)، الاسم، التصنيف، الغرض، النوع، وتدور فين */
+    fun updateRule(old: UserRule, new: UserRule) = viewModelScope.launch(Dispatchers.IO) {
+        settings.updateTaxonomy { t ->
+            t.copy(
+                rules = t.rules.map { if (it == old) new else it },
+                customCategories = if (new.category in Categorizer.allCategories()) t.customCategories else t.customCategories + new.category,
+            )
+        }
+        applyRuleToPast(new)
+    }
+
+    /** ضيف جزء من رسالة لقاعدة موجودة (من شاشة العملية) */
+    fun addPartToRule(rule: UserRule, part: String) = viewModelScope.launch(Dispatchers.IO) {
+        val updated = rule.withParts(rule.parts + part.trim()) ?: return@launch
+        settings.updateTaxonomy { t -> t.copy(rules = t.rules.map { if (it == rule) updated else it }) }
+        applyRuleToPast(updated)
+    }
+
+    /**
+     * العمليات اللي فاتت اللي بتطابق القاعدة: التصنيف والغرض والاسم.
+     * بنقرا كل عملية من جديد جوه القفل، علشان ماننزلش نسخة قديمة فوق تعديل لسه حصل (زي "على حساب الشركة").
+     * لو شيلت جزء من القاعدة، العمليات اللي اتصنفت بيه قبل كده بتفضل زي ما هي.
+     */
+    private suspend fun applyRuleToPast(rule: UserRule) {
+        val p = rule.purpose ?: Categorizer.purposeOf(rule.category) ?: Purpose.OTHER
         txnWrites.withLock {
             dao.allTxnsOnce()
-                .filter { t -> !t.excluded && (dir == null || t.direction == dir) && rule.appliesTo(t.merchant, t.rawText, t.note) }
+                .filter { t -> !t.excluded && (rule.dir == null || t.direction == rule.dir) && rule.appliesTo(t.merchant, t.rawText, t.note) }
                 .forEach { old ->
                     val t = dao.txnsByIds(listOf(old.id)).firstOrNull() ?: return@forEach
-                    dao.updateTxn(t.copy(category = category, purpose = if (t.reimbursable) Purpose.WORK else p, merchant = rule.name ?: t.merchant))
+                    dao.updateTxn(t.copy(category = rule.category, purpose = if (t.reimbursable) Purpose.WORK else p, merchant = rule.name ?: t.merchant))
                 }
         }
     }

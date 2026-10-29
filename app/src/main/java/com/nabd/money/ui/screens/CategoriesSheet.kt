@@ -1,5 +1,6 @@
 package com.nabd.money.ui.screens
 
+import com.nabd.money.ui.components.PurposeChips
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -67,6 +68,7 @@ fun CategoriesSheet(vm: AppViewModel, onDismiss: () -> Unit) {
     var renaming by remember { mutableStateOf<String?>(null) }
     var adding by remember { mutableStateOf(false) }
     var addingRule by remember { mutableStateOf(false) }
+    var editingRule by remember { mutableStateOf<UserRule?>(null) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -91,7 +93,7 @@ fun CategoriesSheet(vm: AppViewModel, onDismiss: () -> Unit) {
                     style = MaterialTheme.typography.labelMedium, color = NabdColors.TextFaint
                 )
             }
-            tax.rules.forEach { r -> RuleRow(r) { vm.deleteRule(r) } }
+            tax.rules.forEach { r -> RuleRow(r, onEdit = { editingRule = r }) { vm.deleteRule(r) } }
             PillButton("قاعدة جديدة", Icons.Rounded.Add, NabdColors.Mint, Modifier.fillMaxWidth()) { addingRule = true }
 
             HorizontalDivider(color = NabdColors.Stroke, modifier = Modifier.padding(vertical = 6.dp))
@@ -151,22 +153,28 @@ fun CategoriesSheet(vm: AppViewModel, onDismiss: () -> Unit) {
         TextDialog("اسم التصنيف", c, onDismiss = { renaming = null }) { n -> vm.renameCategory(c, n); renaming = null }
     }
     if (adding) NewCategoryDialog(onDismiss = { adding = false }) { name, p -> vm.addCategory(name, p); adding = false }
+    editingRule?.let { r ->
+        RuleEditDialog(r, onDismiss = { editingRule = null }, onDelete = { vm.deleteRule(r); editingRule = null }) { updated ->
+            vm.updateRule(r, updated); editingRule = null
+        }
+    }
     if (addingRule) NewRuleDialog(onDismiss = { addingRule = false }) { k, c, p -> vm.addRule(k, c, p); addingRule = false }
 }
 
 @Composable
-private fun RuleRow(r: UserRule, onDelete: () -> Unit) {
+private fun RuleRow(r: UserRule, onEdit: () -> Unit, onDelete: () -> Unit) {
     val p = r.purpose ?: Categorizer.purposeOf(r.category)
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(NabdColors.SurfaceTop)
+            .clickable(onClick = onEdit)
             .padding(start = 14.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text("«${r.keyword}»", style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(r.parts.joinToString(" أو ") { "«$it»" }, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(
                 (r.name?.let { "اسمها «$it» • " } ?: "") + (r.dir?.let { if (it == com.nabd.money.data.Direction.IN) "للدخل بس • " else "للمصروف بس • " } ?: "") + r.category + (p?.let { " • ${it.ar}" } ?: ""),
                 style = MaterialTheme.typography.labelMedium, color = p?.color() ?: NabdColors.TextDim
@@ -256,6 +264,92 @@ private fun NewRuleDialog(onDismiss: () -> Unit, onSave: (String, String, Purpos
                 val c = newCategory.trim().ifBlank { category }
                 if (keyword.isNotBlank() && c != null) onSave(keyword, c, purpose)
             }) { Text("حفظ") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+    )
+}
+
+
+/** تعديل قاعدة: الأجزاء (زوّد أو شيل في أي وقت)، الاسم، التصنيف، الغرض، النوع، وتدور في إيه */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RuleEditDialog(rule: UserRule, onDismiss: () -> Unit, onDelete: () -> Unit, onSave: (UserRule) -> Unit) {
+    var parts by remember { mutableStateOf(rule.parts) }
+    var newPart by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(rule.name.orEmpty()) }
+    var category by remember { mutableStateOf(rule.category) }
+    var purpose by remember { mutableStateOf(rule.purpose) }
+    var dir by remember { mutableStateOf(rule.dir) }
+    var onMessage by remember { mutableStateOf(rule.onMessage) }
+    fun addPart() {
+        val p = newPart.trim()
+        if (p.length >= 2 && p !in parts) parts = parts + p
+        newPart = ""
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NabdColors.Surface,
+        title = { Text("تعديل القاعدة", style = MaterialTheme.typography.titleMedium) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("لو العملية فيها أي جزء من دول", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    parts.forEach { p ->
+                        Row(
+                            Modifier.clip(RoundedCornerShape(50)).background(NabdColors.Mint.copy(alpha = 0.14f))
+                                .clickable { parts = parts - p }.padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(p, style = MaterialTheme.typography.labelLarge, color = NabdColors.Mint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Spacer(Modifier.width(4.dp))
+                            Icon(Icons.Rounded.Close, "شيل", tint = NabdColors.Mint, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
+                if (parts.isEmpty()) Text("لازم جزء واحد على الأقل.", style = MaterialTheme.typography.labelSmall, color = NabdColors.Danger)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        newPart, { newPart = it }, modifier = Modifier.weight(1f), label = { Text("زوّد جزء") },
+                        placeholder = { Text("كلمة، اسم، أو # لأي رقم") }, singleLine = true, shape = RoundedCornerShape(14.dp)
+                    )
+                    PillButton("زوّد", Icons.Rounded.Add, NabdColors.Mint) { addPart() }
+                }
+                Text(
+                    "شيل أي جزء بالضغط عليه. اللي اتصنف قبل كده بيفضل زي ما هو، والتعديل بيتطبق على اللي بيطابق دلوقتي واللي جاي.",
+                    style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint
+                )
+                OutlinedTextField(
+                    name, { name = it }, label = { Text("الاسم (اختياري)") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)
+                )
+                Text("التصنيف", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    (Categorizer.allCategories().let { l -> if (category in l) l else l + category }).forEach { c ->
+                        SelectChip(c, c == category, NabdColors.Cyan) { category = c }
+                    }
+                }
+                Text("الغرض", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+                PurposeChips(purpose) { purpose = it }
+                Text("للدخل ولا للمصروف", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SelectChip("الاتنين", dir == null, NabdColors.Gold) { dir = null }
+                    SelectChip("مصروف بس", dir == com.nabd.money.data.Direction.OUT, NabdColors.Gold) { dir = com.nabd.money.data.Direction.OUT }
+                    SelectChip("دخل بس", dir == com.nabd.money.data.Direction.IN, NabdColors.Gold) { dir = com.nabd.money.data.Direction.IN }
+                }
+                Text("بتدور في", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SelectChip("الرسالة كلها", onMessage, NabdColors.Gold) { onMessage = true }
+                    SelectChip("اسم التاجر بس", !onMessage, NabdColors.Gold) { onMessage = false }
+                }
+                TextButton(onClick = onDelete) { Text("احذف القاعدة", color = NabdColors.Danger) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val all = if (newPart.trim().length >= 2 && newPart.trim() !in parts) parts + newPart.trim() else parts
+                rule.copy(category = category, purpose = purpose, name = name.trim().ifBlank { null }, dir = dir, onMessage = onMessage)
+                    .withParts(all)?.let(onSave)
+            }, enabled = parts.isNotEmpty() || newPart.trim().length >= 2) { Text("حفظ") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
     )

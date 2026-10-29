@@ -288,6 +288,7 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
     }
     editing?.let { t ->
         val allTxns by vm.everything.collectAsStateWithLifecycle()
+        val taxonomy by vm.taxonomy.collectAsStateWithLifecycle()
         EditTxnSheet(
             txn = t,
             accountName = accounts.firstOrNull { it.id == t.accountId }?.name,
@@ -299,6 +300,8 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
             onRule = { k, c, p -> vm.addRule(k, c, p, dir = t.direction, onMessage = false) },
             ruleMatchCount = { kw -> val nk = com.nabd.money.agents.ArabicNumbers.norm(kw.trim()); allTxns.count { x -> x.id != t.id && x.direction == t.direction && !x.excluded && com.nabd.money.agents.ArabicNumbers.norm(x.merchant.orEmpty()).contains(nk) } },
             onMessageRule = { k, c, p, n -> vm.addRule(k, c, p, n, t.direction); editing = null },
+            rules = taxonomy.rules,
+            onAddToRule = { r, part -> vm.addPartToRule(r, part); editing = null },
         )
     }
 }
