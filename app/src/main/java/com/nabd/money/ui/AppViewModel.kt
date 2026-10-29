@@ -453,13 +453,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** كل كتابة على العمليات من الشاشة بتمشي واحدة ورا التانية، علشان تعديلين مايدوسوش على بعض */
     private val txnWrites = kotlinx.coroutines.sync.Mutex()
 
-    fun updateTxn(t: Txn, hide: Boolean? = null, quantity: Int? = null) = viewModelScope.launch(Dispatchers.IO) {
+    /**
+     * settle: لو العملية دي دخل جاي من الشركة بيسدد مصاريف: أرقامها. العملية بتبقى "استرداد مصاريف الشركة"
+     * (مش دخل ولا بتتحسب في الإجمالي) والمصاريف دي بتتقفل كمستلمة.
+     */
+    fun updateTxn(t: Txn, hide: Boolean? = null, quantity: Int? = null, settle: List<Long>? = null) = viewModelScope.launch(Dispatchers.IO) {
         txnWrites.withLock {
             dao.updateTxn(t)
             if (quantity != null && quantity != t.quantity) engine.setQuantity(t.id, quantity)
-            if (hide != null) engine.setHidden(listOf(t.id), hide)
+            if (settle != null) {
+                // استرداد حقيقي: الفلوس وصلت البنك فعلاً، فمفيش تغيير في رصيد الحساب
+                dao.updateTxn(t.copy(category = com.nabd.money.agents.AgentEngine.REFUND_CATEGORY, purpose = Purpose.WORK, excluded = true))
+                if (settle.isNotEmpty()) dao.setReimbursed(settle, t.timestamp)
+            } else if (hide != null) engine.setHidden(listOf(t.id), hide)
         }
     }
+
+    /** مصاريف الشركة المستحقة (لاختيار اللي استرداد بيسددها) */
+    val pendingCompanyNow get() = companyPending.value
     fun deleteTxn(t: Txn) = viewModelScope.launch(Dispatchers.IO) { engine.deleteTxn(t) }
 
     fun addAccount(name: String, type: AccountType, currency: String, balance: Double, agentId: String? = null, last4: String? = null) =

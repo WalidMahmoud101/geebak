@@ -189,4 +189,45 @@ class CashAndHideTest {
         assertTrue(com.nabd.money.data.TxnFilter().matches(dao.allTxnsOnce().first { it.id == shop.id }, 50.0))
         assertEquals(-170.0, dao.account(cash.id)!!.balance, 0.001)
     }
+
+    private fun t(id: Long, amount: Double, daysAgo: Int) = Txn(id = id, accountId = null, amount = amount, direction = Direction.OUT, category = "أخرى",
+        purpose = Purpose.WORK, timestamp = now - daysAgo * 86_400_000L, source = TxnSource.MANUAL, agentId = "manual", fingerprint = "m$id", reimbursable = true)
+
+    @Test
+    fun matchesTheCompanyExpensesAnIncomingTransferSettles() {
+        val items = listOf(t(1, 200.0, 5), t(2, 300.0, 4), t(3, 150.0, 3), t(4, 350.0, 2))
+        // كلهم أقل من المبلغ: كلهم
+        assertEquals(setOf(1L, 2L, 3L, 4L), com.nabd.money.agents.CompanyMatch.pick(items, 1000.0))
+        // مجموعة بالظبط: 200 + 300 = 500
+        assertEquals(setOf(1L, 2L), com.nabd.money.agents.CompanyMatch.pick(items, 500.0))
+        // 350 + 150 = 500 كمان، بس 200+300 أقدم؛ المهم المجموع 500 بالظبط
+        assertEquals(500.0, com.nabd.money.agents.CompanyMatch.sum(items, com.nabd.money.agents.CompanyMatch.pick(items, 500.0)), 0.001)
+        // مفيش مجموعة بالظبط: الأقدم الأول من غير ما يعدّي المبلغ
+        val g = com.nabd.money.agents.CompanyMatch.pick(items, 520.0)
+        assertTrue(com.nabd.money.agents.CompanyMatch.sum(items, g) <= 520.5)
+        assertTrue(1L in g)
+    }
+
+    @Test
+    fun incomingFromCompanySettlesPendingExpensesAndIsNotIncome() = runBlocking {
+        val dao = app.db.dao()
+        val acc = dao.insertAccount(Account(name = "الأهلي", type = AccountType.BANK, agentId = "nbe", accountKey = "9767", balance = 30_000.0, balanceKnown = true))
+        app.engine.addManual(200.0, Direction.OUT, Purpose.WORK, "أدوات شغل", "طابعة", null, now - 86_400_000L, null, reimbursable = true)
+        app.engine.addManual(300.0, Direction.OUT, Purpose.WORK, "أدوات شغل", "ورق", null, now - 3_600_000L, null, reimbursable = true)
+        val inc = dao.insertTxn(Txn(accountId = acc, amount = 500.0, direction = Direction.IN, category = "دخل", purpose = Purpose.OTHER,
+            merchant = "مؤسسة سيفتي", timestamp = now, source = TxnSource.SMS, agentId = "nbe", fingerprint = "refund-in"))
+        val pending = dao.companyPendingOnce()
+        assertEquals(2, pending.size)
+        val vm = com.nabd.money.ui.AppViewModel(app)
+        val job = vm.updateTxn(dao.allTxnsOnce().first { it.id == inc }, hide = null, quantity = 1, settle = pending.map { it.id })
+        val end = System.currentTimeMillis() + 10_000
+        while (!job.isCompleted && System.currentTimeMillis() < end) { org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle(); Thread.sleep(20) }
+        val after = dao.allTxnsOnce().associateBy { it.id }
+        assertEquals("استرداد مصاريف الشركة", after.getValue(inc).category)
+        assertTrue(after.getValue(inc).excluded) // مش دخل
+        assertEquals(0, dao.companyPendingOnce().size)
+        assertEquals(2, dao.allTxnsOnce().count { it.reimbursable && it.reimbursedAt != null })
+        assertEquals(30_000.0, dao.account(acc)!!.balance, 0.001) // الفلوس وصلت فعلاً، الرصيد مابيتغيرش
+        assertEquals(0.0, FilterTotals.of(dao.allTxnsOnce(), { it.amount }).income, 0.0)
+    }
 }

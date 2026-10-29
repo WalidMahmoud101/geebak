@@ -289,11 +289,13 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
     editing?.let { t ->
         val allTxns by vm.everything.collectAsStateWithLifecycle()
         val taxonomy by vm.taxonomy.collectAsStateWithLifecycle()
+        val pendingCompany by vm.companyPending.collectAsStateWithLifecycle()
         EditTxnSheet(
             txn = t,
             accountName = accounts.firstOrNull { it.id == t.accountId }?.name,
             onDismiss = { editing = null },
-            onSave = { t2, hide, qty -> vm.updateTxn(t2, hide, qty); editing = null },
+            onSave = { t2, hide, qty, settle -> vm.updateTxn(t2, hide, qty, settle); editing = null },
+            pendingCompany = pendingCompany,
             onDelete = { vm.deleteTxn(it); editing = null },
             onNewCategory = { name, p -> vm.addCategory(name, p) },
             // القاعدة بتتحفظ للدخل بس أو للمصروف بس حسب العملية، علشان تصنيف دخل مايبوظش مصروف بنفس الاسم

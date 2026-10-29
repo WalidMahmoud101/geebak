@@ -11,6 +11,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import com.nabd.money.agents.AgentEngine
+import com.nabd.money.agents.CompanyMatch
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -372,7 +374,8 @@ fun EditTxnSheet(
     txn: Txn,
     accountName: String?,
     onDismiss: () -> Unit,
-    onSave: (Txn, hide: Boolean?, quantity: Int) -> Unit,
+    onSave: (Txn, hide: Boolean?, quantity: Int, settle: List<Long>?) -> Unit,
+    pendingCompany: List<Txn> = emptyList(),
     onDelete: (Txn) -> Unit,
     onNewCategory: (String, Purpose) -> Unit = { _, _ -> },
     onRule: (keyword: String, category: String, purpose: Purpose) -> Unit = { _, _, _ -> },
@@ -392,6 +395,13 @@ fun EditTxnSheet(
     var company by remember { mutableStateOf(txn.reimbursable) }
     var counted by remember { mutableStateOf(!txn.excluded) }
     var qty by remember { mutableStateOf(txn.quantity.coerceAtLeast(1)) }
+    // دخل جاي من الشركة بيسدد مصاريف دفعتها: بيتقفل عليها وماببقاش دخل
+    val wasRefund = txn.category == AgentEngine.REFUND_CATEGORY
+    var refund by remember { mutableStateOf(wasRefund) }
+    val candidates = remember(pendingCompany) { pendingCompany.filter { it.currency.equals(txn.currency, ignoreCase = true) } }
+    // لو اتصنفت استرداد من غير ما تقفل مصاريف (زي ما حصل قبل كده)، بنقترح المصاريف اللي بتساوي المبلغ
+    val settled = wasRefund && txn.excluded
+    var settleIds by remember { mutableStateOf(if (settled) emptySet() else CompanyMatch.pick(candidates, txn.amount)) }
     val out = txn.direction == Direction.OUT
     val agent = AgentRegistry.byId(txn.agentId)
 
@@ -444,6 +454,49 @@ fun EditTxnSheet(
                 value = merchant, onValueChange = { merchant = it }, label = { Text("الوصف / التاجر") },
                 singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)
             )
+            // دخل من الشركة: سدد مصاريف دفعتها (زي ما في الصورة)
+            if (!out) {
+                ToggleRow(
+                    "ده استرداد مصاريف من الشركة",
+                    if (refund) "مش دخل: الفلوس دي رجعالك. بنقفل بيها المصاريف اللي تحت"
+                    else "فعّلها لو الشركة حولتلك فلوس دفعتها عنها",
+                    refund
+                ) { on ->
+                    refund = on
+                    if (on) { category = AgentEngine.REFUND_CATEGORY; purpose = Purpose.WORK }
+                    else if (category == AgentEngine.REFUND_CATEGORY) { category = "دخل"; if (wasRefund) counted = true }
+                }
+                if (refund) {
+                    if (candidates.isEmpty()) {
+                        Text("مافيش مصاريف شركة مستحقة تتقفل. العملية هتتسجل استرداد من غير ما تقفل حاجة.", style = MaterialTheme.typography.labelSmall, color = NabdColors.Gold)
+                    } else {
+                        val picked = CompanyMatch.sum(candidates, settleIds)
+                        Text(
+                            "المصاريف اللي بتتقفل: ${Money.plain("", picked, txn.currency)} من ${Money.plain("", txn.amount, txn.currency)}" +
+                                if (picked < txn.amount - 0.5) " (الباقي ${Money.plain("", txn.amount - picked, txn.currency)} مش مصاريف)" else if (picked > txn.amount + 0.5) " (أكتر من المحوّل!)" else " ✓",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (picked > txn.amount + 0.5) NabdColors.Danger else NabdColors.Cyan
+                        )
+                        Column(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(NabdColors.SurfaceTop).padding(vertical = 4.dp)
+                        ) {
+                            candidates.forEach { c ->
+                                Row(
+                                    Modifier.fillMaxWidth().clickable { settleIds = if (c.id in settleIds) settleIds - c.id else settleIds + c.id }.padding(horizontal = 10.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    androidx.compose.material3.Checkbox(checked = c.id in settleIds, onCheckedChange = { on -> settleIds = if (on) settleIds + c.id else settleIds - c.id })
+                                    Column(Modifier.weight(1f)) {
+                                        Text((c.merchant ?: c.category) + if (c.quantity > 1) "  × ${c.quantity}" else "", style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                                        Text(Dates.date(c.timestamp), style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
+                                    }
+                                    Text(Money.plain("", c.amount, c.currency), style = MaterialTheme.typography.titleSmall)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             // على حساب الشركة: فوق علشان يبان، مش في آخر الشاشة
             if (out) CompanyToggle(company) {
                 company = it
@@ -472,6 +525,8 @@ fun EditTxnSheet(
                         category = c
                         // الغرض بيتقترح من التصنيف للمصروف بس، الدخل غرضه "أخرى" إلا لو حطيته في صندوق بإيدك
                         if (out) Categorizer.suggestPurpose(c)?.let { if (!company) purpose = it }
+                        // اختيار "استرداد مصاريف الشركة" = الشركة بتسددلك، فنقفل المصاريف المستحقة
+                        if (!out) refund = c == AgentEngine.REFUND_CATEGORY
                     }
                 }
                 SelectChip("+ تصنيف جديد", false, NabdColors.Mint) { newCat = true }
@@ -528,7 +583,8 @@ fun EditTxnSheet(
                         ),
                         // الإخفاء بيتنفذ بعد الحفظ علشان رصيد الحساب يتظبط
                         if (counted != !txn.excluded) !counted else null,
-                        if (company && out) qty else 1
+                        if (company && out) qty else 1,
+                        if (!out && refund) settleIds.toList() else null
                     )
                 }
                 PillButton("حذف", Icons.Rounded.Delete, NabdColors.Danger, Modifier.weight(0.6f)) { confirmDelete = true }
