@@ -274,7 +274,7 @@ fun TxnRow(
             )
             when {
                 t.reimbursable -> Text("على الشركة", style = MaterialTheme.typography.labelSmall, color = NabdColors.Cyan)
-                t.excluded -> Text(if (t.category == "تحويل بين حساباتي") "تحويل بين حساباتك" else "مخفية", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint)
+                t.excluded -> Text(when (t.category) { "تحويل بين حساباتي" -> "تحويل بين حساباتك"; "عهدة من الشركة" -> "فلوس شركة معاك (عهدة)"; "رد للشركة" -> "رديتها للشركة"; "استرداد مصاريف الشركة" -> "استرداد من الشركة"; else -> "مخفية" }, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint)
             }
         }
     }

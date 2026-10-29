@@ -374,7 +374,7 @@ fun EditTxnSheet(
     txn: Txn,
     accountName: String?,
     onDismiss: () -> Unit,
-    onSave: (Txn, hide: Boolean?, quantity: Int, settle: List<Long>?) -> Unit,
+    onSave: (Txn, hide: Boolean?, quantity: Int, settle: List<Long>?, role: String?) -> Unit,
     pendingCompany: List<Txn> = emptyList(),
     onDelete: (Txn) -> Unit,
     onNewCategory: (String, Purpose) -> Unit = { _, _ -> },
@@ -398,6 +398,11 @@ fun EditTxnSheet(
     // دخل جاي من الشركة بيسدد مصاريف دفعتها: بيتقفل عليها وماببقاش دخل
     val wasRefund = txn.category == AgentEngine.REFUND_CATEGORY
     var refund by remember { mutableStateOf(wasRefund) }
+    // عهدة: فلوس بتاعة الشركة دخلت حسابك (مش دخل ليك) أو رديتها للشركة
+    val wasCustody = txn.category == AgentEngine.CUSTODY_IN
+    val wasReturn = txn.category == AgentEngine.CUSTODY_RETURN
+    var custody by remember { mutableStateOf(wasCustody) }
+    var returned by remember { mutableStateOf(wasReturn) }
     val candidates = remember(pendingCompany) { pendingCompany.filter { it.currency.equals(txn.currency, ignoreCase = true) } }
     // لو اتصنفت استرداد من غير ما تقفل مصاريف (زي ما حصل قبل كده)، بنقترح المصاريف اللي بتساوي المبلغ
     val settled = wasRefund && txn.excluded
@@ -463,8 +468,18 @@ fun EditTxnSheet(
                     refund
                 ) { on ->
                     refund = on
-                    if (on) { category = AgentEngine.REFUND_CATEGORY; purpose = Purpose.WORK }
+                    if (on) { custody = false; category = AgentEngine.REFUND_CATEGORY; purpose = Purpose.WORK }
                     else if (category == AgentEngine.REFUND_CATEGORY) { category = "دخل"; if (wasRefund) counted = true }
+                }
+                ToggleRow(
+                    "دي فلوس الشركة معايا (عهدة)",
+                    if (custody) "مش دخل ليك: الفلوس دي بتاعة الشركة. بتتخصم منها مصاريفك من شاشة الشركة، والباقي ليك ترده"
+                    else "فعّلها لو الشركة حولتلك فلوس تصرفها على الشغل أو تسلمها، مش فلوسك",
+                    custody
+                ) { on ->
+                    custody = on
+                    if (on) { refund = false; category = AgentEngine.CUSTODY_IN; purpose = Purpose.WORK }
+                    else if (category == AgentEngine.CUSTODY_IN) category = "دخل"
                 }
                 if (refund) {
                     if (candidates.isEmpty()) {
@@ -497,6 +512,14 @@ fun EditTxnSheet(
                     }
                 }
             }
+            if (out && !company) {
+                ToggleRow(
+                    "رديتها للشركة",
+                    if (returned) "مش مصروف: دي فلوس الشركة اللي كانت معاك ورجعتها. بتنقص من العهدة"
+                    else "فعّلها لو دي فلوس رديتها للشركة من العهدة",
+                    returned
+                ) { on -> returned = on; if (on) { category = AgentEngine.CUSTODY_RETURN; purpose = Purpose.WORK } else if (category == AgentEngine.CUSTODY_RETURN) category = "أخرى" }
+            }
             // على حساب الشركة: فوق علشان يبان، مش في آخر الشاشة
             if (out) CompanyToggle(company) {
                 company = it
@@ -526,7 +549,7 @@ fun EditTxnSheet(
                         // الغرض بيتقترح من التصنيف للمصروف بس، الدخل غرضه "أخرى" إلا لو حطيته في صندوق بإيدك
                         if (out) Categorizer.suggestPurpose(c)?.let { if (!company) purpose = it }
                         // اختيار "استرداد مصاريف الشركة" = الشركة بتسددلك، فنقفل المصاريف المستحقة
-                        if (!out) refund = c == AgentEngine.REFUND_CATEGORY
+                        if (!out) { refund = c == AgentEngine.REFUND_CATEGORY; custody = c == AgentEngine.CUSTODY_IN }
                     }
                 }
                 SelectChip("+ تصنيف جديد", false, NabdColors.Mint) { newCat = true }
@@ -584,7 +607,13 @@ fun EditTxnSheet(
                         // الإخفاء بيتنفذ بعد الحفظ علشان رصيد الحساب يتظبط
                         if (counted != !txn.excluded) !counted else null,
                         if (company && out) qty else 1,
-                        if (!out && refund) settleIds.toList() else null
+                        if (!out && refund) settleIds.toList() else null,
+                        when {
+                            !out && custody -> "custody"
+                            out && returned -> "return"
+                            (wasCustody || wasReturn) && !custody && !returned -> "clear"
+                            else -> null
+                        }
                     )
                 }
                 PillButton("حذف", Icons.Rounded.Delete, NabdColors.Danger, Modifier.weight(0.6f)) { confirmDelete = true }

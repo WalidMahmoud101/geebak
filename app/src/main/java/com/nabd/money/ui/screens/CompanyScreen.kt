@@ -1,5 +1,6 @@
 package com.nabd.money.ui.screens
 
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.rounded.Print
 import androidx.activity.compose.BackHandler
@@ -86,6 +87,8 @@ fun CompanyScreen(vm: AppViewModel, onBack: () -> Unit, onAdd: () -> Unit, onEdi
     var selected by remember { mutableStateOf(setOf<Long>()) }
     var receiving by remember { mutableStateOf<List<Txn>?>(null) }
     var invoice by remember { mutableStateOf(false) }
+    var useCustodyDialog by remember { mutableStateOf(false) }
+    val custody by vm.custody.collectAsStateWithLifecycle()
 
     val pendingTotal = pending.sumOf { vm.txnEgp(it) }
     val doneTotal = done.sumOf { vm.txnEgp(it) }
@@ -122,6 +125,19 @@ fun CompanyScreen(vm: AppViewModel, onBack: () -> Unit, onAdd: () -> Unit, onEdi
                     Text("الشركة مديونالك بـ", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.8f))
                     Text(Money.fmt(pendingTotal), fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color(0xFF8FE3FF))
                     Spacer(Modifier.height(12.dp))
+                    if (custody != 0.0) {
+                        // فلوس بتاعة الشركة دخلت حسابك: بتتقارن بالمصاريف المستحقة ليك
+                        val net = pendingTotal - custody
+                        Row {
+                            StatColumn("فلوس الشركة معاك (عهدة)", Money.fmt(custody, decimals = false), Color(0xFFFFD27A), Modifier.weight(1f), Color.White.copy(alpha = 0.75f))
+                            StatColumn(
+                                if (net >= 0) "الصافي: الشركة مديونالك" else "الصافي: عليك للشركة",
+                                Money.fmt(kotlin.math.abs(net), decimals = false), if (net >= 0) Color(0xFF8CF0C4) else Color(0xFFFF9E9E),
+                                Modifier.weight(1f), Color.White.copy(alpha = 0.75f)
+                            )
+                        }
+                        Spacer(Modifier.height(10.dp))
+                    }
                     Row {
                         StatColumn("عمليات مستحقة", "${pending.size}", Color.White, Modifier.weight(1f), Color.White.copy(alpha = 0.75f))
                         StatColumn("اتسلم قبل كده", Money.fmt(doneTotal, decimals = false), Color(0xFF8CF0C4), Modifier.weight(1f), Color.White.copy(alpha = 0.75f))
@@ -131,6 +147,10 @@ fun CompanyScreen(vm: AppViewModel, onBack: () -> Unit, onAdd: () -> Unit, onEdi
                         GradientButton("استلمت الفلوس كلها", Modifier.fillMaxWidth(), Icons.Rounded.DoneAll) {
                             receiving = pending
                         }
+                    }
+                    if (custody > 0 && pending.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        PillButton("اخصم مصاريفي من فلوس الشركة اللي معايا", Icons.Rounded.DoneAll, Color(0xFFFFD27A), Modifier.fillMaxWidth()) { useCustodyDialog = true }
                     }
                     if (pending.isNotEmpty() || done.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
@@ -206,6 +226,11 @@ fun CompanyScreen(vm: AppViewModel, onBack: () -> Unit, onAdd: () -> Unit, onEdi
         ) { Icon(Icons.Rounded.Add, "مصروف شركة جديد") }
     }
 
+    if (useCustodyDialog) {
+        UseCustodyDialog(pending, custody, vm::txnEgp, onDismiss = { useCustodyDialog = false }) { ids ->
+            vm.useCustody(ids); useCustodyDialog = false
+        }
+    }
     if (invoice) {
         InvoiceSheet(vm, pending, done, chosen, salary.payer, onDismiss = { invoice = false })
     }
@@ -302,4 +327,38 @@ fun CompanyCard(pendingTotal: Double, count: Int, onClick: () -> Unit) {
             Text(Money.fmt(pendingTotal, decimals = false), fontWeight = FontWeight.Bold, color = NabdColors.Cyan)
         }
     }
+}
+
+
+/** خصم مصاريف مستحقة ليك من فلوس الشركة اللي معاك: بتتقفل كمستلمة والعهدة بتقل بنفس المبلغ */
+@Composable
+private fun UseCustodyDialog(pending: List<Txn>, custody: Double, egp: (Txn) -> Double, onDismiss: () -> Unit, onConfirm: (List<Long>) -> Unit) {
+    var picked by remember { mutableStateOf(com.nabd.money.agents.CompanyMatch.pick(pending, custody, egp)) }
+    val total = pending.filter { it.id in picked }.sumOf(egp)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NabdColors.Surface,
+        title = { Text("خصم من فلوس الشركة اللي معاك", style = MaterialTheme.typography.titleMedium) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("معاك ${Money.fmt(custody, decimals = false)} من فلوس الشركة. حدد مصاريفك اللي عايز تقفلها منها.", style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim)
+                Text(
+                    "اتحدد ${Money.fmt(total, decimals = false)}" + if (total > custody + 0.5) " (أكتر من العهدة!)" else " • هيفضل ${Money.fmt(custody - total, decimals = false)} عهدة",
+                    style = MaterialTheme.typography.labelLarge, color = if (total > custody + 0.5) NabdColors.Danger else NabdColors.Cyan
+                )
+                pending.forEach { t ->
+                    Row(Modifier.fillMaxWidth().clickable { picked = if (t.id in picked) picked - t.id else picked + t.id }, verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = t.id in picked, onCheckedChange = { on -> picked = if (on) picked + t.id else picked - t.id })
+                        Column(Modifier.weight(1f)) {
+                            Text((t.merchant ?: t.category) + if (t.quantity > 1) "  × ${t.quantity}" else "", style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                            Text(Dates.date(t.timestamp), style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
+                        }
+                        Text(Money.fmt(t.amount, t.currency, decimals = false), style = MaterialTheme.typography.titleSmall)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { if (picked.isNotEmpty() && total <= custody + 0.5) onConfirm(picked.toList()) }, enabled = picked.isNotEmpty() && total <= custody + 0.5) { Text("اخصم") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+    )
 }

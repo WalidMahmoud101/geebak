@@ -643,6 +643,35 @@ class AgentEngine(
         fixed
     }
 
+    /**
+     * خصم مصاريف دفعتها من جيبك من فلوس الشركة اللي معاك (العهدة): المصاريف دي بتتقفل كمستلمة،
+     * والعهدة بتقل بنفس المبلغ. التسجيل بيتعمل بعملية مستبعدة من الإجمالي، علشان الفلوس نفسها ماتتحسبش مرتين.
+     */
+    suspend fun useCustody(ids: List<Long>): Double = mutex.withLock {
+        val items = dao.txnsByIds(ids).filter { it.reimbursable && it.reimbursedAt == null }
+        if (items.isEmpty()) return@withLock 0.0
+        val total = items.sumOf { settings.toEgp(it.amount, it.currency) }
+        val at = now()
+        dao.setReimbursed(items.map { it.id }, at)
+        dao.insertTxn(
+            Txn(
+                accountId = null, amount = total, currency = "EGP", direction = Direction.OUT,
+                category = CUSTODY_USED, purpose = Purpose.WORK, timestamp = at, source = TxnSource.MANUAL,
+                agentId = AgentRegistry.MANUAL_ID, note = "ids:" + items.joinToString(",") { it.id.toString() },
+                fingerprint = "custody-used|" + UUID.randomUUID(), excluded = true,
+            )
+        )
+        total
+    }
+
+    /** تراجع: لو اتقفلت مصاريف بالعهدة، نشيل عملية الخصم من العهدة بتاعتها */
+    suspend fun undoCustodyUse(ids: List<Long>) = mutex.withLock {
+        val set = ids.map { it.toString() }.toSet()
+        dao.custodyUsedOnce().filter { u ->
+            u.note?.removePrefix("ids:")?.split(",")?.any { it in set } == true
+        }.forEach { dao.deleteTxn(it) }
+    }
+
     /** مرة واحدة: عمليات الكاش القديمة تتنقل لحساب الكاش (من غير ما تغير رصيده) */
     suspend fun adoptCash(): Int = mutex.withLock {
         if (dao.countCashTxns() == 0) return@withLock 0
@@ -839,6 +868,10 @@ class AgentEngine(
         const val CASH_KEY = "cash"
         const val SALARY_CATEGORY = "مرتب"
         const val REFUND_CATEGORY = "استرداد مصاريف الشركة"
+        /** فلوس الشركة اللي معاك (عهدة): دخلت حسابك بس مش ملكك، لازم تصرفها على الشغل أو تردها */
+        const val CUSTODY_IN = "عهدة من الشركة"
+        const val CUSTODY_RETURN = "رد للشركة"
+        const val CUSTODY_USED = "خصم من العهدة"
         const val TRANSFER_CATEGORY = "تحويل بين حساباتي"
 
         val MIRROR_AGENTS = AgentRegistry.MIRROR_AGENTS

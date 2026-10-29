@@ -40,6 +40,16 @@ object CompanyMatch {
         return out
     }
 
+    /** عهدة الشركة: اللي دخلتلك − اللي رديته − اللي خصمته من مصاريفك */
+    fun custody(txns: List<Txn>, egp: (Txn) -> Double = { it.amount }): Double =
+        txns.sumOf { t ->
+            when (t.category) {
+                AgentEngine.CUSTODY_IN -> egp(t)
+                AgentEngine.CUSTODY_RETURN, AgentEngine.CUSTODY_USED -> -egp(t)
+                else -> 0.0
+            }
+        }
+
     fun sum(pending: List<Txn>, ids: Set<Long>, egp: (Txn) -> Double = { it.amount }) =
         pending.filter { it.id in ids }.sumOf(egp)
 

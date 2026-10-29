@@ -442,7 +442,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setReimbursed(ids: List<Long>, received: Boolean) = viewModelScope.launch(Dispatchers.IO) {
         dao.setReimbursed(ids, if (received) System.currentTimeMillis() else null)
+        if (!received) engine.undoCustodyUse(ids)
     }
+
+    // ---------- عهدة الشركة ----------
+    /** فلوس الشركة اللي معاك دلوقتي: اللي دخلتلك كعهدة − اللي رديته − اللي خصمته من مصاريف */
+    val custody = dao.custodyTxns().map { list -> com.nabd.money.agents.CompanyMatch.custody(list, ::txnEgp) }.state(0.0)
+
+    fun useCustody(ids: List<Long>) = viewModelScope.launch(Dispatchers.IO) { txnWrites.withLock { engine.useCustody(ids) } }
 
     /** استلمت فلوس الشركة: نقفل العمليات ونسجل المبلغ كإضافة (اختياري على حساب معين) */
     fun receiveCompanyMoney(items: List<Txn>, accountId: Long?, recordIncome: Boolean) =
@@ -465,11 +472,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * settle: لو العملية دي دخل جاي من الشركة بيسدد مصاريف: أرقامها. العملية بتبقى "استرداد مصاريف الشركة"
      * (مش دخل ولا بتتحسب في الإجمالي) والمصاريف دي بتتقفل كمستلمة.
      */
-    fun updateTxn(t: Txn, hide: Boolean? = null, quantity: Int? = null, settle: List<Long>? = null) = viewModelScope.launch(Dispatchers.IO) {
+    fun updateTxn(t: Txn, hide: Boolean? = null, quantity: Int? = null, settle: List<Long>? = null, role: String? = null) = viewModelScope.launch(Dispatchers.IO) {
         txnWrites.withLock {
             dao.updateTxn(t)
             if (quantity != null && quantity != t.quantity) engine.setQuantity(t.id, quantity)
-            if (settle != null) {
+            // عهدة: فلوس الشركة اللي دخلتلك، أو اللي رديتها. مش دخل ولا مصروف، والرصيد الحقيقي مابيتغيرش
+            if (role == "custody" || role == "return") {
+                val cat = if (role == "custody") com.nabd.money.agents.AgentEngine.CUSTODY_IN else com.nabd.money.agents.AgentEngine.CUSTODY_RETURN
+                dao.updateTxn(t.copy(category = cat, purpose = Purpose.WORK, excluded = true))
+            } else if (role == "clear") {
+                dao.updateTxn(t.copy(category = if (t.direction == Direction.IN) "دخل" else "أخرى", excluded = false))
+            } else if (settle != null) {
                 // استرداد حقيقي: الفلوس وصلت البنك فعلاً، فمفيش تغيير في رصيد الحساب
                 dao.updateTxn(t.copy(category = com.nabd.money.agents.AgentEngine.REFUND_CATEGORY, purpose = Purpose.WORK, excluded = true))
                 if (settle.isNotEmpty()) dao.setReimbursed(settle, t.timestamp)

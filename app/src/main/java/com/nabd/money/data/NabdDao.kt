@@ -132,8 +132,15 @@ interface NabdDao {
     fun agentStats(): Flow<List<AgentStat>>
 
     /** العمليات المخفية والتحويلات الداخلية (من غير استرداد الشركة اللي بيتقفل لوحده) */
-    @Query("SELECT COUNT(*) FROM transactions WHERE excluded = 1 AND category != 'استرداد مصاريف الشركة'")
+    @Query("SELECT COUNT(*) FROM transactions WHERE excluded = 1 AND category NOT IN ('استرداد مصاريف الشركة', 'عهدة من الشركة', 'رد للشركة', 'خصم من العهدة')")
     fun hiddenCount(): Flow<Int>
+
+    // ---------- عهدة الشركة (فلوسها معاك) ----------
+    @Query("SELECT * FROM transactions WHERE category IN ('عهدة من الشركة', 'رد للشركة', 'خصم من العهدة') ORDER BY timestamp DESC")
+    fun custodyTxns(): Flow<List<Txn>>
+
+    @Query("SELECT * FROM transactions WHERE category = 'خصم من العهدة'")
+    suspend fun custodyUsedOnce(): List<Txn>
 
     // ---------- مصاريف الشركة ----------
     @Query("SELECT * FROM transactions WHERE reimbursable = 1 AND reimbursedAt IS NULL ORDER BY timestamp DESC")

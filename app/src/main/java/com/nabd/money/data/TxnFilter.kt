@@ -27,6 +27,9 @@ enum class Period(val ar: String) {
 /** "الكاش" في فلتر الحسابات = عمليات من غير حساب */
 const val CASH_ACCOUNT_ID = -1L
 
+/** عمليات مستبعدة من الإجمالي بس مهمة تبان في العمليات: استرداد الشركة والعهدة (فلوس الشركة اللي معاك) */
+val ALWAYS_SHOWN = setOf("استرداد مصاريف الشركة", "عهدة من الشركة", "رد للشركة")
+
 /**
  * فلتر واحد للمصاريف والتقارير: الفترة، النوع، الغرض، التصنيف، الحساب، المصدر، المبلغ، والبحث.
  * كل اللي جوه الفلتر بيتحسب في الإجمالي اللي ظاهر، ومافيش حاجة بتدخل في بعضها.
@@ -158,8 +161,8 @@ data class TxnFilter(
     fun clearedFilters() = TxnFilter(period = period, month = month, fromDay = fromDay, toDay = toDay)
 
     fun matches(t: Txn, egp: Double): Boolean {
-        if (onlyHidden) { if (!t.excluded || t.category == "استرداد مصاريف الشركة") return false }
-        else if (!showExcluded && t.excluded) return false
+        if (onlyHidden) { if (!t.excluded || t.category in setOf("استرداد مصاريف الشركة", "عهدة من الشركة", "رد للشركة", "خصم من العهدة")) return false }
+        else if (!showExcluded && t.excluded && t.category !in ALWAYS_SHOWN) return false
         if (companyOnly && !t.reimbursable) return false
         if (direction != null && t.direction != direction) return false
         if (purposes.isNotEmpty() && purposes.none { t.belongsTo(it) }) return false

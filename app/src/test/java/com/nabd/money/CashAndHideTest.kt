@@ -230,4 +230,52 @@ class CashAndHideTest {
         assertEquals(30_000.0, dao.account(acc)!!.balance, 0.001) // الفلوس وصلت فعلاً، الرصيد مابيتغيرش
         assertEquals(0.0, FilterTotals.of(dao.allTxnsOnce(), { it.amount }).income, 0.0)
     }
+
+    @Test
+    fun companyMoneyIHoldIsCustodyNotIncomeAndOffsetsWhatTheyOwe() {
+        val dao = app.db.dao()
+        val acc = runBlocking { dao.insertAccount(Account(name = "الأهلي", type = AccountType.BANK, agentId = "nbe", accountKey = "main", balance = 40_000.0, balanceKnown = true)) }
+        val inc = runBlocking { dao.insertTxn(Txn(accountId = acc, amount = 26_800.0, direction = Direction.IN, category = "دخل", purpose = Purpose.OTHER,
+            merchant = "مؤسسة الشركة", timestamp = now, source = TxnSource.SMS, agentId = "nbe", fingerprint = "custody-in")) }
+        runBlocking {
+            app.engine.addManual(20_000.0, Direction.OUT, Purpose.WORK, "أدوات شغل", "معدات", null, now, null, reimbursable = true)
+            app.engine.addManual(5_000.0, Direction.OUT, Purpose.WORK, "مواصلات", "رحلات", null, now, null, reimbursable = true)
+        }
+        val vm = com.nabd.money.ui.AppViewModel(app)
+        fun wait(j: kotlinx.coroutines.Job) { val end = System.currentTimeMillis() + 10_000; while (!j.isCompleted && System.currentTimeMillis() < end) { org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle(); Thread.sleep(20) } }
+
+        // ١- الفلوس دي بتاعة الشركة: عهدة، مش دخل
+        wait(vm.updateTxn(runBlocking { dao.allTxnsOnce() }.first { it.id == inc }, role = "custody"))
+        var all = runBlocking { dao.allTxnsOnce() }
+        assertEquals(26_800.0, com.nabd.money.agents.CompanyMatch.custody(all), 0.001)
+        assertEquals(0.0, FilterTotals.of(all, { it.amount }).income, 0.0)
+        assertEquals(40_000.0, runBlocking { dao.account(acc)!!.balance }, 0.001) // الفلوس دخلت فعلاً
+        val pending = runBlocking { dao.companyPendingOnce() }
+        assertEquals(25_000.0, pending.sumOf { it.amount }, 0.001)
+
+        // ٢- خصم المصاريف المستحقة من العهدة: بتتقفل والعهدة بتقل
+        wait(vm.useCustody(pending.map { it.id }))
+        all = runBlocking { dao.allTxnsOnce() }
+        assertEquals(0, runBlocking { dao.companyPendingOnce() }.size)
+        assertEquals(1_800.0, com.nabd.money.agents.CompanyMatch.custody(all), 0.001)
+        assertTrue(all.single { it.category == AgentEngine.CUSTODY_USED }.excluded)
+        assertEquals(0.0, FilterTotals.of(all, { it.amount }).spent, 0.0)
+
+        // ٣- رديت الباقي للشركة (تحويل خارج)
+        val out = runBlocking { dao.insertTxn(Txn(accountId = acc, amount = 1_800.0, direction = Direction.OUT, category = "تحويلات", purpose = Purpose.OTHER,
+            timestamp = now, source = TxnSource.SMS, agentId = "nbe", fingerprint = "custody-out")) }
+        wait(vm.updateTxn(runBlocking { dao.allTxnsOnce() }.first { it.id == out }, role = "return"))
+        assertEquals(0.0, com.nabd.money.agents.CompanyMatch.custody(runBlocking { dao.allTxnsOnce() }), 0.001)
+
+        // ٤- تراجع عن قفل المصاريف: عملية الخصم من العهدة بتتشال والعهدة ترجع
+        wait(vm.setReimbursed(pending.map { it.id }, false))
+        all = runBlocking { dao.allTxnsOnce() }
+        assertEquals(2, runBlocking { dao.companyPendingOnce() }.size)
+        assertTrue(all.none { it.category == AgentEngine.CUSTODY_USED })
+        assertEquals(26_800.0 - 1_800.0, com.nabd.money.agents.CompanyMatch.custody(all), 0.001)
+
+        // ٥- ورجّعها دخل عادي
+        wait(vm.updateTxn(runBlocking { dao.allTxnsOnce() }.first { it.id == inc }, role = "clear"))
+        assertEquals("دخل", runBlocking { dao.allTxnsOnce() }.first { it.id == inc }.category)
+    }
 }

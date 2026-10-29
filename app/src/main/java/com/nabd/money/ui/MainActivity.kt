@@ -294,7 +294,7 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
             txn = t,
             accountName = accounts.firstOrNull { it.id == t.accountId }?.name,
             onDismiss = { editing = null },
-            onSave = { t2, hide, qty, settle -> vm.updateTxn(t2, hide, qty, settle); editing = null },
+            onSave = { t2, hide, qty, settle, role -> vm.updateTxn(t2, hide, qty, settle, role); editing = null },
             pendingCompany = pendingCompany,
             onDelete = { vm.deleteTxn(it); editing = null },
             onNewCategory = { name, p -> vm.addCategory(name, p) },
