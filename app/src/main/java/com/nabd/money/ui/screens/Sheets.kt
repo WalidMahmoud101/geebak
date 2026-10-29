@@ -1,5 +1,6 @@
 package com.nabd.money.ui.screens
 
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.rounded.CurrencyExchange
@@ -754,6 +755,11 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
     var categories by remember { mutableStateOf(false) }
     var backup by remember { mutableStateOf(false) }
     var reset by remember { mutableStateOf(false) }
+    var about by remember { mutableStateOf(false) }
+    if (about) {
+        AboutSheet(vm) { about = false }
+        return
+    }
     var currencies by remember { mutableStateOf(false) }
     if (currencies) {
         CurrencySheet(vm) { currencies = false }
@@ -823,6 +829,7 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                 )
                 PillButton("التصنيفات والقواعد", Icons.Rounded.Category, NabdColors.Mint, Modifier.fillMaxWidth()) { categories = true }
                 PillButton("النسخة الاحتياطية", Icons.Rounded.CloudDone, NabdColors.Mint, Modifier.fillMaxWidth()) { backup = true }
+                PillButton("عن نبض", Icons.Rounded.Favorite, NabdColors.Pink, Modifier.fillMaxWidth()) { about = true }
                 // مراجعة شاملة للرسايل: بتصلّح العمليات والأرصدة اللي اتسجلت غلط
                 val heal by vm.healMessage.collectAsState()
                 PillButton("راجع كل الرسايل وصلّح", Icons.Rounded.Check, NabdColors.Cyan, Modifier.fillMaxWidth()) { vm.healAll() }

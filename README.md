@@ -9,6 +9,7 @@
 
 [![النسخة](https://img.shields.io/github/v/release/WalidMahmoud101/nabd?label=%D8%A2%D8%AE%D8%B1%20%D9%86%D8%B3%D8%AE%D8%A9&color=0F9D75)](https://github.com/WalidMahmoud101/nabd/releases/latest)
 ![Android](https://img.shields.io/badge/Android-8%2B-3DDC84?logo=android&logoColor=white)
+[![الترخيص](https://img.shields.io/badge/%D8%A7%D9%84%D8%AA%D8%B1%D8%AE%D9%8A%D8%B5-MIT-blue)](LICENSE)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material3-4285F4?logo=jetpackcompose&logoColor=white)
 
@@ -25,6 +26,7 @@
 <img src="docs/screenshots/3_reports_light.png" width="230" alt="التقارير">
 <img src="docs/screenshots/4_accounts_light.png" width="230" alt="الحسابات">
 <img src="docs/screenshots/5_company_dark.png" width="230" alt="مصاريف الشركة">
+<img src="docs/screenshots/about_light.png" width="230" alt="عن نبض">
 </div>
 
 > الصور من بيانات تجريبية، مش بيانات حقيقية.
@@ -84,6 +86,7 @@
 - **نسخة احتياطية** على Google Drive أو الموبايل، ومشاركتها، ونسخة تلقائية كل يوم، ورجوع منها بمعاينة.
 - **ابدأ من جديد**: من أول الشهر أو مسح العمليات أو من الصفر، مع نسخة قبلها وزرار تراجع.
 - **تحديث تلقائي** من GitHub بالبيانات سليمة: بيتأكد من الملف المنزّل، وله طريقة بديلة لو GitHub حدّد الطلبات.
+- شاشة **«عن نبض»** (من الإعدادات أو بالضغط على اسم التطبيق): أرقامك الحقيقية، المميزات، الوكلاء، الخصوصية، الإصدار والتحديث، وروابط الكود.
 - فاتح وداكن وتلقائي، وخط IBM Plex Sans Arabic، وتصميم هادي RTL.
 
 ---
@@ -125,6 +128,9 @@
 | `ui/` | الواجهة بـ Jetpack Compose |
 
 **التقنيات:** Kotlin · Jetpack Compose (Material 3) · Room · WorkManager · Robolectric.
+
+## الترخيص
+[MIT](LICENSE): مفتوح المصدر، تقدر تستخدمه وتعدّل عليه وتوزّعه، مع الإبقاء على إشعار الحقوق. البرنامج بيتقدّم «زي ما هو» من غير ضمان، وانت المسؤول عن فلوسك وقراراتك.
 
 ---
 

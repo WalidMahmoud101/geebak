@@ -109,6 +109,8 @@ fun HomeScreen(
     vm.usdRate.collectAsStateWithLifecycle().value
     var salaryDialog by remember { mutableStateOf(false) }
     var goldOpen by remember { mutableStateOf(false) }
+    var aboutOpen by remember { mutableStateOf(false) }
+    if (aboutOpen) AboutSheet(vm) { aboutOpen = false }
     val gold by vm.gold.collectAsStateWithLifecycle()
     val usdRateNow by vm.usdRate.collectAsStateWithLifecycle()
     if (goldOpen) GoldSheet(vm) { goldOpen = false }
@@ -136,7 +138,8 @@ fun HomeScreen(
                 unread = unread.size,
                 onAgents = { onNavigate(3) },
                 onSettings = { settingsOpen = true },
-                onBell = { vm.markInsightsRead() }
+                onBell = { vm.markInsightsRead() },
+                onAbout = { aboutOpen = true }
             )
         }
         updateCard(update, vm)
@@ -201,10 +204,10 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeHeader(unread: Int, onAgents: () -> Unit, onSettings: () -> Unit, onBell: () -> Unit) {
+private fun HomeHeader(unread: Int, onAgents: () -> Unit, onSettings: () -> Unit, onBell: () -> Unit, onAbout: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
-            Text("نبض", style = MaterialTheme.typography.headlineSmall)
+            Text("نبض", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onAbout))
             Spacer(Modifier.width(8.dp))
             Text(greeting(), style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim, modifier = Modifier.padding(bottom = 3.dp))
         }
