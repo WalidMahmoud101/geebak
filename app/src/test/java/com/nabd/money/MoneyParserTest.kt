@@ -78,6 +78,26 @@ class MoneyParserTest {
     }
 
     @Test
+    fun cardIssuanceAndFeesAreDeductions() {
+        val a = MoneyParser.parse("تم اصدار كارت الدفع اونلاين بنجاح. تم خصم 10 جنيه رصيدك الحالي 90.5 جنيه")!!
+        assertEquals(Direction.OUT, a.direction)
+        assertEquals(10.0, a.amount!!, 0.001)
+        assertEquals(90.5, a.balance!!, 0.001)
+        // حتى لو الرسالة فيها كلمة "إضافة"
+        val b = MoneyParser.parse("تم إصدار كارت الدفع الاونلاين بنجاح وتم إضافة الكارت لمحفظتك. رسوم الإصدار 10 جنيه")!!
+        assertEquals(Direction.OUT, b.direction)
+        assertEquals(10.0, b.amount!!, 0.001)
+        // رسوم أي عملية
+        assertEquals(Direction.OUT, MoneyParser.parse("Card issuance fee EGP 10.00 charged. Balance EGP 40")!!.direction)
+        // فلوس استلمتها بتفضل إضافة حتى لو فيها رسوم
+        val c = MoneyParser.parse("تم استلام تحويل 500 جنيه بعد خصم رسوم 5 جنيه. رصيدك 800 جنيه")!!
+        assertEquals(Direction.IN, c.direction)
+        assertEquals(true, MoneyParser.isFee("تم اصدار كارت الدفع اونلاين بنجاح"))
+        assertEquals(false, MoneyParser.isFee("تم استلام 500 جنيه"))
+        assertEquals("رسوم وعمولات", Categorizer.classify(null, "تم اصدار كارت الدفع اونلاين بنجاح تم خصم 10 جنيه", Direction.OUT, "vodafone_cash").category)
+    }
+
+    @Test
     fun redotpayDollarSpend() {
         val p = MoneyParser.parse("You spent \$12.50 at NETFLIX.COM", "USD")!!
         assertEquals(12.5, p.amount!!, 0.001)

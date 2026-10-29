@@ -88,6 +88,23 @@ class AccountsTidyTest {
     }
 
     @Test
+    fun cardIssuanceRecordedAsIncomeIsFixed() = runBlocking {
+        val dao = app.db.dao()
+        val acc = dao.insertAccount(Account(name = "فودافون كاش", type = AccountType.WALLET, agentId = "vodafone_cash", accountKey = "main", balance = 110.0))
+        dao.insertTxn(Txn(accountId = acc, amount = 10.0, direction = Direction.IN, category = "دخل", purpose = Purpose.OTHER,
+            timestamp = now, source = TxnSource.SMS, agentId = "vodafone_cash", fingerprint = "issue1",
+            rawText = "تم اصدار كارت الدفع اونلاين بنجاح. رسوم الاصدار 10 جنيه"))
+        dao.insertTxn(Txn(accountId = acc, amount = 500.0, direction = Direction.IN, category = "دخل", purpose = Purpose.OTHER,
+            timestamp = now, source = TxnSource.SMS, agentId = "vodafone_cash", fingerprint = "real1", rawText = "تم استلام 500 جنيه من احمد"))
+        app.engine.fixFeeDirections()
+        val t = dao.allTxnsOnce().associateBy { it.fingerprint }
+        assertEquals(Direction.OUT, t.getValue("issue1").direction)
+        assertEquals("رسوم وعمولات", t.getValue("issue1").category)
+        assertEquals(Direction.IN, t.getValue("real1").direction)
+        assertEquals(90.0, dao.account(acc)!!.balance, 0.001) // كانت +10 بقت −10
+    }
+
+    @Test
     fun senderSpellingsAreOneBank() {
         assertEquals(GenericBankAgent.bankKey("HSBC"), GenericBankAgent.bankKey("HSBC-EG"))
         assertEquals(GenericBankAgent.bankKey("hsbc"), GenericBankAgent.bankKey("HSBC Egypt"))

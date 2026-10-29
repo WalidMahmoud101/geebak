@@ -76,6 +76,23 @@ object MoneyParser {
         """(paid|payment|sent|transfer(?:red)?|دفع|سداد|تحويل|أرسلت|ارسلت|إرسال|ارسال|حولت)""",
         RegexOption.IGNORE_CASE
     )
+    /** إصدار كارت أو رسوم وعمولات: دي دايماً خصم (حتى لو الرسالة فيها كلمة زي "بنجاح" أو "إضافة") */
+    private val feeRx = Regex(
+        """((?:اصدار|إصدار|اصدرت|أصدرت)\s*(?:ال)?(?:كارت|بطاق[هة])|(?:كارت|بطاق[هة])\s*(?:ال)?(?:دفع\s*)?(?:ال)?(?:اونلاين|أونلاين|online|افتراضي)|(?<![\p{L}])رسوم|عمول[هة]|issuance|card issued|virtual card|\bfees?\b)""",
+        RegexOption.IGNORE_CASE
+    )
+    /** فلوس اتستلمت فعلاً: بتغلب على الرسوم (مثلاً "تم استلام 500 جنيه بعد خصم رسوم 5") */
+    private val receivedRx = Regex(
+        """(تم\s*استلام|استلمت|received|credited|deposit(?:ed)?|إيداع|ايداع|تحويل\s*وارد)""",
+        RegexOption.IGNORE_CASE
+    )
+
+    /** رسالة إصدار كارت أو رسوم: خصم مش إضافة */
+    fun isFee(raw: String): Boolean {
+        val t = normalize(raw)
+        return feeRx.containsMatchIn(t) && !receivedRx.containsMatchIn(t)
+    }
+
     private val toMe = Regex("""(إليك|اليك|لحسابك|to your account|to you\b)""", RegexOption.IGNORE_CASE)
 
     private const val MERCHANT_BODY =
@@ -137,6 +154,7 @@ object MoneyParser {
     private data class M(val start: Int, val end: Int, val value: Double, val cur: String)
 
     fun direction(t: String): Direction? {
+        if (feeRx.containsMatchIn(t) && !receivedRx.containsMatchIn(t)) return Direction.OUT
         val inM = strongIn.find(t)
         val outM = strongOut.find(t)
         return when {

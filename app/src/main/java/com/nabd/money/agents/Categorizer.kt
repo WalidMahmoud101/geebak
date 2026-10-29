@@ -33,12 +33,16 @@ object Categorizer {
     val CATEGORIES = listOf(
         "بقالة", "فواتير", "إيجار", "مصروف البيت", "وقود", "صيانة عربية", "مطاعم وكافيهات", "ترفيه",
         "مواصلات", "اشتراكات", "أدوات شغل", "صحة", "تسوق", "تحويلات", "سحب كاش", "كريبتو",
-        "مرتب", "دخل", "تحويل بين حساباتي", "استرداد مصاريف الشركة", "أخرى",
+        "رسوم وعمولات", "مرتب", "دخل", "تحويل بين حساباتي", "استرداد مصاريف الشركة", "أخرى",
     )
 
     private data class Rule(val category: String, val purpose: Purpose, val words: List<String>)
 
     private val rules = listOf(
+        Rule("رسوم وعمولات", Purpose.PERSONAL, listOf(
+            "رسوم", "عمولة", "عموله", "اصدار كارت", "اصدار الكارت", "إصدار كارت", "إصدار الكارت", "اصدار بطاقة", "إصدار بطاقة",
+            "كارت الدفع", "كارت دفع", "كارت افتراضي", "issuance", "virtual card", "fee", "fees"
+        )),
         Rule("بقالة", Purpose.HOME, listOf(
             "carrefour", "كارفور", "kazyon", "كازيون", "spinneys", "سبينيس", "hyper", "هايبر", "seoudi", "سعودي ماركت",
             "metro market", "مترو ماركت", "oscar", "أوسكار", "kheir zaman", "خير زمان", "gourmet", "جورميه", "ragab",

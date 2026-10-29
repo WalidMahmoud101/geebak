@@ -486,6 +486,27 @@ class AgentEngine(
         dao.updateAccount(a.copy(balance = a.balance + if (reverse) -delta else delta, updatedAt = now()))
     }
 
+    /**
+     * مرة واحدة: رسايل إصدار الكارت والرسوم اللي اتسجلت قبل كده كأنها إضافة، تتحول خصم.
+     * الرصيد التقديري بيتظبط (من +10 لـ −10)، ورصيد البنك اللي جاي من الرسالة نفسها مابيتغيرش.
+     */
+    suspend fun fixFeeDirections(): Int = mutex.withLock {
+        var fixed = 0
+        for (t in dao.allTxnsOnce()) {
+            if (t.source == TxnSource.MANUAL || t.direction != Direction.IN) continue
+            val raw = t.rawText ?: continue
+            if (!MoneyParser.isFee(raw)) continue
+            val cls = Categorizer.classify(t.merchant, raw, Direction.OUT, t.agentId, builtIn = settings.isEnabled(Categorizer.ID))
+            dao.updateTxn(t.copy(direction = Direction.OUT, category = cls.category, purpose = cls.purpose))
+            val a = t.accountId?.let { dao.account(it) }
+            if (a != null && !a.balanceKnown && a.currency.equals(t.currency, ignoreCase = true)) {
+                dao.updateAccount(a.copy(balance = a.balance - 2 * t.amount, updatedAt = now()))
+            }
+            fixed++
+        }
+        fixed
+    }
+
     /** مرة واحدة: عمليات الكاش القديمة تتنقل لحساب الكاش (من غير ما تغير رصيده) */
     suspend fun adoptCash(): Int = mutex.withLock {
         if (dao.countCashTxns() == 0) return@withLock 0
