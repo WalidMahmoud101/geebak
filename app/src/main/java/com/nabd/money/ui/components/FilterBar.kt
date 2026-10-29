@@ -199,6 +199,7 @@ private fun activeChips(f: TxnFilter, accounts: List<Account>): List<Pair<String
     if (f.minAmount != null || f.maxAmount != null) add(amountLabel(f) to { x: TxnFilter -> x.copy(minAmount = null, maxAmount = null) })
     if (f.query.isNotBlank()) add("«${f.query}»" to { x: TxnFilter -> x.copy(query = "") })
     if (f.companyOnly) add("مصاريف الشركة" to { x: TxnFilter -> x.copy(companyOnly = false) })
+    if (f.onlyHidden) add("المخفي والتحويلات بس" to { x: TxnFilter -> x.copy(onlyHidden = false) })
     if (f.showCompany) add("+ مصاريف الشركة" to { x: TxnFilter -> x.copy(showCompany = false) })
     if (f.showExcluded) add("+ المخفي والتحويلات" to { x: TxnFilter -> x.copy(showExcluded = false) })
 }
@@ -282,6 +283,7 @@ private fun FilterSheet(
             Section("كمان") {
                 SelectChip("مصاريف الشركة بس", f.companyOnly, NabdColors.Cyan, Icons.Rounded.BusinessCenter) { f = f.copy(companyOnly = !f.companyOnly) }
                 SelectChip("وريني مصاريف الشركة هنا كمان", f.showCompany, NabdColors.Cyan, Icons.Rounded.BusinessCenter) { f = f.copy(showCompany = !f.showCompany) }
+                SelectChip("المخفي والتحويلات بس (علشان ترجّعها أو تنقلها للشركة)", f.onlyHidden, NabdColors.Danger, Icons.Rounded.VisibilityOff) { f = f.copy(onlyHidden = !f.onlyHidden) }
                 SelectChip("وريني المخفي والتحويلات الداخلية", f.showExcluded, NabdColors.TextDim, Icons.Rounded.VisibilityOff) { f = f.copy(showExcluded = !f.showExcluded) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

@@ -198,6 +198,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         engine.addManual(amount, direction, purpose, category, merchant, accountId, timestamp, note, reimbursable, currency, quantity = quantity)
     }
 
+    val hiddenCount = dao.hiddenCount().state(0)
+
+    /** المخفي أو التحويلات الداخلية تتنقل لمصاريف الشركة */
+    fun moveToCompany(ids: Collection<Long>) = viewModelScope.launch(Dispatchers.IO) {
+        txnWrites.withLock { engine.moveToCompany(ids.toList()) }
+    }
+
     fun hideTxns(ids: Collection<Long>, hide: Boolean) = viewModelScope.launch(Dispatchers.IO) {
         engine.setHidden(ids.toList(), hide)
     }

@@ -1,5 +1,6 @@
 package com.nabd.money.ui.screens
 
+import androidx.compose.material.icons.rounded.BusinessCenter
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.navigationBarsPadding
 import com.nabd.money.ui.components.PillButton
@@ -68,6 +69,7 @@ import com.nabd.money.util.Money
 @Composable
 fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit: (Txn) -> Unit, onCompany: () -> Unit = {}) {
     val companyPending by vm.companyPending.collectAsStateWithLifecycle()
+    val hiddenCount by vm.hiddenCount.collectAsStateWithLifecycle()
     val filter by vm.filter.collectAsStateWithLifecycle()
     val all by vm.filtered.collectAsStateWithLifecycle()
     // مصاريف الشركة ليها خانتها لوحدها، فمابتظهرش هنا إلا لو طلبتها من الفلتر (التقارير بتفضل شايفاها)
@@ -138,6 +140,22 @@ fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit:
                     )
                 }
                 ComparisonLine(totals, prev, filter)
+                if (hiddenCount > 0 && !filter.onlyHidden) {
+                    Text(
+                        "مخفي ومحوّل بين حساباتك: $hiddenCount عملية — افتحهم ترجّعهم أو تنقلهم للشركة ›",
+                        style = MaterialTheme.typography.labelMedium, color = NabdColors.TextDim,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(8.dp))
+                            .clickable { vm.setFilter(TxnFilter(period = Period.ALL, onlyHidden = true)); selecting = true }.padding(vertical = 4.dp)
+                    )
+                }
+                if (filter.onlyHidden) {
+                    Text(
+                        "بتشوف المخفي والتحويلات بس. حدد وارجعهم، أو انقلهم لمصاريف الشركة.",
+                        style = MaterialTheme.typography.labelMedium, color = NabdColors.Danger, textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+                    )
+                }
                 if (companyPending.isNotEmpty() && !filter.companyOnly) {
                     Text(
                         "مصاريف الشركة ${Money.fmt(companyPending.sumOf { vm.txnEgp(it) }, decimals = false)} (${companyPending.size}) في خانتها لوحدها ›",
@@ -198,8 +216,9 @@ fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit:
     if (selecting) {
         SelectionBar(
             count = picked.size,
-            showingHidden = filter.showExcluded,
+            showingHidden = filter.showExcluded || filter.onlyHidden,
             onAll = { selected = visibleIds },
+            onCompany = { vm.moveToCompany(picked); selected = emptySet(); selecting = false },
             onHide = { vm.hideTxns(picked, true); selected = emptySet(); selecting = false },
             onRestore = { vm.hideTxns(picked, false); selected = emptySet(); selecting = false },
             onCancel = { selected = emptySet(); selecting = false },
@@ -213,7 +232,7 @@ fun LedgerScreen(vm: AppViewModel, onAdd: (Direction, Purpose?) -> Unit, onEdit:
 @Composable
 private fun SelectionBar(
     count: Int, showingHidden: Boolean,
-    onAll: () -> Unit, onHide: () -> Unit, onRestore: () -> Unit, onCancel: () -> Unit,
+    onAll: () -> Unit, onHide: () -> Unit, onRestore: () -> Unit, onCompany: () -> Unit, onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -234,17 +253,18 @@ private fun SelectionBar(
                 modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onCancel).padding(horizontal = 8.dp, vertical = 4.dp))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PillButton("اخفيها من الحساب", Icons.Rounded.VisibilityOff, NabdColors.Danger, Modifier.weight(1f)) { if (count > 0) onHide() }
             if (showingHidden) {
                 PillButton("رجّعها", Icons.Rounded.Visibility, NabdColors.Mint, Modifier.weight(1f)) { if (count > 0) onRestore() }
+                PillButton("للشركة", Icons.Rounded.BusinessCenter, NabdColors.Cyan, Modifier.weight(1f)) { if (count > 0) onCompany() }
+            } else {
+                PillButton("اخفيها من الحساب", Icons.Rounded.VisibilityOff, NabdColors.Danger, Modifier.weight(1f)) { if (count > 0) onHide() }
             }
         }
-        if (!showingHidden) {
-            Text(
-                "المخفي مابيتحسبش خصم ولا إضافة. تلاقيه في الفلتر: «وريني المخفي والتحويلات الداخلية»، ومن هناك تقدر ترجّعه.",
-                style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint
-            )
-        }
+        Text(
+            if (showingHidden) "«رجّعها» بترجعها تتحسب وتظهر في العمليات. «للشركة» بتنقل المصروف لخانة مصاريف الشركة (الدخل مابيتنقلش)."
+            else "المخفي مابيتحسبش خصم ولا إضافة. تلاقيه بسطر «مخفي» فوق، ومن هناك ترجّعه أو تنقله للشركة.",
+            style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint
+        )
     }
 }
 

@@ -145,4 +145,48 @@ class CashAndHideTest {
         com.nabd.money.data.Backup.restore(app.db, app.settings, json)
         assertEquals(3, dao.allTxnsOnce().single().quantity)
     }
+
+    @Test
+    fun hiddenAndTransfersCanBeRestoredOrMovedToCompany() = runBlocking {
+        val dao = app.db.dao()
+        // مصروف كاش مخفي بإيدك
+        app.engine.addManual(120.0, Direction.OUT, Purpose.PERSONAL, "مواصلات", "تاكسي", null, now, null)
+        val cash = dao.findAccount(AgentRegistry.MANUAL_ID, AgentEngine.CASH_KEY)!!
+        val taxi = dao.allTxnsOnce().single()
+        app.engine.setHidden(listOf(taxi.id), true)
+        assertEquals(0.0, dao.account(cash.id)!!.balance, 0.001)
+        // تحويل داخلي (خارج) ودخل جاي منه
+        val acc = dao.insertAccount(Account(name = "CIB", type = AccountType.BANK, agentId = "cib", accountKey = "main", balance = 1000.0, balanceKnown = true))
+        val out = dao.insertTxn(Txn(accountId = acc, amount = 300.0, direction = Direction.OUT, category = "تحويل بين حساباتي", purpose = Purpose.OTHER,
+            timestamp = now, source = TxnSource.SMS, agentId = "cib", fingerprint = "tr-out", excluded = true))
+        val inn = dao.insertTxn(Txn(accountId = acc, amount = 300.0, direction = Direction.IN, category = "تحويل بين حساباتي", purpose = Purpose.OTHER,
+            timestamp = now, source = TxnSource.SMS, agentId = "cib", fingerprint = "tr-in", excluded = true))
+
+        // الفلتر: المخفي والتحويلات بس
+        val f = com.nabd.money.data.TxnFilter(onlyHidden = true)
+        val all = dao.allTxnsOnce()
+        assertEquals(3, all.count { f.matches(it, it.amount) })
+        assertEquals(0, dao.allTxnsOnce().count { com.nabd.money.data.TxnFilter().matches(it, it.amount) })
+
+        // المخفي والتحويل الخارج يروحوا لمصاريف الشركة. الدخل مابيتنقلش
+        val moved = app.engine.moveToCompany(listOf(taxi.id, out, inn))
+        assertEquals(2, moved)
+        val now1 = dao.allTxnsOnce().associateBy { it.id }
+        assertTrue(now1.getValue(taxi.id).reimbursable && !now1.getValue(taxi.id).excluded)
+        assertEquals(Purpose.WORK, now1.getValue(taxi.id).purpose)
+        assertTrue(now1.getValue(out).reimbursable && !now1.getValue(out).excluded)
+        assertEquals("أخرى", now1.getValue(out).category)
+        assertTrue(now1.getValue(inn).excluded && !now1.getValue(inn).reimbursable)
+        // أثر الإخفاء على رصيد الكاش رجع (العملية بتتحسب في الشركة)
+        assertEquals(-120.0, dao.account(cash.id)!!.balance, 0.001)
+        assertEquals(2, dao.companyPendingOnce().size)
+
+        // وترجيع عادي: مخفي → يظهر
+        app.engine.addManual(50.0, Direction.OUT, Purpose.HOME, "بقالة", "سوبر", null, now, null)
+        val shop = dao.allTxnsOnce().first { it.merchant == "سوبر" }
+        app.engine.setHidden(listOf(shop.id), true)
+        app.engine.setHidden(listOf(shop.id), false)
+        assertTrue(com.nabd.money.data.TxnFilter().matches(dao.allTxnsOnce().first { it.id == shop.id }, 50.0))
+        assertEquals(-170.0, dao.account(cash.id)!!.balance, 0.001)
+    }
 }

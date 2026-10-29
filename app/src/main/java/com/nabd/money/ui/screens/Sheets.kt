@@ -488,7 +488,10 @@ fun EditTxnSheet(
                     applyAll
                 ) { applyAll = it }
             }
-            if (out) CompanyToggle(company) { company = it; if (it) purpose = Purpose.WORK }
+            if (out) CompanyToggle(company) {
+                company = it
+                if (it) { purpose = Purpose.WORK; counted = true } // مصروف الشركة بيتحسب في خانته، مش مخفي
+            }
             if (out && company) {
                 // سعر الوحدة ثابت، والإجمالي بيتغير بالكمية
                 val unit = txn.amount / txn.quantity.coerceAtLeast(1)

@@ -51,6 +51,8 @@ data class TxnFilter(
     val showExcluded: Boolean = false,
     /** مصاريف الشركة بتظهر في خانة الشركة بس، ومابتتخلطش بالعمليات إلا لو طلبت */
     val showCompany: Boolean = false,
+    /** المخفي والتحويلات الداخلية بس (علشان ترجّعها أو تنقلها للشركة) */
+    val onlyHidden: Boolean = false,
 ) {
     private val zone: ZoneId get() = ZoneId.systemDefault()
 
@@ -150,13 +152,14 @@ data class TxnFilter(
     val activeCount: Int
         get() = listOf(
             direction != null, purposes.isNotEmpty(), categories.isNotEmpty(), accountIds.isNotEmpty(),
-            sources.isNotEmpty(), query.isNotBlank(), minAmount != null || maxAmount != null, companyOnly, showExcluded, showCompany,
+            sources.isNotEmpty(), query.isNotBlank(), minAmount != null || maxAmount != null, companyOnly, showExcluded, showCompany, onlyHidden,
         ).count { it }
 
     fun clearedFilters() = TxnFilter(period = period, month = month, fromDay = fromDay, toDay = toDay)
 
     fun matches(t: Txn, egp: Double): Boolean {
-        if (!showExcluded && t.excluded) return false
+        if (onlyHidden) { if (!t.excluded || t.category == "استرداد مصاريف الشركة") return false }
+        else if (!showExcluded && t.excluded) return false
         if (companyOnly && !t.reimbursable) return false
         if (direction != null && t.direction != direction) return false
         if (purposes.isNotEmpty() && purposes.none { t.belongsTo(it) }) return false

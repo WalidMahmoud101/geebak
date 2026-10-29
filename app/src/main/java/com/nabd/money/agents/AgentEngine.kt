@@ -479,6 +479,28 @@ class AgentEngine(
         changed
     }
 
+    /**
+     * نقل عمليات (مخفية أو تحويلات داخلية) لمصاريف الشركة: بتتشال من الإخفاء وتظهر في خانة الشركة.
+     * بتتطبق على المصروف بس (الشركة مديونالك باللي خرج من جيبك). أثر الإخفاء على الرصيد بيرجع.
+     */
+    suspend fun moveToCompany(ids: List<Long>): Int = mutex.withLock {
+        var moved = 0
+        val hiddenSet = settings.userHidden.toMutableSet()
+        for (t in dao.txnsByIds(ids)) {
+            if (t.direction != Direction.OUT) continue
+            if (t.excluded && hiddenSet.remove(t.id)) adjustBalance(t, reverse = false)
+            dao.updateTxn(
+                t.copy(
+                    excluded = false, reimbursable = true, reimbursedAt = null, purpose = Purpose.WORK,
+                    category = if (t.category == TRANSFER_CATEGORY) "أخرى" else t.category,
+                )
+            )
+            moved++
+        }
+        settings.userHidden = hiddenSet
+        moved
+    }
+
     private suspend fun adjustBalance(t: Txn, reverse: Boolean) {
         val a = t.accountId?.let { dao.account(it) } ?: return
         if (!(t.source == TxnSource.MANUAL || !a.balanceKnown)) return

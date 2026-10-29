@@ -131,6 +131,10 @@ interface NabdDao {
     @Query("SELECT agentId, COUNT(*) AS cnt, MAX(timestamp) AS last FROM transactions GROUP BY agentId")
     fun agentStats(): Flow<List<AgentStat>>
 
+    /** العمليات المخفية والتحويلات الداخلية (من غير استرداد الشركة اللي بيتقفل لوحده) */
+    @Query("SELECT COUNT(*) FROM transactions WHERE excluded = 1 AND category != 'استرداد مصاريف الشركة'")
+    fun hiddenCount(): Flow<Int>
+
     // ---------- مصاريف الشركة ----------
     @Query("SELECT * FROM transactions WHERE reimbursable = 1 AND reimbursedAt IS NULL ORDER BY timestamp DESC")
     fun companyPending(): Flow<List<Txn>>
