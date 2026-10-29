@@ -41,6 +41,7 @@ import com.nabd.money.ui.theme.NabdColors
 import com.nabd.money.util.CompanyInvoice
 import com.nabd.money.util.InvoiceInfo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private enum class Scope(val ar: String) { CHOSEN("المحدد"), PENDING("المستحقة"), ALL("الكل") }
@@ -61,14 +62,19 @@ fun InvoiceSheet(
     var employee by remember { mutableStateOf(s.invoiceEmployee) }
     var busy by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
+    // رقم الفاتورة من قاعدة البيانات (NBD-يوم-001، 002…): بيتحفظ مع الفاتورة وبتدوّر بيه بعدين
+    var number by remember { mutableStateOf<String?>(null) }
+    var savedNumber by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { number = vm.nextInvoiceNumber() }
+    val uiScope = androidx.compose.runtime.rememberCoroutineScope()
 
     val txns = when (scope) {
         Scope.CHOSEN -> chosen
         Scope.PENDING -> pending
         Scope.ALL -> pending + done
     }
-    val info = remember(txns, company, employee, scope) {
-        InvoiceInfo(CompanyInvoice.number(), company.trim(), employee.trim(), System.currentTimeMillis(), scope.ar, CompanyInvoice.items(txns))
+    val info = remember(txns, company, employee, scope, number) {
+        InvoiceInfo(number ?: "…", company.trim(), employee.trim(), System.currentTimeMillis(), scope.ar, CompanyInvoice.items(txns))
     }
     var previews by remember { mutableStateOf<List<android.graphics.Bitmap>>(emptyList()) }
     LaunchedEffect(info) {
@@ -114,23 +120,39 @@ fun InvoiceSheet(
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(androidx.compose.ui.graphics.Color.White)
                     )
                 }
+                Text(
+                    "رقم الفاتورة: ${info.number}" + if (savedNumber == info.number) "  ✓ اتحفظت في «الفواتير المحفوظة»" else "  (بتتحفظ أول ما تطبع أو تبعت)",
+                    style = MaterialTheme.typography.labelMedium, color = if (savedNumber == info.number) NabdColors.Mint else NabdColors.TextDim
+                )
+                // أي إجراء بيحفظ الفاتورة الأول برقمها وبنودها، وبعدين ينفّذ
+                fun act(run: () -> Unit) {
+                    if (number == null) return
+                    saveNames()
+                    uiScope.launch {
+                        runCatching { vm.saveInvoice(info, txns.map { it.id }) }
+                            .onSuccess { savedNumber = info.number; run() }
+                            .onFailure { note = "ماقدرتش أحفظ الفاتورة: ${it.message}" }
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PillButton("طباعة", Icons.Rounded.Print, NabdColors.Mint, Modifier.weight(1f)) {
-                        saveNames(); busy = true
-                        runCatching { CompanyInvoice.print(ctx, CompanyInvoice.pdf(ctx, info), "فاتورة ${info.number}") }
-                            .onFailure { note = "الطباعة ماشتغلتش: ${it.message}" }
-                        busy = false
+                        act {
+                            runCatching { CompanyInvoice.print(ctx, CompanyInvoice.pdf(ctx, info), "فاتورة ${info.number}") }
+                                .onFailure { note = "الطباعة ماشتغلتش: ${it.message}" }
+                        }
                     }
                     PillButton("PDF", Icons.Rounded.PictureAsPdf, NabdColors.Danger, Modifier.weight(1f)) {
-                        saveNames()
-                        runCatching { CompanyInvoice.share(ctx, CompanyInvoice.pdf(ctx, info), CompanyInvoice.MIME_PDF, "فاتورة نبض ${info.number}") }
-                            .onFailure { note = "ماقدرتش أعمل الـ PDF: ${it.message}" }
+                        act {
+                            runCatching { CompanyInvoice.share(ctx, CompanyInvoice.pdf(ctx, info), CompanyInvoice.MIME_PDF, "فاتورة نبض ${info.number}") }
+                                .onFailure { note = "ماقدرتش أعمل الـ PDF: ${it.message}" }
+                        }
                     }
                 }
                 GradientButton("Excel للمحاسب (.xlsx)", Modifier.fillMaxWidth(), Icons.Rounded.TableChart) {
-                    saveNames()
-                    runCatching { CompanyInvoice.share(ctx, CompanyInvoice.xlsx(ctx, info), CompanyInvoice.MIME_XLSX, "مصاريف الشركة ${info.number}") }
-                        .onFailure { note = "ماقدرتش أعمل ملف الإكسيل: ${it.message}" }
+                    act {
+                        runCatching { CompanyInvoice.share(ctx, CompanyInvoice.xlsx(ctx, info), CompanyInvoice.MIME_XLSX, "مصاريف الشركة ${info.number}") }
+                            .onFailure { note = "ماقدرتش أعمل ملف الإكسيل: ${it.message}" }
+                    }
                 }
                 note?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = NabdColors.Danger) }
             }

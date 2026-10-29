@@ -69,6 +69,24 @@ data class Txn(
     @ColumnInfo(defaultValue = "0") val excluded: Boolean = false,
     /** الكمية (لمصاريف الشركة): amount = سعر الوحدة × الكمية */
     @ColumnInfo(defaultValue = "1") val quantity: Int = 1,
+    /** رقم (أو أرقام مفصولة بفاصلة) الفواتير اللي العملية دخلت فيها، علشان البحث برقم الفاتورة */
+    val invoiceNo: String? = null,
+)
+
+/** فاتورة مصاريف شركة محفوظة: نسخة كاملة من بنودها وقت الإصدار، وتتفتح وتتطبع من جديد في أي وقت */
+@Entity(tableName = "invoices", indices = [Index(value = ["number"], unique = true)])
+data class Invoice(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** NBD-20261029-001 */
+    val number: String,
+    val createdAt: Long,
+    val company: String,
+    val employee: String,
+    val scope: String,
+    val total: Double,
+    val itemCount: Int,
+    /** بنود الفاتورة JSON */
+    val itemsJson: String,
 )
 
 /** العملية دي تدخل في إجمالي الدخل والمصروف الشخصي؟ مصاريف الشركة ليها إجمالي لوحدها */

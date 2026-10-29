@@ -38,7 +38,8 @@ object Money {
 
     /** نفس التنسيق من غير أي تحويل (للمحوّل وشاشة العملات) */
     fun plain(sign: String, v: Double, currency: String, decimals: Boolean = true): String {
-        val f = if (decimals) df2 else df0
+        // القروش بتظهر دايماً (13,228.84)، مش الجنيه بس. الباراميتر decimals فضل للتوافق ومابقاش بيخفي القروش
+        val f = df2
         val neg = v < 0 && sign.isEmpty()
         val s = if (neg) "−" else sign
         val n = if (neg) -v else v

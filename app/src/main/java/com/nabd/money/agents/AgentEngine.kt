@@ -6,6 +6,7 @@ import com.nabd.money.data.AccountType
 import com.nabd.money.data.Direction
 import com.nabd.money.data.Fx
 import com.nabd.money.data.Insight
+import com.nabd.money.data.Invoice
 import com.nabd.money.data.NabdDao
 import com.nabd.money.data.NetWorth
 import com.nabd.money.data.Purpose
@@ -670,6 +671,48 @@ class AgentEngine(
         dao.custodyUsedOnce().filter { u ->
             u.note?.removePrefix("ids:")?.split(",")?.any { it in set } == true
         }.forEach { dao.deleteTxn(it) }
+    }
+
+    // ------------------------------------------------------------------ الفواتير المحفوظة
+
+    private fun addNo(existing: String?, no: String) =
+        (existing.orEmpty().split(',').map { it.trim() }.filter { it.isNotBlank() } + no).distinct().joinToString(",")
+
+    private fun removeNo(existing: String?, no: String) =
+        existing.orEmpty().split(',').map { it.trim() }.filter { it.isNotBlank() && it != no }.joinToString(",").ifBlank { null }
+
+    /** رقم الفاتورة الجاية: NBD-يوم-001 ثم 002… وماتتكررش */
+    suspend fun nextInvoiceNumber(at: Long = now()): String = mutex.withLock {
+        val d = Dates.toLocal(at)
+        val prefix = "NBD-%04d%02d%02d-".format(d.year, d.monthValue, d.dayOfMonth)
+        var n = dao.countInvoicesWithPrefix(prefix) + 1
+        while (dao.invoiceByNumber(prefix + "%03d".format(n)) != null) n++
+        prefix + "%03d".format(n)
+    }
+
+    /**
+     * يحفظ الفاتورة برقمها وبنودها (نسخة كاملة)، ويكتب رقمها على كل عملية دخلت فيها،
+     * علشان البحث برقم الفاتورة يطلّعها ويطلّع عملياتها. لو الرقم اتحفظ قبل كده بيتحدّث بدل ما يتكرر.
+     */
+    suspend fun saveInvoice(info: com.nabd.money.util.InvoiceInfo, txnIds: List<Long>): Invoice = mutex.withLock {
+        val old = dao.invoiceByNumber(info.number)
+        if (old != null) dao.txnsOfInvoice(info.number).filter { info.number in it.invoiceNo.orEmpty().split(',') }
+            .forEach { dao.updateTxn(it.copy(invoiceNo = removeNo(it.invoiceNo, info.number))) }
+        val total = info.items.sumOf { settings.toEgp(it.total, it.currency) }
+        val inv = Invoice(
+            id = old?.id ?: 0, number = info.number, createdAt = old?.createdAt ?: info.issuedAt, company = info.company,
+            employee = info.employee, scope = info.scope, total = total, itemCount = info.items.size,
+            itemsJson = com.nabd.money.util.CompanyInvoice.itemsToJson(info.items),
+        )
+        dao.putInvoice(inv)
+        dao.txnsByIds(txnIds).forEach { dao.updateTxn(it.copy(invoiceNo = addNo(it.invoiceNo, info.number))) }
+        dao.invoiceByNumber(info.number)!!
+    }
+
+    suspend fun deleteInvoice(inv: Invoice) = mutex.withLock {
+        dao.txnsOfInvoice(inv.number).filter { inv.number in it.invoiceNo.orEmpty().split(',') }
+            .forEach { dao.updateTxn(it.copy(invoiceNo = removeNo(it.invoiceNo, inv.number))) }
+        dao.deleteInvoice(inv)
     }
 
     /** مرة واحدة: عمليات الكاش القديمة تتنقل لحساب الكاش (من غير ما تغير رصيده) */

@@ -135,6 +135,34 @@ interface NabdDao {
     @Query("SELECT COUNT(*) FROM transactions WHERE excluded = 1 AND category NOT IN ('استرداد مصاريف الشركة', 'عهدة من الشركة', 'رد للشركة', 'خصم من العهدة')")
     fun hiddenCount(): Flow<Int>
 
+    // ---------- الفواتير المحفوظة ----------
+    @Query("SELECT * FROM invoices ORDER BY createdAt DESC")
+    fun invoices(): Flow<List<Invoice>>
+
+    @Query("SELECT * FROM invoices")
+    suspend fun invoicesOnce(): List<Invoice>
+
+    @Query("SELECT * FROM invoices WHERE number = :number LIMIT 1")
+    suspend fun invoiceByNumber(number: String): Invoice?
+
+    @Query("SELECT COUNT(*) FROM invoices WHERE number LIKE :prefix || '%'")
+    suspend fun countInvoicesWithPrefix(prefix: String): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putInvoice(i: Invoice): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putInvoices(list: List<Invoice>)
+
+    @Delete
+    suspend fun deleteInvoice(i: Invoice)
+
+    @Query("DELETE FROM invoices")
+    suspend fun clearInvoices()
+
+    @Query("SELECT * FROM transactions WHERE invoiceNo LIKE '%' || :number || '%'")
+    suspend fun txnsOfInvoice(number: String): List<Txn>
+
     // ---------- عهدة الشركة (فلوسها معاك) ----------
     @Query("SELECT * FROM transactions WHERE category IN ('عهدة من الشركة', 'رد للشركة', 'خصم من العهدة') ORDER BY timestamp DESC")
     fun custodyTxns(): Flow<List<Txn>>

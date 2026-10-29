@@ -87,6 +87,8 @@ fun CompanyScreen(vm: AppViewModel, onBack: () -> Unit, onAdd: () -> Unit, onEdi
     var selected by remember { mutableStateOf(setOf<Long>()) }
     var receiving by remember { mutableStateOf<List<Txn>?>(null) }
     var invoice by remember { mutableStateOf(false) }
+    var invoicesOpen by remember { mutableStateOf(false) }
+    val savedInvoices by vm.invoices.collectAsStateWithLifecycle()
     var useCustodyDialog by remember { mutableStateOf(false) }
     val custody by vm.custody.collectAsStateWithLifecycle()
 
@@ -155,6 +157,10 @@ fun CompanyScreen(vm: AppViewModel, onBack: () -> Unit, onAdd: () -> Unit, onEdi
                     if (pending.isNotEmpty() || done.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         PillButton("فاتورة وطباعة وExcel للمحاسب", Icons.Rounded.Print, NabdColors.Cyan, Modifier.fillMaxWidth()) { invoice = true }
+                        if (savedInvoices.isNotEmpty()) {
+                            Spacer(Modifier.height(8.dp))
+                            PillButton("الفواتير المحفوظة (${savedInvoices.size})", Icons.Rounded.Print, Color(0xFFB8D4FF), Modifier.fillMaxWidth()) { invoicesOpen = true }
+                        }
                     }
                     if (salary.enabled) {
                         Text(
@@ -231,6 +237,7 @@ fun CompanyScreen(vm: AppViewModel, onBack: () -> Unit, onAdd: () -> Unit, onEdi
             vm.useCustody(ids); useCustodyDialog = false
         }
     }
+    if (invoicesOpen) InvoicesSheet(vm) { invoicesOpen = false }
     if (invoice) {
         InvoiceSheet(vm, pending, done, chosen, salary.payer, onDismiss = { invoice = false })
     }

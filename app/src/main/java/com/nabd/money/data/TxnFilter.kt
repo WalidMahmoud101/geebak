@@ -175,7 +175,7 @@ data class TxnFilter(
         if (query.isNotBlank()) {
             val q = ArabicNumbers.norm(query.trim())
             val hay = ArabicNumbers.norm(
-                listOfNotNull(t.merchant, t.note, t.category, t.purpose.ar, t.rawText).joinToString(" ")
+                listOfNotNull(t.merchant, t.note, t.category, t.purpose.ar, t.rawText, t.invoiceNo).joinToString(" ")
             )
             if (q.split(' ').filter { it.isNotBlank() }.any { !hay.contains(it) }) return false
         }

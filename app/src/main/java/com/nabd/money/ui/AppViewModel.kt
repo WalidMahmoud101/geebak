@@ -445,6 +445,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (!received) engine.undoCustodyUse(ids)
     }
 
+    // ---------- الفواتير المحفوظة ----------
+    val invoices = dao.invoices().state(emptyList())
+    suspend fun nextInvoiceNumber() = withContext(Dispatchers.IO) { engine.nextInvoiceNumber() }
+    suspend fun saveInvoice(info: com.nabd.money.util.InvoiceInfo, txnIds: List<Long>) =
+        withContext(Dispatchers.IO) { txnWrites.withLock { engine.saveInvoice(info, txnIds) } }
+    fun deleteInvoice(inv: com.nabd.money.data.Invoice) = viewModelScope.launch(Dispatchers.IO) { txnWrites.withLock { engine.deleteInvoice(inv) } }
+
     // ---------- عهدة الشركة ----------
     /** فلوس الشركة اللي معاك دلوقتي: اللي دخلتلك كعهدة − اللي رديته − اللي خصمته من مصاريف */
     val custody = dao.custodyTxns().map { list -> com.nabd.money.agents.CompanyMatch.custody(list, ::txnEgp) }.state(0.0)

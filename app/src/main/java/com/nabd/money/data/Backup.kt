@@ -34,6 +34,7 @@ object Backup {
             put("transactions", JSONArray(dao.allTxnsOnce().map(::txnJson)))
             put("budgets", JSONArray(dao.budgetsOnce().map { JSONObject().put("category", it.category).put("limit", it.monthlyLimit) }))
             put("insights", JSONArray(dao.insightsOnce().map(::insightJson)))
+            put("invoices", JSONArray(dao.invoicesOnce().map(::invoiceJson)))
             put("settings", settings.exportPrefs())
         }.toString()
     }
@@ -63,13 +64,15 @@ object Backup {
         val txns = o.getJSONArray("transactions").objects().map(::txn)
         val budgets = o.optJSONArray("budgets")?.objects()?.map { Budget(it.getString("category"), it.getDouble("limit")) } ?: emptyList()
         val insights = o.optJSONArray("insights")?.objects()?.map(::insight) ?: emptyList()
+        val invoices = o.optJSONArray("invoices")?.objects()?.map(::invoice) ?: emptyList()
         val dao = db.dao()
         db.withTransaction {
-            dao.clearTxns(); dao.clearAccounts(); dao.clearBudgets(); dao.clearInsights()
+            dao.clearTxns(); dao.clearAccounts(); dao.clearBudgets(); dao.clearInsights(); dao.clearInvoices()
             dao.putAccounts(accounts)
             dao.putTxns(txns)
             dao.putBudgets(budgets)
             dao.putInsights(insights)
+            dao.putInvoices(invoices)
         }
         o.optJSONObject("settings")?.let(settings::importPrefs)
         return info(json)!!
@@ -102,7 +105,7 @@ object Backup {
         .put("timestamp", t.timestamp).put("source", t.source.name).put("agentId", t.agentId)
         .put("rawText", t.rawText ?: JSONObject.NULL).put("note", t.note ?: JSONObject.NULL)
         .put("fingerprint", t.fingerprint).put("reimbursable", t.reimbursable)
-        .put("reimbursedAt", t.reimbursedAt ?: JSONObject.NULL).put("excluded", t.excluded).put("quantity", t.quantity)
+        .put("reimbursedAt", t.reimbursedAt ?: JSONObject.NULL).put("excluded", t.excluded).put("quantity", t.quantity).put("invoiceNo", t.invoiceNo ?: JSONObject.NULL)
 
     private fun txn(o: JSONObject) = Txn(
         id = o.getLong("id"), accountId = o.optLongOrNull("accountId"), amount = o.getDouble("amount"),
@@ -112,7 +115,17 @@ object Backup {
         timestamp = o.getLong("timestamp"), source = TxnSource.valueOf(o.getString("source")),
         agentId = o.getString("agentId"), rawText = o.optStringOrNull("rawText"), note = o.optStringOrNull("note"),
         fingerprint = o.getString("fingerprint"), reimbursable = o.optBoolean("reimbursable"),
-        reimbursedAt = o.optLongOrNull("reimbursedAt"), excluded = o.optBoolean("excluded"), quantity = o.optInt("quantity", 1).coerceAtLeast(1),
+        reimbursedAt = o.optLongOrNull("reimbursedAt"), excluded = o.optBoolean("excluded"), quantity = o.optInt("quantity", 1).coerceAtLeast(1), invoiceNo = o.optStringOrNull("invoiceNo"),
+    )
+
+    private fun invoiceJson(i: Invoice) = JSONObject()
+        .put("id", i.id).put("number", i.number).put("createdAt", i.createdAt).put("company", i.company).put("employee", i.employee)
+        .put("scope", i.scope).put("total", i.total).put("itemCount", i.itemCount).put("itemsJson", i.itemsJson)
+
+    private fun invoice(o: JSONObject) = Invoice(
+        id = o.getLong("id"), number = o.getString("number"), createdAt = o.getLong("createdAt"), company = o.getString("company"),
+        employee = o.getString("employee"), scope = o.getString("scope"), total = o.getDouble("total"),
+        itemCount = o.getInt("itemCount"), itemsJson = o.getString("itemsJson"),
     )
 
     private fun insightJson(i: Insight) = JSONObject()

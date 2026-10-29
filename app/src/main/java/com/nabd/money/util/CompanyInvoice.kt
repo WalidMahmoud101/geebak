@@ -81,6 +81,28 @@ object CompanyInvoice {
         )
     }
 
+    /** بنود الفاتورة كـ JSON علشان تتحفظ وتتفتح من جديد */
+    fun itemsToJson(items: List<InvoiceItem>): String = org.json.JSONArray(items.map {
+        org.json.JSONObject().put("ts", it.ts).put("title", it.title).put("category", it.category).put("qty", it.qty)
+            .put("unit", it.unit).put("total", it.total).put("currency", it.currency).put("reimbursed", it.reimbursed)
+            .put("note", it.note ?: org.json.JSONObject.NULL)
+    }).toString()
+
+    fun itemsFromJson(json: String): List<InvoiceItem> = runCatching {
+        val a = org.json.JSONArray(json)
+        (0 until a.length()).map { a.getJSONObject(it) }.map { o ->
+            InvoiceItem(
+                ts = o.getLong("ts"), title = o.getString("title"), category = o.optString("category"), qty = o.optInt("qty", 1),
+                unit = o.getDouble("unit"), total = o.getDouble("total"), currency = o.optString("currency", "EGP"),
+                reimbursed = o.optBoolean("reimbursed"), note = if (o.isNull("note")) null else o.optString("note"),
+            )
+        }
+    }.getOrDefault(emptyList())
+
+    fun fromStored(inv: com.nabd.money.data.Invoice) = InvoiceInfo(
+        inv.number, inv.company, inv.employee, inv.createdAt, inv.scope, itemsFromJson(inv.itemsJson)
+    )
+
     fun number(now: LocalDateTime = LocalDateTime.now()) =
         "NBD-%04d%02d%02d-%02d%02d".format(now.year, now.monthValue, now.dayOfMonth, now.hour, now.minute)
 

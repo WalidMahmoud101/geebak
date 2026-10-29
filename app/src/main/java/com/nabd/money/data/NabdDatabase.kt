@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [Account::class, Txn::class, Budget::class, Insight::class],
-    version = 4,
+    entities = [Account::class, Txn::class, Budget::class, Insight::class, Invoice::class],
+    version = 5,
     exportSchema = false,
 )
 abstract class NabdDatabase : RoomDatabase() {
@@ -18,8 +18,21 @@ abstract class NabdDatabase : RoomDatabase() {
     companion object {
         fun build(context: Context): NabdDatabase =
             Room.databaseBuilder(context, NabdDatabase::class.java, "nabd.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
+
+        /** v4.1: الفواتير المحفوظة ورقم الفاتورة على العمليات */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE transactions ADD COLUMN invoiceNo TEXT")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `invoices` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `number` TEXT NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL, `company` TEXT NOT NULL, `employee` TEXT NOT NULL, `scope` TEXT NOT NULL, " +
+                        "`total` REAL NOT NULL, `itemCount` INTEGER NOT NULL, `itemsJson` TEXT NOT NULL)"
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_invoices_number` ON `invoices` (`number`)")
+            }
+        }
 
         /** v2.6: كمية مصاريف الشركة */
         val MIGRATION_3_4 = object : Migration(3, 4) {

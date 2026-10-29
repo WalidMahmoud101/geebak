@@ -272,6 +272,7 @@ fun TxnRow(
                 },
                 style = MaterialTheme.typography.titleSmall
             )
+            t.invoiceNo?.takeIf { it.isNotBlank() }?.let { Text("فاتورة $it", style = MaterialTheme.typography.labelSmall, color = NabdColors.Cyan, maxLines = 1) }
             when {
                 t.reimbursable -> Text("على الشركة", style = MaterialTheme.typography.labelSmall, color = NabdColors.Cyan)
                 t.excluded -> Text(when (t.category) { "تحويل بين حساباتي" -> "تحويل بين حساباتك"; "عهدة من الشركة" -> "فلوس شركة معاك (عهدة)"; "رد للشركة" -> "رديتها للشركة"; "استرداد مصاريف الشركة" -> "استرداد من الشركة"; else -> "مخفية" }, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint)
