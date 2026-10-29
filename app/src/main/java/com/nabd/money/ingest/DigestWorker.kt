@@ -19,6 +19,7 @@ class DigestWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         app.engine.dailyDigest()
         // سعر الصرف الحي
         runCatching { app.settings.syncRates() }
+        runCatching { app.settings.syncGold() }
         // نسخة احتياطية تلقائية مرة في اليوم لو اخترت فولدر
         com.nabd.money.util.BackupFiles.autoBackup(app)
         // التحديثات: إشعار مرة واحدة لكل نسخة جديدة

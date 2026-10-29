@@ -164,7 +164,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     init {
         viewModelScope.launch(Dispatchers.IO) { engine.runPeriodicInsights(notify = false) }
         checkForUpdate()
-        viewModelScope.launch { runCatching { settings.syncRates() } }
+        viewModelScope.launch { runCatching { settings.syncRates() }; runCatching { settings.syncGold() } }
     }
 
     fun toEgp(amount: Double, currency: String) = settings.toEgp(amount, currency)
@@ -550,6 +550,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun toggleAgent(id: String, enabled: Boolean) = settings.setEnabled(id, enabled)
     fun setUsdRate(v: Double) = settings.setUsdRate(v)
+
+    // ---------- الدهب ----------
+    val gold = settings.gold
+    val goldMessage = MutableStateFlow<String?>(null)
+
+    fun syncGoldNow() = viewModelScope.launch {
+        goldMessage.value = "بيحدّث السعر…"
+        val ok = runCatching { settings.syncGold(force = true) }.getOrDefault(false)
+        goldMessage.value = if (ok) "اتحدّث سعر الدهب" else "مقدرتش أوصل لسعر الدهب، اتأكد من النت"
+    }
+
+    fun setGoldPremium(pct: Double) = settings.setGoldPremium(pct)
 
     // ---------- العملات ----------
     val ratesAt = settings.ratesAt

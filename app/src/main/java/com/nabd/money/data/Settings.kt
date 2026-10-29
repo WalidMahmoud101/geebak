@@ -1,6 +1,7 @@
 package com.nabd.money.data
 
 import android.content.Context
+import com.nabd.money.util.Dates
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -26,6 +27,43 @@ class Settings(context: Context) {
     var displayCurrency: String
         get() = sp.getString("display_currency", "AUTO")!!
         set(v) { sp.edit().putString("display_currency", v).apply(); com.nabd.money.util.Money.mode = v }
+
+    // ---------- الدهب ----------
+    private val _gold = MutableStateFlow(readGold())
+    /** سعر أوقية الدهب بالدولار وآخر تحديث وتاريخ الأسعار (يوم ← سعر الأوقية) */
+    data class GoldState(val ounceUsd: Double, val updatedAt: Long, val premiumPct: Double, val history: List<Pair<Long, Double>>)
+    val gold: StateFlow<GoldState> = _gold
+
+    private fun readGold(): GoldState {
+        val h = runCatching {
+            val o = org.json.JSONObject(sp.getString("gold_history", null) ?: return@runCatching emptyList())
+            o.keys().asSequence().mapNotNull { k -> k.toLongOrNull()?.let { it to o.getDouble(k) } }.sortedBy { it.first }.toList()
+        }.getOrDefault(emptyList())
+        return GoldState(
+            sp.getFloat("gold_ounce_usd", 0f).toDouble(), sp.getLong("gold_updated_at", 0L),
+            sp.getFloat("gold_premium_pct", 0f).toDouble(), h
+        )
+    }
+
+    fun setGoldPremium(pct: Double) {
+        sp.edit().putFloat("gold_premium_pct", pct.toFloat()).apply()
+        _gold.value = _gold.value.copy(premiumPct = pct)
+    }
+
+    /** سعر الدهب من النت (بيتحدث على الأقل كل ساعة إلا لو force). بيرجع true لو نجح */
+    suspend fun syncGold(force: Boolean = false): Boolean {
+        if (!force && System.currentTimeMillis() - _gold.value.updatedAt < 3_600_000L) return false
+        val oz = com.nabd.money.util.Gold.fetchOunceUsd() ?: return false
+        val now = System.currentTimeMillis()
+        val day = Dates.dayKey(now)
+        val hist = (_gold.value.history.filter { it.first != day } + (day to oz)).sortedBy { it.first }.takeLast(60)
+        sp.edit()
+            .putFloat("gold_ounce_usd", oz.toFloat()).putLong("gold_updated_at", now)
+            .putString("gold_history", org.json.JSONObject(hist.associate { it.first.toString() to it.second }).toString())
+            .apply()
+        _gold.value = _gold.value.copy(ounceUsd = oz, updatedAt = now, history = hist)
+        return true
+    }
 
     /** مزامنة سعر الصرف لوحدها (الافتراضي شغال). لو قفلتها السعر اللي كتبته بإيدك بيفضل ثابت */
     var autoRates: Boolean
@@ -194,6 +232,7 @@ class Settings(context: Context) {
         com.nabd.money.util.Money.mode = displayCurrency
         loadFx()
         _ratesAt.value = ratesUpdatedAt
+        _gold.value = readGold()
         _theme.value = runCatching { com.nabd.money.ui.theme.ThemeMode.valueOf(sp.getString("theme", "SYSTEM")!!) }
             .getOrDefault(com.nabd.money.ui.theme.ThemeMode.SYSTEM)
         _saved.value = FilterCodec.decode(sp.getString("saved_filters", null))

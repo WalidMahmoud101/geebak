@@ -108,6 +108,10 @@ fun HomeScreen(
     val update by vm.update.collectAsStateWithLifecycle()
     vm.usdRate.collectAsStateWithLifecycle().value
     var salaryDialog by remember { mutableStateOf(false) }
+    var goldOpen by remember { mutableStateOf(false) }
+    val gold by vm.gold.collectAsStateWithLifecycle()
+    val usdRateNow by vm.usdRate.collectAsStateWithLifecycle()
+    if (goldOpen) GoldSheet(vm) { goldOpen = false }
     var breakdown by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     if (settingsOpen) SettingsDialog(vm) { settingsOpen = false }
@@ -153,6 +157,8 @@ fun HomeScreen(
         }
         // خانة المرتب: ميعاد القبض، متأخر كام يوم، وآخر مرتب. دوس عليها تظبط الشركة والمبلغ
         item { SalaryCard(salary) { salaryDialog = true } }
+        // سعر الدهب بالجنيه (بيتحدث لوحده)
+        item { GoldCard(gold, usdRateNow) { goldOpen = true } }
         if (!perms.allGranted) item { PermissionCard(perms) }
         if (unread.isNotEmpty()) {
             items(unread.take(2).size) { i -> InsightRow(unread[i]) { vm.dismissInsight(unread[i]) } }
