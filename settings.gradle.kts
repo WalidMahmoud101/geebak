@@ -10,6 +10,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Tesseract4Android (قراءة الفواتير) متاحة من هنا بس، ومحصورة على المكتبة دي
+        maven("https://jitpack.io") { content { includeGroup("cz.adaptech.tesseract4android") } }
     }
 }
 rootProject.name = "Nabd"

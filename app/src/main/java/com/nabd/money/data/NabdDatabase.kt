@@ -8,8 +8,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [Account::class, Txn::class, Budget::class, Insight::class, Invoice::class],
-    version = 5,
+    entities = [Account::class, Txn::class, Budget::class, Insight::class, Invoice::class, StockItem::class, StockPrice::class],
+    version = 6,
     exportSchema = false,
 )
 abstract class NabdDatabase : RoomDatabase() {
@@ -18,8 +18,27 @@ abstract class NabdDatabase : RoomDatabase() {
     companion object {
         fun build(context: Context): NabdDatabase =
             Room.databaseBuilder(context, NabdDatabase::class.java, "nabd.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
+
+        /** المخزون: حاجات البيت وأسعارها. جداول جديدة بس، فمفيش حاجة قديمة بتتلمس */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `stock_items` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, " +
+                        "`key` TEXT NOT NULL, `category` TEXT NOT NULL, `isOut` INTEGER NOT NULL, `outAt` INTEGER, " +
+                        "`aliases` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_stock_items_key` ON `stock_items` (`key`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_stock_items_category` ON `stock_items` (`category`)")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `stock_prices` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `itemId` INTEGER NOT NULL, " +
+                        "`price` REAL NOT NULL, `qty` REAL NOT NULL, `store` TEXT, `at` INTEGER NOT NULL, `fromReceipt` INTEGER NOT NULL)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_stock_prices_itemId` ON `stock_prices` (`itemId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_stock_prices_at` ON `stock_prices` (`at`)")
+            }
+        }
 
         /** v4.1: الفواتير المحفوظة ورقم الفاتورة على العمليات */
         val MIGRATION_4_5 = object : Migration(4, 5) {

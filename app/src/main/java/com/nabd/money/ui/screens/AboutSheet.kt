@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.BusinessCenter
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.CurrencyExchange
+import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.OpenInNew
@@ -100,6 +101,12 @@ val licenseItems = listOf(
     LicenseItem("AndroidX (Core، Activity، Lifecycle)", "أساسيات أندرويد", "Apache 2.0"),
     LicenseItem("Room", "قاعدة البيانات على الموبايل", "Apache 2.0"),
     LicenseItem("WorkManager", "المراجعة الدورية في الخلفية", "Apache 2.0"),
+    LicenseItem("Tesseract OCR", "قراءة الفواتير على الموبايل", "Apache 2.0"),
+    LicenseItem("Tesseract4Android", "تشغيل Tesseract على أندرويد", "Apache 2.0"),
+    LicenseItem("نماذج tessdata_fast", "قراءة العربي والإنجليزي (ara، eng)", "Apache 2.0"),
+    LicenseItem("Leptonica", "تجهيز صورة الفاتورة", "BSD-2-Clause"),
+    LicenseItem("libjpeg", "فتح صور JPEG", "IJG"),
+    LicenseItem("libpng", "فتح صور PNG", "libpng-2.0"),
     LicenseItem("IBM Plex Sans Arabic", "الخط • © 2019 IBM Corp.", "SIL OFL 1.1"),
     LicenseItem("Exchange Rate API", "سعر الدولار والعملات (Rates By Exchange Rate API)", "خدمة خارجية"),
     LicenseItem("gold-api.com", "سعر الأوقية العالمي للدهب", "خدمة خارجية"),
@@ -112,6 +119,7 @@ private val features = listOf(
     Feature(Icons.Rounded.Sms, Color(0xFF2F9E7E), "بيسجّل لوحده", "بيقرا رسايل البنك والمحافظ وإشعارات InstaPay وBinance وغيرهم، ويطلّع اتخصم كام والباقي كام. ويتجاهل الأكواد السرية والإعلانات."),
     Feature(Icons.Rounded.AccountBalanceWallet, Color(0xFF4C7BE0), "كل حساباتك", "إجمالي فلوسك وإجمالي كل بنك ومحفظة وكارت. وتضيف Binance وVisa وغيرهم بإيدك، والكاش (جيبك) حساب حقيقي."),
     Feature(Icons.Rounded.BusinessCenter, Color(0xFF2E9BC9), "مصاريف الشركة والعهدة", "اللي دفعته للشغل، وفلوس الشركة اللي معاك، والصافي بينكم. وفاتورة PDF باسم نبض وملف Excel للمحاسب."),
+    Feature(Icons.Rounded.Inventory2, Color(0xFFC98A1B), "المخزون وقايمة الشرا", "علّم اللي خلص من البيت فمايتنسيش، وصوّر الفاتورة تتقرا على موبايلك، ويقولك السعر الجديد غالي ولا رخيص عن آخر مرة."),
     Feature(Icons.Rounded.Mic, Color(0xFFE0663E), "سجّل بصوتك", "«ضيف في بينانس 100 دولار» أو «اتخصم 250 من الفيزا»: بيفهم المصري والأرقام بالكلام."),
     Feature(Icons.Rounded.CurrencyExchange, Color(0xFFD9A21B), "الدولار والدهب", "سعر الدولار بيتحدث لوحده، واضغط على إجمالي فلوسك يتحول للدولار. وسعر الدهب بالجنيه لكل العيارات أول بأول."),
     Feature(Icons.Rounded.PieChart, Color(0xFF8E63D6), "تقارير وتحليل", "فلتر قوي، صناديق للبيت والشغل والعربية، وتصنيفات وقواعد بتظبطها بنفسك، وتنبيهات لما الرصيد يقل أو الميزانية تخلص."),
@@ -198,6 +206,7 @@ fun AboutContent(
             Spacer(Modifier.height(10.dp))
             listOf(
                 "الرسايل والإشعارات بتتقرا على الموبايل ومابتتبعتش لأي مكان.",
+                "صورة الفاتورة بتتقرا على الموبايل ومابتتبعتش لأي مكان. لقطة الكاميرا بتتمسح بعدها، وصورة المعرض بتفضل في المعرض.",
                 "النت بيُستخدم لـ: تحديثات التطبيق من GitHub، وسعر الدولار، وسعر الدهب. من غير أي بيانات مالية.",
                 "النسخة الاحتياطية ملف بتحفظه في المكان اللي انت تختاره.",
                 "الكود مفتوح تقدر تراجعه بنفسك.",

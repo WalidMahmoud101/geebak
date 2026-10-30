@@ -42,6 +42,27 @@ import java.time.YearMonth
 
 private const val RESET_SNAPSHOT = "before-reset.json"
 
+/** مراجعة فاتورة قبل الحفظ: كل حاجة قابلة للتعديل، ومفيش حاجة بتتحفظ من غير ما تدوس احفظ */
+class ReceiptSession(val draft: com.nabd.money.agents.ReceiptDraft, items: List<com.nabd.money.data.StockItem>, val confidence: Int, val source: ReceiptSource) {
+    val store = androidx.compose.runtime.mutableStateOf(draft.store.orEmpty())
+    val date = androidx.compose.runtime.mutableStateOf(draft.date ?: java.time.LocalDate.now())
+    val lines = androidx.compose.runtime.mutableStateListOf<com.nabd.money.data.ReviewLine>().apply {
+        addAll(draft.lines.mapIndexed { i, l -> com.nabd.money.data.ReviewLine.from(i, l, items) })
+    }
+    private var nextUid = draft.lines.size
+
+    fun addLine() { lines += com.nabd.money.data.ReviewLine(nextUid++, "", "1", "", com.nabd.money.data.StockCatalog.OTHER) }
+    fun update(l: com.nabd.money.data.ReviewLine) { lines.indexOfFirst { it.uid == l.uid }.takeIf { it >= 0 }?.let { lines[it] = l } }
+    fun remove(l: com.nabd.money.data.ReviewLine) { lines.removeAll { it.uid == l.uid } }
+}
+
+/** الفاتورة جت منين. لقطة الكاميرا ملفنا فبنمسحها، لكن صورة المعرض بتاعة صاحبها ومابنلمسهاش */
+enum class ReceiptSource(val note: String) {
+    CAMERA("عدّل أي صنف أو سعر قبل الحفظ. الصورة اتقرت على موبايلك واتمسحت."),
+    GALLERY("عدّل أي صنف أو سعر قبل الحفظ. الصورة اتقرت على موبايلك، ولسه موجودة في معرض الصور."),
+    MANUAL("ضيف الأصناف والأسعار من الفاتورة، وبعدين احفظ."),
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val nabd = app as NabdApp
@@ -399,6 +420,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 ResetScope.EVERYTHING -> {
                     dao.clearTxns(); dao.clearInsights(); dao.clearAccounts(); dao.clearBudgets()
+                    dao.clearStockPrices(); dao.clearStockItems()
                     settings.resetUserSettings()
                     settings.ignoreBefore = now
                 }
@@ -451,6 +473,51 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun saveInvoice(info: com.nabd.money.util.InvoiceInfo, txnIds: List<Long>) =
         withContext(Dispatchers.IO) { txnWrites.withLock { engine.saveInvoice(info, txnIds) } }
     fun deleteInvoice(inv: com.nabd.money.data.Invoice) = viewModelScope.launch(Dispatchers.IO) { txnWrites.withLock { engine.deleteInvoice(inv) } }
+
+    // ---------- المخزون ----------
+    private val stock = com.nabd.money.data.StockStore(nabd.db)
+    val stockItems = dao.stockItems().state(emptyList())
+    val stockPrices = dao.stockPrices().map { list -> list.groupBy { it.itemId } }.state(emptyMap())
+
+    fun addStock(name: String, category: String, out: Boolean) = viewModelScope.launch(Dispatchers.IO) { stock.add(name, category, out) }
+    fun setStockOut(item: com.nabd.money.data.StockItem, out: Boolean) = viewModelScope.launch(Dispatchers.IO) { stock.setOut(item.id, out) }
+    suspend fun editStock(item: com.nabd.money.data.StockItem, name: String, category: String) = withContext(Dispatchers.IO) { stock.edit(item, name, category) }
+    fun deleteStock(item: com.nabd.money.data.StockItem) = viewModelScope.launch(Dispatchers.IO) { stock.delete(item.id) }
+    fun addStockPrice(item: com.nabd.money.data.StockItem, price: Double, store: String?) = viewModelScope.launch(Dispatchers.IO) { stock.addPrice(item.id, price, store) }
+    fun deleteStockPrice(p: com.nabd.money.data.StockPrice) = viewModelScope.launch(Dispatchers.IO) { dao.deleteStockPrice(p.id) }
+
+    /** الفاتورة اللي بتتقرا أو بتتراجع دلوقتي. موجودة هنا علشان تعديلاتك ماتضيعش لو الشاشة لفت */
+    val receipt = MutableStateFlow<ReceiptSession?>(null)
+    val receiptReading = MutableStateFlow(false)
+    val stockMessage = MutableStateFlow<String?>(null)
+
+    /** بنقرا الصورة على الموبايل، ونمسح لقطة الكاميرا أول ما نخلص */
+    fun readReceipt(uri: android.net.Uri, source: ReceiptSource) {
+        if (receiptReading.value) return
+        viewModelScope.launch {
+            receiptReading.value = true
+            val app = getApplication<Application>()
+            runCatching { com.nabd.money.util.ReceiptOcr.read(app, uri) }
+                .onSuccess { r ->
+                    val draft = withContext(Dispatchers.Default) { com.nabd.money.agents.ReceiptParser.parse(r.text) }
+                    receipt.value = ReceiptSession(draft, stockItems.value.ifEmpty { dao.stockItemsOnce() }, r.confidence, source)
+                }
+                .onFailure { stockMessage.value = "مقدرتش أقرا الفاتورة: ${it.message ?: "جرب تاني"}" }
+            com.nabd.money.util.ReceiptOcr.clearCaptures(app)
+            receiptReading.value = false
+        }
+    }
+
+    fun startEmptyReceipt() {
+        receipt.value = ReceiptSession(com.nabd.money.agents.ReceiptDraft(null, null, emptyList(), null), stockItems.value, 100, ReceiptSource.MANUAL)
+    }
+
+    fun saveReceipt(s: ReceiptSession) = viewModelScope.launch(Dispatchers.IO) {
+        val entries = s.lines.filter { it.valid }.map { it.entry() }
+        stock.saveReceipt(entries, s.store.value, Dates.toEpoch(s.date.value))
+        receipt.value = null
+        stockMessage.value = "اتحفظت أسعار ${entries.size} صنف"
+    }
 
     // ---------- عهدة الشركة ----------
     /** فلوس الشركة اللي معاك دلوقتي: اللي دخلتلك كعهدة − اللي رديته − اللي خصمته من مصاريف */

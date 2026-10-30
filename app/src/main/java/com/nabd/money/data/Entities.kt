@@ -123,3 +123,33 @@ data class Insight(
 )
 
 data class AgentStat(val agentId: String, val cnt: Int, val last: Long?)
+
+/** حاجة من حاجات البيت: موجودة ولا خلصت، وفي أنهي تصنيف */
+@Entity(tableName = "stock_items", indices = [Index(value = ["key"], unique = true), Index("category")])
+data class StockItem(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    /** الاسم بعد التوحيد (StockCatalog.key)، علشان "سكّر" و"سكر" يبقوا حاجة واحدة */
+    val key: String,
+    val category: String,
+    /** خلصت من البيت: بتظهر في قايمة الشرا */
+    val isOut: Boolean = false,
+    /** وقت ما اتعلّمت خلصانة */
+    val outAt: Long? = null,
+    /** أسماء تانية للحاجة دي على الفواتير (مفاتيح مفصولة بسطر) */
+    val aliases: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+/** سعر الوحدة من الحاجة دي في وقت معين، من فاتورة أو بإيدك */
+@Entity(tableName = "stock_prices", indices = [Index("itemId"), Index("at")])
+data class StockPrice(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val itemId: Long,
+    /** سعر الوحدة الواحدة، مش إجمالي السطر */
+    val price: Double,
+    val qty: Double = 1.0,
+    val store: String? = null,
+    val at: Long,
+    val fromReceipt: Boolean = false,
+)

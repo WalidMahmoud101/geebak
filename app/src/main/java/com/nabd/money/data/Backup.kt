@@ -16,7 +16,7 @@ data class BackupInfo(
 
 /**
  * النسخة الاحتياطية: ملف JSON واحد فيه كل حاجة
- * (الحسابات، العمليات، الميزانيات، التنبيهات، والإعدادات زي المرتب والقواعد والتصنيفات).
+ * (الحسابات، العمليات، الميزانيات، التنبيهات، المخزون، والإعدادات زي المرتب والقواعد والتصنيفات).
  * الرجوع بيحط النسخة مكان البيانات الحالية بالظبط، وبنفس الأرقام التعريفية علشان العمليات تفضل مربوطة بحساباتها.
  */
 object Backup {
@@ -35,6 +35,8 @@ object Backup {
             put("budgets", JSONArray(dao.budgetsOnce().map { JSONObject().put("category", it.category).put("limit", it.monthlyLimit) }))
             put("insights", JSONArray(dao.insightsOnce().map(::insightJson)))
             put("invoices", JSONArray(dao.invoicesOnce().map(::invoiceJson)))
+            put("stockItems", JSONArray(dao.stockItemsOnce().map(::stockItemJson)))
+            put("stockPrices", JSONArray(dao.stockPricesOnce().map(::stockPriceJson)))
             put("settings", settings.exportPrefs())
         }.toString()
     }
@@ -65,6 +67,9 @@ object Backup {
         val budgets = o.optJSONArray("budgets")?.objects()?.map { Budget(it.getString("category"), it.getDouble("limit")) } ?: emptyList()
         val insights = o.optJSONArray("insights")?.objects()?.map(::insight) ?: emptyList()
         val invoices = o.optJSONArray("invoices")?.objects()?.map(::invoice) ?: emptyList()
+        // نسخة أقدم من المخزون مافيهاش الخانة دي: مخزونك الحالي بيفضل زي ما هو
+        val stockItems = o.optJSONArray("stockItems")?.objects()?.map(::stockItem)
+        val stockPrices = o.optJSONArray("stockPrices")?.objects()?.map(::stockPrice)
         val dao = db.dao()
         db.withTransaction {
             dao.clearTxns(); dao.clearAccounts(); dao.clearBudgets(); dao.clearInsights(); dao.clearInvoices()
@@ -73,6 +78,11 @@ object Backup {
             dao.putBudgets(budgets)
             dao.putInsights(insights)
             dao.putInvoices(invoices)
+            if (stockItems != null) {
+                dao.clearStockPrices(); dao.clearStockItems()
+                dao.putStockItems(stockItems)
+                dao.putStockPrices(stockPrices.orEmpty())
+            }
         }
         o.optJSONObject("settings")?.let(settings::importPrefs)
         return info(json)!!
@@ -126,6 +136,24 @@ object Backup {
         id = o.getLong("id"), number = o.getString("number"), createdAt = o.getLong("createdAt"), company = o.getString("company"),
         employee = o.getString("employee"), scope = o.getString("scope"), total = o.getDouble("total"),
         itemCount = o.getInt("itemCount"), itemsJson = o.getString("itemsJson"),
+    )
+
+    private fun stockItemJson(i: StockItem) = JSONObject()
+        .put("id", i.id).put("name", i.name).put("key", i.key).put("category", i.category).put("isOut", i.isOut)
+        .put("outAt", i.outAt ?: JSONObject.NULL).put("aliases", i.aliases).put("createdAt", i.createdAt)
+
+    private fun stockItem(o: JSONObject) = StockItem(
+        id = o.getLong("id"), name = o.getString("name"), key = o.getString("key"), category = o.getString("category"),
+        isOut = o.optBoolean("isOut"), outAt = o.optLongOrNull("outAt"), aliases = o.optString("aliases"), createdAt = o.getLong("createdAt"),
+    )
+
+    private fun stockPriceJson(p: StockPrice) = JSONObject()
+        .put("id", p.id).put("itemId", p.itemId).put("price", p.price).put("qty", p.qty)
+        .put("store", p.store ?: JSONObject.NULL).put("at", p.at).put("fromReceipt", p.fromReceipt)
+
+    private fun stockPrice(o: JSONObject) = StockPrice(
+        id = o.getLong("id"), itemId = o.getLong("itemId"), price = o.getDouble("price"), qty = o.optDouble("qty", 1.0),
+        store = o.optStringOrNull("store"), at = o.getLong("at"), fromReceipt = o.optBoolean("fromReceipt"),
     )
 
     private fun insightJson(i: Insight) = JSONObject()

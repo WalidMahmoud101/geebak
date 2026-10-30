@@ -24,6 +24,7 @@ import androidx.compose.material.icons.rounded.BusinessCenter
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Paid
@@ -69,6 +70,7 @@ import com.nabd.money.data.countsInTotals
 import com.nabd.money.data.isIncome
 import com.nabd.money.ui.AppViewModel
 import com.nabd.money.ui.COMPANY_TAB
+import com.nabd.money.ui.STOCK_TAB
 import com.nabd.money.ui.Perms
 import com.nabd.money.ui.components.EmptyState
 import com.nabd.money.ui.components.GlassCard
@@ -106,6 +108,7 @@ fun HomeScreen(
     val salary by vm.salary.collectAsStateWithLifecycle()
     val companyPending by vm.companyPending.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
+    val stockItems by vm.stockItems.collectAsStateWithLifecycle()
     vm.usdRate.collectAsStateWithLifecycle().value
     var salaryDialog by remember { mutableStateOf(false) }
     var goldOpen by remember { mutableStateOf(false) }
@@ -158,6 +161,8 @@ fun HomeScreen(
                 onCompany = { onNavigate(COMPANY_TAB) },
             )
         }
+        // المخزون: حاجات البيت، واللي خلص منها
+        item { StockCard(stockItems.size, stockItems.count { it.isOut }) { onNavigate(STOCK_TAB) } }
         // خانة المرتب: ميعاد القبض، متأخر كام يوم، وآخر مرتب. دوس عليها تظبط الشركة والمبلغ
         item { SalaryCard(salary) { salaryDialog = true } }
         // سعر الدهب بالجنيه (بيتحدث لوحده)
@@ -318,6 +323,29 @@ private fun QuickActions(
         QuickAction("مصروف", Icons.Rounded.Remove, Modifier.weight(1f), onExpense)
         QuickAction("إضافة فلوس", Icons.Rounded.Add, Modifier.weight(1f), onIncome)
         QuickAction(if (companyCount > 0) "الشركة ($companyCount)" else "الشركة", Icons.Rounded.BusinessCenter, Modifier.weight(1f), onCompany)
+    }
+}
+
+@Composable
+private fun StockCard(total: Int, out: Int, onClick: () -> Unit) {
+    GlassCard(Modifier.fillMaxWidth(), padding = 10.dp, onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconBubble(Icons.Rounded.Inventory2, NabdColors.Gold, 34.dp)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("المخزون", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    when {
+                        out > 0 -> "$out خلصت من البيت • قايمة الشرا جاهزة"
+                        total > 0 -> "$total حاجة في البيت، ومفيش حاجة خلصت"
+                        else -> "حاجات البيت، قايمة الشرا، وأسعار فواتيرك"
+                    },
+                    style = MaterialTheme.typography.labelSmall, color = if (out > 0) NabdColors.Gold else NabdColors.TextDim,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(Icons.Rounded.ChevronLeft, null, tint = NabdColors.TextFaint, modifier = Modifier.size(18.dp))
+        }
     }
 }
 

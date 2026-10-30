@@ -183,6 +183,48 @@ interface NabdDao {
     @Query("UPDATE transactions SET reimbursedAt = :at WHERE id IN (:ids)")
     suspend fun setReimbursed(ids: List<Long>, at: Long?)
 
+    // ---------- المخزون ----------
+    @Query("SELECT * FROM stock_items ORDER BY isOut DESC, name")
+    fun stockItems(): Flow<List<StockItem>>
+
+    @Query("SELECT * FROM stock_items")
+    suspend fun stockItemsOnce(): List<StockItem>
+
+    @Query("SELECT * FROM stock_items WHERE id = :id")
+    suspend fun stockItem(id: Long): StockItem?
+
+    @Query("SELECT * FROM stock_prices ORDER BY at DESC, id DESC")
+    fun stockPrices(): Flow<List<StockPrice>>
+
+    @Query("SELECT * FROM stock_prices")
+    suspend fun stockPricesOnce(): List<StockPrice>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertStockItem(i: StockItem): Long
+
+    @Update
+    suspend fun updateStockItem(i: StockItem)
+
+    @Query("UPDATE stock_items SET isOut = :out, outAt = :at WHERE id IN (:ids)")
+    suspend fun setStockOut(ids: List<Long>, out: Boolean, at: Long?)
+
+    @Query("DELETE FROM stock_items WHERE id = :id")
+    suspend fun deleteStockItem(id: Long)
+
+    @Insert
+    suspend fun insertStockPrice(p: StockPrice): Long
+
+    @Query("DELETE FROM stock_prices WHERE id = :id")
+    suspend fun deleteStockPrice(id: Long)
+
+    @Query("DELETE FROM stock_prices WHERE itemId = :itemId")
+    suspend fun deletePricesOf(itemId: Long)
+
+    @Query("DELETE FROM stock_items") suspend fun clearStockItems()
+    @Query("DELETE FROM stock_prices") suspend fun clearStockPrices()
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putStockItems(list: List<StockItem>)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putStockPrices(list: List<StockPrice>)
+
     // ---------- الميزانيات ----------
     @Query("SELECT * FROM budgets")
     fun budgets(): Flow<List<Budget>>

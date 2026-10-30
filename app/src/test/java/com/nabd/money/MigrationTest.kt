@@ -47,7 +47,7 @@ class MigrationTest {
         }
 
         val room = Room.databaseBuilder(ctx, NabdDatabase::class.java, "migtest.db")
-            .addMigrations(NabdDatabase.MIGRATION_1_2, NabdDatabase.MIGRATION_2_3, NabdDatabase.MIGRATION_3_4, NabdDatabase.MIGRATION_4_5)
+            .addMigrations(NabdDatabase.MIGRATION_1_2, NabdDatabase.MIGRATION_2_3, NabdDatabase.MIGRATION_3_4, NabdDatabase.MIGRATION_4_5, NabdDatabase.MIGRATION_5_6)
             .allowMainThreadQueries()
             .build()
         val dao = room.dao()

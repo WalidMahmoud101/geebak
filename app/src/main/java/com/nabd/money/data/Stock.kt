@@ -1,0 +1,175 @@
+package com.nabd.money.data
+
+import androidx.room.withTransaction
+import com.nabd.money.agents.ArabicNumbers
+import com.nabd.money.agents.MoneyParser
+
+/** تصنيفات المخزون الجاهزة، والمفتاح اللي بيخلّي نفس الصنف يتعرف بأكتر من كتابة */
+object StockCatalog {
+    const val KITCHEN = "المطبخ"
+    const val BATH = "الحمام"
+    const val CLEANING = "النظافة والغسيل"
+    const val FOOD = "الأكل والشرب"
+    const val MEAT = "اللحوم والفراخ"
+    const val LUXURY = "الرفاهية"
+    const val OTHER = "حاجات تانية"
+
+    val builtIn = listOf(KITCHEN, FOOD, MEAT, CLEANING, BATH, LUXURY, OTHER)
+
+    /** أمثلة بتظهر وانت بتضيف، علشان أول مرة ماتبدأش من ورقة فاضية */
+    val suggestions: Map<String, List<String>> = mapOf(
+        KITCHEN to listOf("زيت", "سمنة", "ملح", "فلفل", "بهارات", "خل", "أكياس زبالة", "ورق فويل"),
+        FOOD to listOf("رز", "مكرونة", "سكر", "شاي", "قهوة", "لبن", "بيض", "جبنة", "عيش", "مياه"),
+        MEAT to listOf("لحمة مفرومة", "فراخ", "بانيه", "كفتة", "سجق", "برجر", "كبدة", "سمك"),
+        CLEANING to listOf("مسحوق غسيل", "منعم ملابس", "سائل أطباق", "كلور", "ديتول", "سلك مواعين"),
+        BATH to listOf("صابون", "شامبو", "معجون أسنان", "ورق تواليت", "مناديل", "شاور جل"),
+        LUXURY to listOf("شوكولاتة", "بسكويت", "مكسرات", "آيس كريم", "عصير", "شيبسي"),
+    )
+
+    private val hints: List<Pair<String, List<String>>> = listOf(
+        MEAT to listOf("لحم", "لحمه", "مفروم", "فراخ", "دجاج", "صدور", "وراك", "اوراك", "بانيه", "كفته", "سجق", "برجر", "كبده", "سمك", "جمبري", "شاورما", "هوت دوج", "لانشون", "بسطرمه", "chicken", "beef", "meat", "burger"),
+        CLEANING to listOf("مسحوق", "غسيل", "منعم", "كلور", "ديتول", "فلاش", "اطباق", "مواعين", "اريال", "برسيل", "تايد", "داوني", "فيري", "ariel", "persil", "tide", "downy", "fairy", "clorox", "dettol", "detergent", "softener"),
+        BATH to listOf("صابون", "شامبو", "معجون", "فرشه", "تواليت", "مناديل", "شاور", "بلسم", "مزيل عرق", "حفاضات", "فوط", "soap", "shampoo", "toothpaste", "tissue", "diaper"),
+        LUXURY to listOf("شوكولا", "شيكولا", "بسكويت", "مكسرات", "ايس كريم", "شيبسي", "حلويات", "جاتوه", "كيك", "نسكافيه", "chocolate", "biscuit", "chips", "nuts", "ice cream"),
+        KITCHEN to listOf("زيت", "سمن", "ملح", "فلفل", "بهارات", "خل", "فويل", "اكياس", "كمون", "oil", "salt", "spice", "foil"),
+        FOOD to listOf("رز", "ارز", "مكرونه", "سكر", "شاي", "قهوه", "لبن", "حليب", "بيض", "جبن", "عيش", "خبز", "مياه", "عصير", "زبادي", "فول", "عدس", "دقيق", "صلصه", "تونه", "خضار", "فاكهه", "rice", "pasta", "sugar", "tea", "coffee", "milk", "egg", "cheese", "bread", "water", "juice", "yogurt"),
+    )
+
+    /** الاسم في أبسط صورة: من غير تشكيل ولا همزات ولا علامات، وبأرقام إنجليزية */
+    fun key(name: String): String =
+        ArabicNumbers.norm(MoneyParser.normalize(name))
+            .replace(Regex("[\\u064B-\\u0652\\u0670]"), "")
+            .replace('ک', 'ك').replace('ی', 'ي').replace('ھ', 'ه')
+            .replace(Regex("(?<!\\d)\\.|\\.(?!\\d)"), " ")
+            .replace(Regex("[^\\p{L}\\p{N}.]+"), " ")
+            .trim()
+
+    fun guessCategory(name: String): String {
+        val k = key(name)
+        return hints.firstOrNull { (_, words) -> words.any { k.contains(it) } }?.first ?: OTHER
+    }
+
+    fun aliasesOf(i: StockItem) = i.aliases.split('\n').filter { it.isNotBlank() }
+
+    /**
+     * أقرب صنف عندك لاسم مكتوب على فاتورة. لازم نفس الأرقام:
+     * "زيت 1 لتر" و"زيت 2 لتر" مش نفس الصنف، والمقارنة بينهم تطلّع غالي ورخيص غلط.
+     */
+    fun match(name: String, items: List<StockItem>): StockItem? {
+        val k = key(name)
+        if (k.isEmpty()) return null
+        items.firstOrNull { it.key == k || k in aliasesOf(it) }?.let { return it }
+        val tokens = k.split(' ').toSet()
+        val numbers = tokens.filterTo(mutableSetOf()) { t -> t.any(Char::isDigit) }
+        return items
+            .mapNotNull { item ->
+                val other = item.key.split(' ').toSet()
+                if (other.filterTo(mutableSetOf()) { t -> t.any(Char::isDigit) } != numbers) return@mapNotNull null
+                val common = tokens.intersect(other).count { it.length >= 2 }
+                val score = common.toDouble() / maxOf(tokens.size, other.size)
+                (item to score).takeIf { common >= 1 && score >= 0.6 }
+            }
+            .maxByOrNull { it.second }?.first
+            // "زيت" اللي في قايمة الشرا هو "زيت كريستال 1 لتر" اللي على الفاتورة. بس "فراخ" مش "صدور فراخ"
+            ?: items.filter { i -> i.key.none(Char::isDigit) && (k == i.key || k.startsWith(i.key + " ")) }.maxByOrNull { it.key.length }
+    }
+}
+
+/** سطر جاهز للحفظ من شاشة مراجعة الفاتورة */
+data class ReceiptEntry(val name: String, val qty: Double, val price: Double, val category: String, val itemId: Long? = null)
+
+/** الكتابة على المخزون: كلها هنا علشان تتجرب من غير واجهة */
+class StockStore(private val db: NabdDatabase) {
+    private val dao = db.dao()
+
+    /** بيرجع الصنف الجديد، أو الموجود لو نفس الاسم متسجل */
+    suspend fun add(name: String, category: String, out: Boolean = false): StockItem? = db.withTransaction {
+        val clean = name.trim()
+        val key = StockCatalog.key(clean)
+        if (key.isEmpty()) return@withTransaction null
+        val existing = dao.stockItemsOnce().firstOrNull { it.key == key }
+        if (existing != null) {
+            if (out && !existing.isOut) setOut(existing.id, true)
+            return@withTransaction dao.stockItem(existing.id)
+        }
+        val now = System.currentTimeMillis()
+        val i = StockItem(name = clean, key = key, category = category, isOut = out, outAt = now.takeIf { out }, createdAt = now)
+        i.copy(id = dao.insertStockItem(i))
+    }
+
+    suspend fun setOut(id: Long, out: Boolean) =
+        dao.setStockOut(listOf(id), out, System.currentTimeMillis().takeIf { out })
+
+    /** false لو الاسم الجديد بتاع صنف تاني */
+    suspend fun edit(item: StockItem, name: String, category: String): Boolean = db.withTransaction {
+        val clean = name.trim()
+        val key = StockCatalog.key(clean)
+        if (key.isEmpty() || dao.stockItemsOnce().any { it.id != item.id && it.key == key }) return@withTransaction false
+        dao.updateStockItem(item.copy(name = clean, key = key, category = category))
+        true
+    }
+
+    suspend fun delete(id: Long) = db.withTransaction {
+        dao.deletePricesOf(id)
+        dao.deleteStockItem(id)
+    }
+
+    /** سعر جديد بإيدك. لو جبت الحاجة، بترجع موجودة في البيت */
+    suspend fun addPrice(id: Long, price: Double, store: String? = null, at: Long = System.currentTimeMillis()) = db.withTransaction {
+        dao.insertStockPrice(StockPrice(itemId = id, price = price, store = store?.trim()?.takeIf { it.isNotEmpty() }, at = at))
+        setOut(id, false)
+    }
+
+    /**
+     * حفظ الفاتورة بعد المراجعة: كل سطر بيتربط بصنف موجود أو يعمل صنف جديد، وسعره يتسجل،
+     * واللي اشتريته يرجع موجود في البيت. لو الاسم على الفاتورة غير اسم الصنف، بيتحفظ علشان المرة الجاية.
+     */
+    suspend fun saveReceipt(entries: List<ReceiptEntry>, store: String?, at: Long) = db.withTransaction {
+        val cleanStore = store?.trim()?.takeIf { it.isNotEmpty() }
+        val items = dao.stockItemsOnce().toMutableList()
+        entries.forEach { e ->
+            val item = items.firstOrNull { it.id == e.itemId } ?: StockCatalog.match(e.name, items)
+                ?: add(e.name, e.category)?.also { items += it }
+                ?: return@forEach
+            val key = StockCatalog.key(e.name)
+            if (key.isNotEmpty() && key != item.key && key !in StockCatalog.aliasesOf(item)) {
+                val updated = item.copy(aliases = (StockCatalog.aliasesOf(item) + key).joinToString("\n"))
+                dao.updateStockItem(updated)
+                items[items.indexOfFirst { it.id == item.id }] = updated
+            }
+            dao.insertStockPrice(StockPrice(itemId = item.id, price = e.price, qty = e.qty, store = cleanStore, at = at, fromReceipt = true))
+            setOut(item.id, false)
+        }
+    }
+}
+
+/** سطر قابل للتعديل في شاشة المراجعة. الأرقام نص علشان تتكتب براحتها */
+data class ReviewLine(
+    val uid: Int,
+    val name: String,
+    val qty: String,
+    val price: String,
+    val category: String,
+    /** الصنف اللي عندك اللي السطر ده اترِبط بيه. null = صنف جديد */
+    val itemId: Long? = null,
+    val doubtful: Boolean = false,
+) {
+    val qtyValue get() = com.nabd.money.util.Money.parseInput(qty)?.takeIf { it > 0 }
+    val priceValue get() = com.nabd.money.util.Money.parseInput(price)?.takeIf { it > 0 }
+    val valid get() = name.isNotBlank() && qtyValue != null && priceValue != null
+    val total get() = (qtyValue ?: 0.0) * (priceValue ?: 0.0)
+
+    fun entry() = ReceiptEntry(name.trim(), qtyValue ?: 1.0, priceValue ?: 0.0, category, itemId)
+
+    companion object {
+        private fun text(v: Double) = if (v == Math.rint(v)) v.toLong().toString() else "%.2f".format(java.util.Locale.US, v).trimEnd('0').trimEnd('.')
+
+        fun from(uid: Int, line: com.nabd.money.agents.ReceiptLine, items: List<StockItem>): ReviewLine {
+            val match = StockCatalog.match(line.name, items)
+            return ReviewLine(
+                uid, line.name, text(line.qty), line.unitPrice?.let(::text).orEmpty(),
+                match?.category ?: StockCatalog.guessCategory(line.name), match?.id, line.doubtful,
+            )
+        }
+    }
+}

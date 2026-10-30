@@ -11,6 +11,14 @@
 | [Room](https://developer.android.com/jetpack/androidx/releases/room) | قاعدة البيانات على الموبايل | Apache 2.0 |
 | [WorkManager](https://developer.android.com/jetpack/androidx/releases/work) | المراجعة الدورية في الخلفية | Apache 2.0 |
 | [KSP](https://github.com/google/ksp) | توليد كود Room وقت البناء | Apache 2.0 |
+| [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) 5.5.1 | قراءة الفواتير على الموبايل | Apache 2.0 |
+| [Tesseract4Android](https://github.com/adaptech-cz/Tesseract4Android) 4.9.0 | تشغيل Tesseract على أندرويد | Apache 2.0 |
+| [Leptonica](http://leptonica.org) 1.85.0 | تجهيز صورة الفاتورة (جوه Tesseract4Android) | BSD-2-Clause |
+| [libjpeg](https://ijg.org) v9f | فتح صور JPEG (جوه Tesseract4Android) | IJG |
+| [libpng](http://www.libpng.org/pub/png/libpng.html) 1.6.48 | فتح صور PNG (جوه Tesseract4Android) | libpng-2.0 |
+
+## نماذج القراءة
+- **tessdata_fast** (`ara` و`eng`) من [tesseract-ocr/tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast) تحت Apache 2.0، متضمّنة في `app/src/main/assets/tessdata` وبتشتغل على الموبايل من غير نت.
 
 ## الخط
 - **IBM Plex Sans Arabic** © 2019 IBM Corp. تحت [SIL Open Font License 1.1](LICENSES/OFL-IBM-Plex-Sans-Arabic.txt). الخط متضمّن في التطبيق وفي صفحة الموقع.

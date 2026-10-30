@@ -87,7 +87,7 @@ fun ResetSheet(vm: AppViewModel, onDismiss: () -> Unit) {
             ResetOption(
                 Icons.Rounded.RestartAlt, NabdColors.Danger,
                 "ابدأ من الصفر خالص",
-                "كأنك لسه منزّل التطبيق: العمليات والحسابات والميزانيات والإعدادات",
+                "كأنك لسه منزّل التطبيق: العمليات والحسابات والميزانيات والمخزون والإعدادات",
                 enabled = true,
             ) { confirm = ResetScope.EVERYTHING }
             Text(

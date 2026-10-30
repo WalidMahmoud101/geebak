@@ -13,8 +13,10 @@ android {
         applicationId = "com.nabd.money"
         minSdk = 26
         targetSdk = 35
-        versionCode = 32
-        versionName = "4.1"
+        versionCode = 33
+        versionName = "4.2"
+        // مكتبة قراءة الفواتير native: موبايلات ARM بس، علشان حجم التطبيق
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
 
     buildTypes {
@@ -60,6 +62,8 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
+    // قراءة الفواتير على الموبايل (Tesseract). ML Kit مابيدعمش العربي أصلاً
+    implementation("cz.adaptech.tesseract4android:tesseract4android-openmp:4.9.0")
 
     testImplementation("junit:junit:4.13.2")
     // لقطات شاشة حقيقية للتصميم على الكمبيوتر (Robolectric)

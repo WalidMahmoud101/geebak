@@ -82,6 +82,7 @@ import com.nabd.money.ui.screens.EditTxnSheet
 import com.nabd.money.ui.screens.HomeScreen
 import com.nabd.money.ui.screens.LedgerScreen
 import com.nabd.money.ui.screens.ReportsScreen
+import com.nabd.money.ui.screens.StockScreen
 import com.nabd.money.ui.screens.VoiceSheet
 import com.nabd.money.ui.theme.BrandGradient
 import com.nabd.money.util.Money
@@ -165,6 +166,7 @@ private fun rememberPerms(onSmsGranted: () -> Unit): Perms {
 }
 
 const val COMPANY_TAB = 5
+const val STOCK_TAB = 6
 
 data class AddRequest(val direction: Direction, val purpose: Purpose?, val company: Boolean = false)
 
@@ -220,7 +222,7 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
 
     Scaffold(
         containerColor = NabdColors.Bg,
-        bottomBar = { BottomBar(if (tab == COMPANY_TAB || tab == 3) 0 else tab, onMic = startVoice) { tab = it } },
+        bottomBar = { BottomBar(if (tab == COMPANY_TAB || tab == STOCK_TAB || tab == 3) 0 else tab, onMic = startVoice) { tab = it } },
     ) { pad ->
         Box(Modifier.fillMaxSize().padding(top = pad.calculateTopPadding())) {
             when (tab) {
@@ -231,6 +233,7 @@ fun NabdRoot(vm: AppViewModel = viewModel()) {
                     onAdd = { addRequest = AddRequest(Direction.OUT, Purpose.WORK, company = true) },
                     onEdit = onEdit,
                 )
+                STOCK_TAB -> StockScreen(vm, onBack = { tab = 0 })
                 1 -> LedgerScreen(vm, onAdd = onAdd, onEdit = onEdit, onCompany = { tab = COMPANY_TAB })
                 2 -> AccountsScreen(vm, onEdit = onEdit)
                 3 -> AgentsScreen(vm, perms)
