@@ -14,6 +14,7 @@
 
 ## الخط
 - **IBM Plex Sans Arabic** © 2019 IBM Corp. تحت [SIL Open Font License 1.1](LICENSES/OFL-IBM-Plex-Sans-Arabic.txt). الخط متضمّن في التطبيق وفي صفحة الموقع.
+- **Amiri** © 2010-2022 The Amiri Project Authors تحت [SIL Open Font License 1.1](docs/fonts/OFL-Amiri.txt). نسخة مصغّرة من الوزن العريض، لعناوين صفحة الموقع بس.
 
 ## للاختبارات فقط (مش جوه التطبيق)
 | المكتبة | الترخيص |
