@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="nabd_bg">#F3F5FA</color>
-    <color name="nabd_icon_bg">#0A1224</color>
+    <color name="nabd_icon_bg">#0B5F49</color>
 
     <style name="Theme.Nabd" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/nabd_bg</item>

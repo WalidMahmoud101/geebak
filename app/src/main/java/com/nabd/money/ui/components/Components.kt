@@ -349,27 +349,22 @@ fun BarChart(values: List<Float>, modifier: Modifier = Modifier, highlight: Int?
     }
 }
 
+/** شعار جيبك: حرف الجيم، ونقطته عملة في الجيب. نفس رسمة أيقونة التطبيق */
 @Composable
-fun PulseLine(modifier: Modifier = Modifier, color: Color = NabdColors.Mint) {
+fun GeebakMark(modifier: Modifier = Modifier, color: Color = Color(0xFFFFF6E6), coin: Color = Color(0xFFF4B740)) {
     Canvas(modifier) {
-        val w = size.width
-        val h = size.height
-        val mid = h / 2
+        val unit = size.minDimension / 66f
+        fun x(v: Float) = (v - 22f) * unit
+        fun y(v: Float) = (v - 25f) * unit
         val p = Path().apply {
-            moveTo(0f, mid)
-            lineTo(w * 0.30f, mid)
-            lineTo(w * 0.36f, mid - h * 0.25f)
-            lineTo(w * 0.43f, mid + h * 0.40f)
-            lineTo(w * 0.50f, mid - h * 0.45f)
-            lineTo(w * 0.56f, mid + h * 0.15f)
-            lineTo(w * 0.60f, mid)
-            lineTo(w, mid)
+            moveTo(x(38f), y(34f))
+            lineTo(x(68f), y(34f))
+            quadraticBezierTo(x(78f), y(34f), x(72f), y(42f))
+            cubicTo(x(60f), y(50f), x(30f), y(58f), x(34f), y(74f))
+            cubicTo(x(37f), y(86f), x(60f), y(88f), x(76f), y(76f))
         }
-        drawPath(
-            p,
-            brush = Brush.horizontalGradient(listOf(color.copy(alpha = 0f), color, color.copy(alpha = 0f))),
-            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-        )
+        drawPath(p, color, style = Stroke(width = 9f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawCircle(coin, radius = 8.5f * unit, center = Offset(x(55f), y(62f)))
     }
 }
 

@@ -1,14 +1,8 @@
 package com.nabd.money.ui.screens
 
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -58,13 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -76,6 +64,7 @@ import com.nabd.money.BuildConfig
 import com.nabd.money.agents.AgentRegistry
 import com.nabd.money.data.TxnSource
 import com.nabd.money.ui.AppViewModel
+import com.nabd.money.ui.components.GeebakMark
 import com.nabd.money.ui.components.GlassCard
 import com.nabd.money.ui.components.IconBubble
 import com.nabd.money.ui.components.PillButton
@@ -297,40 +286,17 @@ fun AboutContent(
     }
 }
 
-/** الكارت الكبير: دايرة بتنبض + الاسم والإصدار */
+/** الكارت الكبير: الشعار + الاسم والإصدار */
 @Composable
 private fun Hero(versionName: String, versionCode: Int) {
-    val t = rememberInfiniteTransition(label = "pulse")
-    val ring by t.animateFloat(0f, 1f, infiniteRepeatable(tween(2200, easing = LinearEasing), RepeatMode.Restart), label = "ring")
-    val beat by t.animateFloat(1f, 1.08f, infiniteRepeatable(tween(700, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "beat")
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(HeroGradient).padding(vertical = 26.dp, horizontal = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(Modifier.size(132.dp), contentAlignment = Alignment.Center) {
-            Canvas(Modifier.size(132.dp)) {
-                val c = Offset(size.width / 2, size.height / 2)
-                // حلقتين بيتوسعوا ويختفوا
-                for (k in 0..1) {
-                    val p = (ring + k * 0.5f) % 1f
-                    drawCircle(Color.White.copy(alpha = (1f - p) * 0.28f), radius = size.minDimension * (0.34f + p * 0.16f), center = c, style = Stroke(width = 2.dp.toPx()))
-                }
-            }
-            Box(
-                Modifier.size(84.dp).scale(beat).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Canvas(Modifier.size(56.dp)) {
-                    val w = size.width; val h = size.height; val mid = h / 2
-                    val p = Path().apply {
-                        moveTo(0f, mid); lineTo(w * 0.22f, mid); lineTo(w * 0.34f, mid - h * 0.34f)
-                        lineTo(w * 0.50f, mid + h * 0.40f); lineTo(w * 0.64f, mid - h * 0.18f); lineTo(w * 0.72f, mid); lineTo(w, mid)
-                    }
-                    drawPath(p, Color.White, style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-                }
-            }
+        Box(Modifier.size(112.dp).clip(RoundedCornerShape(30.dp)).background(Color.White.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+            GeebakMark(Modifier.size(78.dp))
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(10.dp))
         Text("جيبك", fontSize = 38.sp, fontWeight = FontWeight.Bold, color = Color.White)
         Text("Geebak", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.7f))
         Spacer(Modifier.height(6.dp))

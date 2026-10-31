@@ -20,7 +20,7 @@ object CsvExport {
         val names = accounts.associate { it.id to it.name }
         val dir = File(ctx.cacheDir, "exports").apply { mkdirs() }
         val safe = label.replace(Regex("[^\\p{L}\\p{N}]+"), "-").trim('-').take(40)
-        val file = File(dir, "nabd-$safe.csv")
+        val file = File(dir, "geebak-$safe.csv")
         val header = listOf(
             "التاريخ", "الوقت", "النوع", "المبلغ", "العملة", "بالجنيه", "الوصف", "التصنيف", "الغرض",
             "الحساب", "المصدر", "الوكيل", "على حساب الشركة", "اتسلمت من الشركة", "في الإجمالي", "ملاحظة",

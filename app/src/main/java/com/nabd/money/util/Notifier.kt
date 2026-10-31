@@ -74,7 +74,7 @@ object Notifier {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val n = NotificationCompat.Builder(ctx, channel)
-            .setSmallIcon(R.drawable.ic_stat_pulse)
+            .setSmallIcon(R.drawable.ic_stat_geebak)
             .setColor(0xFF2EF2B5.toInt())
             .setContentTitle(title)
             .setContentText(body.lineSequence().first())

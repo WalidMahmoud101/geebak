@@ -194,7 +194,7 @@ object CompanyInvoice {
             drawPage(page.canvas, f, info, p, idx + 1, pages.size)
             doc.finishPage(page)
         }
-        val file = File(exportsDir(ctx), "nabd-invoice-${info.number}.pdf")
+        val file = File(exportsDir(ctx), "geebak-invoice-${info.number}.pdf")
         FileOutputStream(file).use { doc.writeTo(it) }
         doc.close()
         return file
@@ -222,19 +222,24 @@ object CompanyInvoice {
             // الهيدر: شريط أخضر بالشعار واسم التطبيق
             val band = RectF(LEFT, 34f, RIGHT, 124f)
             c.drawRoundRect(band, 16f, 16f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = GREEN })
-            // الشعار: دايرة ونبضة
+            // الشعار: حرف الجيم ونقطته عملة، في دايرة
             val cx = RIGHT - 34f
             val cy = 79f
             c.drawCircle(cx, cy, 22f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; alpha = 40 })
-            c.drawCircle(cx, cy, 22f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 2f })
-            val pulse = Path().apply {
-                moveTo(cx - 14, cy + 2); lineTo(cx - 7, cy + 2); lineTo(cx - 3, cy - 9); lineTo(cx + 2, cy + 11)
-                lineTo(cx + 6, cy - 3); lineTo(cx + 14, cy - 3)
+            val unit = 0.46f
+            fun lx(v: Float) = cx + (v - 55f) * unit
+            fun ly(v: Float) = cy + (v - 58f) * unit
+            val mark = Path().apply {
+                moveTo(lx(38f), ly(34f)); lineTo(lx(68f), ly(34f))
+                quadTo(lx(78f), ly(34f), lx(72f), ly(42f))
+                cubicTo(lx(60f), ly(50f), lx(30f), ly(58f), lx(34f), ly(74f))
+                cubicTo(lx(37f), ly(86f), lx(60f), ly(88f), lx(76f), ly(76f))
             }
-            c.drawPath(pulse, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 2.6f
+            c.drawPath(mark, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 4f
                 strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
             })
+            c.drawCircle(lx(55f), ly(62f), 3.9f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F4B740") })
             cell(c, "جيبك", tp(f.bold, 28f, Color.WHITE), RIGHT - 70f - 160f, 54f, 160f, RIGHT_ALIGN)
             cell(c, "إدارة فلوسك بذكاء", tp(f.regular, 10f, Color.parseColor("#CFEBDD")), RIGHT - 70f - 160f, 92f, 160f, RIGHT_ALIGN)
             // يسار الهيدر: نوع المستند ورقمه
@@ -430,7 +435,7 @@ object CompanyInvoice {
 </cellXfs>
 </styleSheet>"""
 
-        val file = File(exportsDir(ctx), "nabd-invoice-${info.number}.xlsx")
+        val file = File(exportsDir(ctx), "geebak-invoice-${info.number}.xlsx")
         ZipOutputStream(FileOutputStream(file)).use { z ->
             fun put(name: String, text: String) { z.putNextEntry(ZipEntry(name)); z.write(text.toByteArray(Charsets.UTF_8)); z.closeEntry() }
             put("[Content_Types].xml", """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>

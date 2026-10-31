@@ -11,7 +11,7 @@
 <meta property="og:description" content="يقرا رسايل البنك والمحافظ ويسجل لوحده. بياناتك على موبايلك، والكود مفتوح.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://walidmahmoud101.github.io/nabd/screenshots/1_home_light.png">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230F6B4F'/%3E%3Cpath d='M8 34h12l6-16 10 28 7-16h13' fill='none' stroke='white' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 108 108'%3E%3Crect width='108' height='108' rx='26' fill='%230B5F49'/%3E%3Cpath d='M38 34H68Q78 34 72 42C60 50 30 58 34 74C37 86 60 88 76 76' fill='none' stroke='%23FFF6E6' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='55' cy='62' r='8.5' fill='%23F4B740'/%3E%3C/svg%3E">
 <link rel="preload" href="fonts/amiri_bold_subset.woff2" as="font" type="font/woff2" crossorigin>
 <style>
 @font-face{font-family:"Amiri";src:url(fonts/amiri_bold_subset.woff2) format("woff2");font-weight:700;font-display:swap}
@@ -69,7 +69,7 @@ header{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1p
 }
 .nav .btn{padding:7px 18px;font-size:15px}
 
-/* الهيرو: خط النبض بينقش الورقة ويخلص جوا الموبايل */
+/* الهيرو: نقش بنكنوت رفيع بيعدي على الورقة ويخلص جوا الموبايل */
 .hero{--h1:clamp(68px,10.4vw,142px);position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
 .hero .wrap{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 430px;grid-template-rows:auto auto;column-gap:56px}
 .hero h1{grid-column:1;grid-row:1;padding-top:56px;font-size:var(--h1);line-height:1.22}
@@ -126,10 +126,10 @@ header{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1p
 .banks h3{color:var(--dim);font-weight:400;font-size:19px}
 .banks ul{display:flex;flex-wrap:wrap;gap:4px 30px;margin-top:6px;font-size:clamp(21px,2.4vw,27px);font-weight:600;line-height:1.7}
 
-/* الخطوات: كل خطوة نبضة */
+/* الخطوات: خط زي غرزة الجيب */
 .steps{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:48px;margin-top:56px;padding-top:92px;counter-reset:s}
 .beat{position:absolute;inset-inline:0;top:0;width:100%;height:88px;color:var(--green)}
-.beat path{fill:none;stroke:currentColor;stroke-width:1.75;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}
+.beat path{fill:none;stroke:currentColor;stroke-width:2;stroke-dasharray:10 10;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}
 .step{counter-increment:s}
 .step::before{content:counter(s);display:block;font-family:var(--display);font-weight:700;font-size:64px;line-height:1.2;color:var(--green)}
 .step p{color:var(--dim);margin-top:6px}
@@ -186,7 +186,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:14px 40px;align-items:center;justif
 footer div div{display:flex;flex-wrap:wrap;gap:6px 24px}
 footer a{color:var(--ink)}
 
-/* حركة واحدة بس: النبضة بتتنقش مرة واحدة عند الفتح */
+/* حركة واحدة بس: النقش بيترسم مرة واحدة عند الفتح */
 @media (prefers-reduced-motion:no-preference){
   .band path{stroke-dasharray:1;stroke-dashoffset:1;animation:engrave 1.9s cubic-bezier(.3,.1,.2,1) forwards;animation-delay:calc(var(--i)*14ms)}
 }
@@ -246,7 +246,7 @@ footer a{color:var(--ink)}
 <header>
   <div class="wrap nav">
     <a class="logo" href="#top" aria-label="جيبك">
-      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#0F6B4F"/><path d="M8 34h12l6-16 10 28 7-16h13" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg viewBox="0 0 108 108" aria-hidden="true"><rect width="108" height="108" rx="26" fill="#0B5F49"/><path d="M38 34H68Q78 34 72 42C60 50 30 58 34 74C37 86 60 88 76 76" fill="none" stroke="#FFF6E6" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><circle cx="55" cy="62" r="8.5" fill="#F4B740"/></svg>
       جيبك
     </a>
     <nav aria-label="أقسام الصفحة">
@@ -342,7 +342,7 @@ footer a{color:var(--ink)}
   <h2>تبدأ في 3 خطوات</h2>
   <p class="sub">من غير حساب ولا تسجيل دخول.</p>
   <div class="steps">
-    <svg class="beat" viewBox="0 0 1200 88" preserveAspectRatio="none" aria-hidden="true"><path d="M1200 66H1198l-14-44-22 62-16-30-10 12H783l-14-44-22 62-16-30-10 12H366l-14-44-22 62-16-30-10 12H0"/></svg>
+    <svg class="beat" viewBox="0 0 1200 88" preserveAspectRatio="none" aria-hidden="true"><path d="M1200 44H0"/></svg>
     <div class="step"><h3>نزّل وثبّت</h3><p>نزّل <code>nabd.apk</code> من صفحة آخر نسخة وثبّته (اسمح بالتثبيت من المصدر).</p></div>
     <div class="step"><h3>ادي الصلاحيات</h3><p>صلاحية الرسايل، وفعّل «الوصول للإشعارات» لجيبك علشان يلقط إشعارات InstaPay وBinance وغيرها.</p></div>
     <div class="step"><h3>سيبه يشتغل</h3><p>بيفحص رسايل آخر 4 شهور ويبني تاريخك، وكل عملية جديدة بتتسجل لحظتها حتى والتطبيق مقفول.</p></div>
@@ -452,17 +452,15 @@ footer a{color:var(--ink)}
 <script>
 (function(){
   var NS='http://www.w3.org/2000/svg',TAU=Math.PI*2;
-  function gauss(x,w){return Math.exp(-(x*x)/(2*w*w))}
-  // نقش البنكنوت: حبل من خطوط رفيعة، وكل الخطوط بتنبض عند نفس النقطة
+  // نقش البنكنوت: حبل من خطوط رفيعة
   function band(svg){
-    var N=30,beat=905,d,x,y,i,p;
+    var N=30,d,x,y,i,p;
     for(i=0;i<N;i++){
       var ph=i/N*TAU,h=74+58*Math.cos(ph);
       d='';
       for(x=1600;x>=0;x-=5){
-        var e=x-beat,rope=(30+16*Math.sin(x*.0043))*Math.sin(x*.0125+ph),
-            pulse=gauss(e,10)-.34*gauss(e+27,9)-.24*gauss(e-31,11)+.13*gauss(e-95,24);
-        y=216+rope-h*.82*pulse;
+        var rope=(30+16*Math.sin(x*.0043))*Math.sin(x*.0125+ph);
+        y=216+rope+h*.05*Math.sin(x*.003);
         d+=(d?'L':'M')+x+' '+y.toFixed(1);
       }
       p=document.createElementNS(NS,'path');

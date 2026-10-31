@@ -22,7 +22,7 @@ object BackupFiles {
     private const val AUTO_PREFIX = "nabd-auto-"
     private const val KEEP = 7
 
-    fun suggestedName(prefix: String = "nabd-backup-"): String {
+    fun suggestedName(prefix: String = "geebak-backup-"): String {
         val d = LocalDateTime.now()
         return "%s%04d-%02d-%02d_%02d%02d.json".format(java.util.Locale.US, prefix, d.year, d.monthValue, d.dayOfMonth, d.hour, d.minute)
     }
