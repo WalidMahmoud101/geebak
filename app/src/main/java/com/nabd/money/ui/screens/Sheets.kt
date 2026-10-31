@@ -87,6 +87,8 @@ import com.nabd.money.ui.components.icon
 import com.nabd.money.ui.theme.NabdColors
 import com.nabd.money.util.Dates
 import com.nabd.money.util.Money
+import com.nabd.money.util.action
+import com.nabd.money.util.status
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -793,26 +795,11 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                     Column(Modifier.weight(1f)) {
                         Text("الإصدار ${com.nabd.money.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            when (val u = update) {
-                                is com.nabd.money.util.UpdateState.Checking -> "بيدور على تحديث…"
-                                is com.nabd.money.util.UpdateState.UpToDate -> "عندك آخر نسخة"
-                                is com.nabd.money.util.UpdateState.Available -> "في نسخة جديدة: ${u.release.name}"
-                                is com.nabd.money.util.UpdateState.Downloading -> "بينزل ${(u.progress * 100).toInt()}%"
-                                is com.nabd.money.util.UpdateState.Ready -> "جاهز للتثبيت"
-                                is com.nabd.money.util.UpdateState.Error -> u.message
-                                else -> "التحديثات بتوصل لوحدها"
-                            },
+                            update.status(),
                             style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim
                         )
                     }
-                    val u = update
-                    if (u is com.nabd.money.util.UpdateState.Available) {
-                        TextButton(onClick = { vm.downloadAndInstall(u.release) }) { Text("حدّث") }
-                    } else if (u is com.nabd.money.util.UpdateState.Ready) {
-                        TextButton(onClick = { com.nabd.money.util.Updater.install(vm.getApplication(), u.file) }) { Text("ثبّت") }
-                    } else {
-                        TextButton(onClick = { vm.checkForUpdate(manual = true) }) { Text("اتحقق") }
-                    }
+                    update.action()?.let { TextButton(onClick = { vm.updateAction() }) { Text(it) } }
                 }
                 HorizontalDivider(color = NabdColors.Stroke)
                 val rateNow by vm.usdRate.collectAsState()

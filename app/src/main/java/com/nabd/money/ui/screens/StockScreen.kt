@@ -87,6 +87,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nabd.money.agents.PriceCheck
 import com.nabd.money.agents.PriceLevel
 import com.nabd.money.agents.PriceVerdict
+import com.nabd.money.data.CarrefourCatalog
 import com.nabd.money.data.StockCatalog
 import com.nabd.money.data.StockItem
 import com.nabd.money.data.StockPrice
@@ -237,6 +238,7 @@ fun StockScreen(vm: AppViewModel, onBack: () -> Unit) {
         onOpen = { openId = it.id },
         onBought = { buying = it },
         onQuickAdd = { vm.addStock(it, StockCatalog.targetFor(it, category), page == 1); query = "" },
+        onAddTo = { name, dept -> vm.addStock(name, dept, page == 1); query = "" },
         onClear = { confirmClear = true },
         undoCount = undo?.items?.size ?: 0,
         onUndo = { vm.undoClearStock() },
@@ -282,6 +284,7 @@ fun StockContent(
     onToggle: (StockItem) -> Unit, onOpen: (StockItem) -> Unit, onBought: (StockItem) -> Unit,
     modifier: Modifier = Modifier,
     onQuickAdd: (String) -> Unit = {},
+    onAddTo: (String, String) -> Unit = { _, _ -> },
     onClear: () -> Unit = {},
     undoCount: Int = 0,
     onUndo: () -> Unit = {},
@@ -292,6 +295,8 @@ fun StockContent(
     val q = StockCatalog.key(query)
     val shown = items.filter { StockCatalog.inFilter(it.category, category) && (q.isEmpty() || it.key.contains(q)) }
     val inCarrefour = category == StockCatalog.CARREFOUR || category in StockCatalog.carrefour
+    val have = items.map { it.key }.toSet()
+    val catalogHits = CarrefourCatalog.search(query).filter { StockCatalog.key(it.first) !in have }.take(8)
     // اللي بتدوّر عليه مش موجود؟ يبقى ضيفه من مكانك
     val canQuickAdd = q.isNotEmpty() && items.none { it.key == q }
 
@@ -356,6 +361,23 @@ fun StockContent(
                     keyboardActions = KeyboardActions(onDone = { if (canQuickAdd) onQuickAdd(query.trim()) }),
                 )
             }
+            if (catalogHits.isNotEmpty()) item {
+                GlassCard(Modifier.fillMaxWidth(), padding = 4.dp) {
+                    Text("من كارفور", style = MaterialTheme.typography.labelMedium, color = NabdColors.TextDim, modifier = Modifier.padding(start = 10.dp, top = 6.dp))
+                    catalogHits.forEach { (name, dept) ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onAddTo(name, dept) }.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(dept, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim, maxLines = 1)
+                            }
+                            Icon(Icons.Rounded.Add, "ضيف", tint = NabdColors.Mint, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
             if (canQuickAdd) item {
                 val target = StockCatalog.targetFor(query, category)
                 GlassCard(Modifier.fillMaxWidth(), padding = 4.dp) {
@@ -384,6 +406,7 @@ fun StockContent(
                     StockCatalog.carrefour.forEach { c -> SelectChip(c, category == c, stockColor(c), stockIcon(c)) { onCategory(if (category == c) StockCatalog.CARREFOUR else c) } }
                 }
             }
+            if (category in StockCatalog.carrefour) item { CarrefourPicks(category!!, have) { onAddTo(it, category) } }
             if (items.isEmpty()) {
                 item { EmptyState(Icons.Rounded.Inventory2, "لسه مفيش حاجات", "ضيف اللي في البيت، أو صوّر فاتورة وهتتضاف لوحدها.") }
             } else if (shown.isEmpty() && !canQuickAdd) {
@@ -438,6 +461,27 @@ fun StockContent(
         }
         if (page == 0 && items.any { StockCatalog.inFilter(it.category, category) }) item {
             PillButton(if (category == null) "امسح المخزون كله" else "امسح كل «$category»", Icons.Rounded.Delete, NabdColors.Danger, Modifier.fillMaxWidth(), onClick = onClear)
+        }
+    }
+}
+
+/** أصناف القسم من كارفور: لمسة تضيف، واللي عندك بيختفي من القايمة */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CarrefourPicks(dept: String, have: Set<String>, onPick: (String) -> Unit) {
+    var all by remember(dept) { mutableStateOf(false) }
+    val left = CarrefourCatalog.items[dept].orEmpty().filter { StockCatalog.key(it) !in have }
+    if (left.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("أصناف من كارفور", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            (if (all) left else left.take(8)).forEach { SelectChip(it, false, NabdColors.Mint, Icons.Rounded.Add) { onPick(it) } }
+        }
+        if (left.size > 8) {
+            Text(
+                if (all) "أقل" else "كل الأصناف (${left.size})", style = MaterialTheme.typography.labelLarge, color = NabdColors.Mint,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { all = !all }.padding(4.dp),
+            )
         }
     }
 }
@@ -576,7 +620,7 @@ private fun StockAddSheet(items: List<StockItem>, initialOut: Boolean, initialCa
             if (newCategory) {
                 OutlinedTextField(custom, { custom = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp), label = { Text("اسم التصنيف") })
             }
-            val ideas = StockCatalog.suggestions[chosen].orEmpty().filter { StockCatalog.key(it) !in have && it !in added && name.isBlank() }
+            val ideas = (StockCatalog.suggestions[chosen].orEmpty() + CarrefourCatalog.items[chosen].orEmpty()).filter { StockCatalog.key(it) !in have && it !in added && name.isBlank() }
             if (ideas.isNotEmpty()) {
                 Text("أو اختار بسرعة", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

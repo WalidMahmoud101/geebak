@@ -37,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -589,7 +590,12 @@ private fun LazyListScope.updateCard(update: UpdateState, vm: AppViewModel) {
             }
             Spacer(Modifier.height(10.dp))
             when (update) {
-                is UpdateState.Downloading -> ProgressBar(update.progress, NabdColors.Mint)
+                is UpdateState.Downloading -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) { ProgressBar(update.progress, NabdColors.Mint) }
+                    Spacer(Modifier.width(10.dp))
+                    Text("${(update.progress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, color = NabdColors.TextDim)
+                    TextButton(onClick = { vm.stopUpdate() }) { Text("وقّف", color = NabdColors.Danger) }
+                }
                 is UpdateState.Ready -> GradientButton("ثبّت دلوقتي", Modifier.fillMaxWidth()) {
                     com.nabd.money.util.Updater.install(vm.getApplication(), update.file)
                 }

@@ -82,7 +82,8 @@ import com.nabd.money.ui.components.PillButton
 import com.nabd.money.ui.theme.HeroGradient
 import com.nabd.money.ui.theme.NabdColors
 import com.nabd.money.util.Dates
-import com.nabd.money.util.UpdateState
+import com.nabd.money.util.action
+import com.nabd.money.util.status
 
 const val REPO_URL = "https://github.com/WalidMahmoud101/nabd"
 
@@ -141,6 +142,7 @@ fun AboutContent(
     onCheckUpdate: () -> Unit,
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
+    updateButton: String? = "اتحقق",
 ) {
     Column(
         modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 28.dp),
@@ -227,10 +229,12 @@ fun AboutContent(
                     Text("الإصدار $versionName", style = MaterialTheme.typography.titleSmall)
                     Text(updateText, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
                 }
-                Text(
-                    "اتحقق", style = MaterialTheme.typography.labelLarge, color = NabdColors.Mint,
-                    modifier = Modifier.clip(RoundedCornerShape(50)).background(NabdColors.Mint.copy(alpha = 0.12f)).clickable(onClick = onCheckUpdate).padding(horizontal = 14.dp, vertical = 6.dp)
-                )
+                updateButton?.let {
+                    Text(
+                        it, style = MaterialTheme.typography.labelLarge, color = NabdColors.Mint,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(NabdColors.Mint.copy(alpha = 0.12f)).clickable(onClick = onCheckUpdate).padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+                }
             }
         }
 
@@ -370,15 +374,7 @@ fun AboutSheet(vm: AppViewModel, onDismiss: () -> Unit) {
         )
     }
     val agentNames = remember { AgentRegistry.all.map { it.name.removePrefix("وكيل ").trim() } }
-    val updateText = when (val u = update) {
-        is UpdateState.Checking -> "بيدور على تحديث…"
-        is UpdateState.UpToDate -> "عندك آخر نسخة ✓"
-        is UpdateState.Available -> "في نسخة جديدة: ${u.release.name}"
-        is UpdateState.Downloading -> "بينزل ${(u.progress * 100).toInt()}%"
-        is UpdateState.Ready -> "جاهز للتثبيت"
-        is UpdateState.Error -> u.message
-        else -> "التحديثات بتوصل لوحدها"
-    }
+    val updateText = update.status()
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -387,7 +383,8 @@ fun AboutSheet(vm: AppViewModel, onDismiss: () -> Unit) {
         AboutContent(
             versionName = BuildConfig.VERSION_NAME, versionCode = BuildConfig.VERSION_CODE,
             stats = stats, agentNames = agentNames, updateText = updateText,
-            onCheckUpdate = { vm.checkForUpdate(manual = true) },
+            updateButton = update.action(),
+            onCheckUpdate = { vm.updateAction() },
             onOpen = { url -> runCatching { uri.openUri(url) } },
         )
     }

@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteDatabase
 import com.nabd.money.agents.PriceCheck
 import com.nabd.money.agents.PriceLevel
 import com.nabd.money.data.Backup
+import com.nabd.money.data.CarrefourCatalog
 import com.nabd.money.data.NabdDatabase
 import com.nabd.money.data.ReceiptEntry
 import com.nabd.money.data.StockCatalog
@@ -107,6 +108,17 @@ class StockTest {
         store.add("زيت", StockCatalog.KITCHEN)
         assertEquals(2, store.clear(StockCatalog.CARREFOUR).items.size)
         assertEquals(listOf("زيت"), app.db.dao().stockItemsOnce().map { it.name })
+    }
+
+    @Test
+    fun carrefourCatalogCoversEveryDepartmentAndSearches() {
+        assertEquals(StockCatalog.carrefour.toSet(), CarrefourCatalog.items.keys)
+        CarrefourCatalog.items.values.forEach { names ->
+            assertTrue(names.size >= 20)
+            assertEquals(names.size, names.map(StockCatalog::key).toSet().size)
+        }
+        assertTrue(CarrefourCatalog.search("جهينة").any { it.second == StockCatalog.DAIRY })
+        assertTrue(CarrefourCatalog.search("ا").isEmpty())
     }
 
     @Test

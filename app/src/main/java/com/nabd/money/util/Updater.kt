@@ -6,20 +6,45 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
+import kotlin.coroutines.resume
 
 sealed interface UpdateState {
     data object Idle : UpdateState
     data object Checking : UpdateState
     data object UpToDate : UpdateState
     data class Available(val release: Updater.Release) : UpdateState
-    data class Downloading(val progress: Float) : UpdateState
+    data class Downloading(val release: Updater.Release, val progress: Float) : UpdateState
     data class Ready(val release: Updater.Release, val file: File) : UpdateState
     data class Error(val message: String) : UpdateState
+}
+
+/** الجملة اللي بتوصف الحالة، في كل مكان بيعرض التحديث */
+fun UpdateState.status(): String = when (this) {
+    is UpdateState.Checking -> "بيدور على تحديث…"
+    is UpdateState.UpToDate -> "عندك آخر نسخة ✓"
+    is UpdateState.Available -> "في نسخة جديدة: ${release.name}"
+    is UpdateState.Downloading -> "بينزل ${(progress * 100).toInt()}%"
+    is UpdateState.Ready -> "جاهز للتثبيت"
+    is UpdateState.Error -> message
+    is UpdateState.Idle -> "التحديثات بتوصل لوحدها"
+}
+
+/** الزرار لازم يعمل حاجة في كل حالة. null وهو بيدور، لأن مفيش حاجة تتعمل */
+fun UpdateState.action(): String? = when (this) {
+    is UpdateState.Checking -> null
+    is UpdateState.Available -> "نزّل وثبّت"
+    is UpdateState.Downloading -> "وقّف"
+    is UpdateState.Ready -> "ثبّت"
+    else -> "اتحقق"
 }
 
 /**
@@ -152,47 +177,69 @@ object Updater {
         return downloadOnce(ctx, r, onProgress) ?: downloadOnce(ctx, r, onProgress)
     }
 
-    private suspend fun downloadOnce(ctx: Context, r: Release, onProgress: (Float) -> Unit): File? = withContext(Dispatchers.IO) {
-        runCatching {
-            val dir = dir(ctx)
-            dir.listFiles()?.forEach { it.delete() }
-            val final = File(dir, "nabd-${r.versionCode}.apk")
-            // بينزل في ملف مؤقت ويتسمى باسمه الحقيقي لما يخلص بس، علشان الناقص مايتحسبش نازل
-            val out = File(dir, "nabd-${r.versionCode}.part")
-            var url = URL(r.apkUrl)
-            var c: HttpURLConnection
-            // GitHub بيحول التحميل لسيرفر تاني
-            while (true) {
-                c = url.openConnection() as HttpURLConnection
-                c.instanceFollowRedirects = false
-                c.connectTimeout = 20_000
-                c.readTimeout = 60_000
-                c.setRequestProperty("User-Agent", "Nabd/${com.nabd.money.BuildConfig.VERSION_NAME} (Android)")
-                if (c.responseCode in 300..399) {
-                    url = URL(url, c.getHeaderField("Location")); c.disconnect(); continue
-                }
-                break
+    /**
+     * التحميل في thread لوحده، لأن القراية من النت مابتحسش بالإلغاء. زرار "وقّف" بيرجع على طول،
+     * والـ thread بيقفل لوحده. كل محاولة ليها ملف مؤقت باسمها علشان القديمة ماتلمسش الجديدة.
+     */
+    private suspend fun downloadOnce(ctx: Context, r: Release, onProgress: (Float) -> Unit): File? = suspendCancellableCoroutine { cont ->
+        val dir = dir(ctx)
+        val stopped = AtomicBoolean(false)
+        val connection = AtomicReference<HttpURLConnection?>()
+        val out = File(dir, "nabd-${r.versionCode}-${System.nanoTime()}.part")
+        cont.invokeOnCancellation {
+            stopped.set(true)
+            out.delete()
+            thread(isDaemon = true) { runCatching { connection.get()?.disconnect() } }
+        }
+        thread(isDaemon = true, name = "nabd-update") {
+            val file = try {
+                fetch(dir, r, out, stopped, connection, onProgress)
+            } catch (_: Exception) {
+                null
+            } finally {
+                out.delete()
             }
-            if (c.responseCode != 200) return@runCatching null
-            val total = c.contentLengthLong.takeIf { it > 0 } ?: r.sizeBytes
-            c.inputStream.use { input ->
-                out.outputStream().use { output ->
-                    val buf = ByteArray(64 * 1024)
-                    var done = 0L
-                    while (true) {
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        output.write(buf, 0, n)
-                        done += n
-                        if (total > 0) withContext(Dispatchers.Main) { onProgress(done.toFloat() / total) }
-                    }
+            cont.resume(file)
+        }
+    }
+
+    private fun fetch(dir: File, r: Release, out: File, stopped: AtomicBoolean, connection: AtomicReference<HttpURLConnection?>, onProgress: (Float) -> Unit): File? {
+        dir.listFiles()?.filter { it != out }?.forEach { it.delete() }
+        // بينزل في ملف مؤقت ويتسمى باسمه الحقيقي لما يخلص بس، علشان الناقص مايتحسبش نازل
+        val final = File(dir, "nabd-${r.versionCode}.apk")
+        var url = URL(r.apkUrl)
+        var c: HttpURLConnection
+        // GitHub بيحول التحميل لسيرفر تاني
+        while (true) {
+            c = url.openConnection() as HttpURLConnection
+            connection.set(c)
+            c.instanceFollowRedirects = false
+            c.connectTimeout = 20_000
+            c.readTimeout = 60_000
+            c.setRequestProperty("User-Agent", "Nabd/${com.nabd.money.BuildConfig.VERSION_NAME} (Android)")
+            if (c.responseCode in 300..399) {
+                url = URL(url, c.getHeaderField("Location")); c.disconnect(); continue
+            }
+            break
+        }
+        if (c.responseCode != 200) return null
+        val total = c.contentLengthLong.takeIf { it > 0 } ?: r.sizeBytes
+        c.inputStream.use { input ->
+            out.outputStream().use { output ->
+                val buf = ByteArray(64 * 1024)
+                var done = 0L
+                while (!stopped.get()) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    output.write(buf, 0, n)
+                    done += n
+                    if (total > 0) onProgress(done.toFloat() / total)
                 }
             }
-            val expected = if (r.sizeBytes > 0) r.sizeBytes else total
-            if (expected > 0 && out.length() != expected) { out.delete(); return@runCatching null }
-            if (!out.renameTo(final)) return@runCatching null
-            final
-        }.getOrNull()
+        }
+        val expected = if (r.sizeBytes > 0) r.sizeBytes else total
+        if (stopped.get() || (expected > 0 && out.length() != expected)) return null
+        return final.takeIf { out.renameTo(it) }
     }
 
     fun install(ctx: Context, file: File) {

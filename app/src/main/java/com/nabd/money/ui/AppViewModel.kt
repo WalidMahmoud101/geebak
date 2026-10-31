@@ -27,6 +27,7 @@ import com.nabd.money.ingest.InboxScanner
 import com.nabd.money.util.Dates
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -131,12 +132,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- التحديثات ----------
     val update = MutableStateFlow<UpdateState>(UpdateState.Idle)
+    private var updateDownload: kotlinx.coroutines.Job? = null
+
+    /** زرار التحديث في أي مكان: بيعمل الخطوة اللي عليها الدور */
+    fun updateAction() {
+        when (val u = update.value) {
+            is UpdateState.Checking -> Unit
+            is UpdateState.Available -> downloadAndInstall(u.release)
+            is UpdateState.Downloading -> stopUpdate()
+            is UpdateState.Ready -> Updater.install(getApplication(), u.file)
+            else -> checkForUpdate(manual = true)
+        }
+    }
+
+    fun stopUpdate() {
+        val u = update.value as? UpdateState.Downloading ?: return
+        updateDownload?.cancel()
+        update.value = UpdateState.Available(u.release)
+    }
 
     fun checkForUpdate(manual: Boolean = false) {
         if (update.value is UpdateState.Checking || update.value is UpdateState.Downloading) return
         viewModelScope.launch {
             update.value = UpdateState.Checking
             val app = getApplication<Application>()
+            // الفحص ساعات بيخلص في لحظة، فلازم تشوف إن الزرار اشتغل
+            if (manual) kotlinx.coroutines.delay(600)
             val check = Updater.check()
             val r = check.release
             // لو النسخة دي اتنزلت قبل كده وسليمة، نروح على التثبيت علطول من غير تنزيل
@@ -152,15 +173,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun downloadAndInstall(r: Updater.Release) {
-        viewModelScope.launch {
+        if (update.value is UpdateState.Downloading) return
+        updateDownload = viewModelScope.launch {
             val have = Updater.cached(getApplication(), r)
             if (have != null) {
                 update.value = UpdateState.Ready(r, have)
                 Updater.install(getApplication(), have)
                 return@launch
             }
-            update.value = UpdateState.Downloading(0f)
-            val file = Updater.download(getApplication(), r) { p -> update.value = UpdateState.Downloading(p) }
+            update.value = UpdateState.Downloading(r, 0f)
+            val file = Updater.download(getApplication(), r) { p -> if (isActive) update.value = UpdateState.Downloading(r, p) }
             if (file == null) {
                 update.value = UpdateState.Error("التحميل وقف، جرب تاني")
             } else {

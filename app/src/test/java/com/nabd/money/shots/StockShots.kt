@@ -87,7 +87,7 @@ class StockShots {
     private fun carrefour(mode: ThemeMode, name: String) = capture(mode, name) {
         val shopItems = items + item(8, "لبن جهينة", StockCatalog.DAIRY) + item(9, "مياه نستله", StockCatalog.DRINKS, true)
         StockContent(
-            shopItems, prices, 0, {}, StockCatalog.CARREFOUR, {}, "", {}, reading = false,
+            shopItems, prices, 0, {}, StockCatalog.DAIRY, {}, "", {}, reading = false,
             onBack = {}, onAdd = {}, onCamera = {}, onGallery = {}, onManualReceipt = {}, onToggle = {}, onOpen = {}, onBought = {},
             modifier = Modifier.fillMaxSize().background(NabdColors.Bg),
         )
