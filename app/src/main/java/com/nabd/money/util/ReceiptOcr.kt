@@ -45,7 +45,7 @@ object ReceiptOcr {
 
     suspend fun read(ctx: Context, uri: Uri): OcrResult = busy.withLock {
         withContext(Dispatchers.Default) {
-            val bitmap = load(ctx, uri) ?: error("مقدرتش أفتح الصورة")
+            val bitmap = load(ctx, uri)?.let(::prepared) ?: error("مقدرتش أفتح الصورة")
             val dataDir = ensureModels(ctx)
             val tess = TessBaseAPI()
             try {
@@ -63,6 +63,20 @@ object ReceiptOcr {
                 bitmap.recycle()
             }
         }
+    }
+
+    /** بنفرد الورقة ونشيل الخلفية والضل، ولو الموبايل ماستحملش نقرا الصورة زي ما هي */
+    private fun prepared(photo: Bitmap): Bitmap = try {
+        val argb = IntArray(photo.width * photo.height)
+        photo.getPixels(argb, 0, photo.width, 0, 0, photo.width, photo.height)
+        val gray = ReceiptImage.prepare(argb, photo.width, photo.height)
+        val out = IntArray(gray.pixels.size) { i ->
+            val v = gray.pixels[i].toInt() and 0xFF
+            (0xFF shl 24) or (v shl 16) or (v shl 8) or v
+        }
+        Bitmap.createBitmap(out, gray.width, gray.height, Bitmap.Config.ARGB_8888).also { photo.recycle() }
+    } catch (_: OutOfMemoryError) {
+        photo
     }
 
     /** Tesseract محتاج ملفات حقيقية، فبننسخ النماذج من جوه التطبيق مرة واحدة لكل إصدار */

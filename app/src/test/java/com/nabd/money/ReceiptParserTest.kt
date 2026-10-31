@@ -22,7 +22,7 @@ class ReceiptParserTest {
         val r = ReceiptParser.parse(ocr("supermarket_ar"))
         assertEquals("سوبر ماركت خيرزمان", r.store)
         assertEquals(java.time.LocalDate.of(2026, 10, 12), r.date)
-        assertEquals(6, r.lines.size)
+        assertEquals(r.lines.toString(), 6, r.lines.size)
         assertEquals(2.0, r.price("سكر").qty, 0.0)
         assertEquals(38.5, r.price("سكر").unitPrice!!, 0.001)
         assertEquals(92.0, r.price("كريستال").unitPrice!!, 0.001)
@@ -170,6 +170,96 @@ class ReceiptParserTest {
         assertNull(oil.unitPrice)
         assertTrue(oil.doubtful)
         assertEquals(false, r.matchesTotal())
+    }
+
+    /** فاتورة جملة: الأعمدة بالعكس، الكمية لازقة في الإجمالي، موزون بكسور، وخصم تحت الصنف */
+    @Test
+    fun wholesaleReceiptWithDiscountLinesAndWeights() {
+        val r = ReceiptParser.parse(
+            """
+            >. CT a tO eee,
+            5 02525 eu
+            سوق الخير 11 المعادي
+            الصنف السعر الكمية القيمة
+            200.00     1200.00 ج م فراخ بانيه
+            50.00              خصم
+            90.00 0.25   360.00 جبنة رومي
+            70.00 0.25870.00
+            280.0084 0.25872.24 لانشون بق
+            10.32              pod
+            1120.00  1 120.00 زيت شمس
+            4. 0               خصم
+            0 .149  1 149.00 قهوة وسط
+            50 .17  1 17.50 700 ملح طعام
+            4-20.00  60.00 شوكولاتة
+            لبن بودرة 6.00 646.00
+            99.00 | 99.00 vs مربى
+            220     | 22.00 صلصة
+            عددالأصناف: 8 القيمة المستحقة: 1016.42
+            كارت الائتمان: 1016.40
+            العروض وفرت لك 64.32 EGP
+            """.trimIndent()
+        )
+        assertEquals("سوق الخير المعادي", r.store)
+        assertEquals(1016.42, r.total!!, 0.001)
+        assertEquals(150.0, r.price("فراخ").unitPrice!!, 0.001)
+        assertEquals(1.0, r.price("فراخ").qty, 0.0)
+        assertEquals(0.25, r.price("رومي").qty, 0.0)
+        assertEquals(360.0, r.price("رومي").unitPrice!!, 0.001)
+        // سعر الكيلو بعد الخصم، والوزن زي ما هو
+        assertEquals(0.258, r.price("لانشون").qty, 0.0)
+        assertEquals(240.0, r.price("لانشون").unitPrice!!, 0.001)
+        assertEquals(116.0, r.price("شمس").unitPrice!!, 0.001)
+        assertEquals(149.0, r.price("قهوة").unitPrice!!, 0.001)
+        assertEquals("700 ملح طعام".split(' ').toSet(), r.price("ملح").name.split(' ').toSet())
+        assertEquals(17.5, r.price("ملح").unitPrice!!, 0.001)
+        assertEquals(3.0, r.price("شوكولاتة").qty, 0.0)
+        assertEquals(6.0, r.price("بودرة").qty, 0.0)
+        assertEquals(6.0, r.price("بودرة").unitPrice!!, 0.001)
+        assertTrue(r.price("بودرة").doubtful)
+        assertEquals(99.0, r.price("مربى").unitPrice!!, 0.001)
+        assertEquals(22.0, r.price("صلصة").unitPrice!!, 0.001)
+    }
+
+    /** مطعم: الاسم في النص بين الأعمدة، والكمية مطبوعة من غير كسور فالوزن هو الإجمالي ÷ السعر */
+    @Test
+    fun restaurantReceiptWithNameBetweenColumnsAndCutQuantities() {
+        val r = ReceiptParser.parse(
+            """
+            | مشويات النيل oy |
+            Order # 77         CASH
+            Date   30/09/2026  09:12 PM
+            Cashier  كريم
+            Qty  U.P  Item  Total
+            0 X 300.00  كفتة  180.00
+            1 X 300.00  طرب  330.00
+            2 X 100.00  سلطة  200.00
+            Net Sales   710.00
+            VAT 14 %
+            TOTAL DUE   710.00
+            CASH 0.00  Change 0.00
+            Hot Line
+            15280
+            """.trimIndent()
+        )
+        assertEquals("مشويات النيل", r.store)
+        assertEquals(java.time.LocalDate.of(2026, 9, 30), r.date)
+        assertEquals(3, r.lines.size)
+        assertEquals("كفتة", r.lines[0].name)
+        assertEquals(0.6, r.lines[0].qty, 0.0001)
+        assertEquals(300.0, r.lines[0].unitPrice!!, 0.001)
+        assertEquals(1.1, r.lines[1].qty, 0.0001)
+        assertEquals(2.0, r.lines[2].qty, 0.0)
+        assertNull(r.tax)
+        assertEquals(710.0, r.total!!, 0.001)
+        assertEquals(true, r.matchesTotal())
+    }
+
+    @Test
+    fun lostUnitNextToTheMarkKeepsPriceAndTotalApart() {
+        val r = ReceiptParser.parse("اسم المحل\n30.00 x 45.00 مكرونة\nالاجمالي 45.00")
+        assertEquals(30.0, r.lines[0].unitPrice!!, 0.001)
+        assertEquals(1.5, r.lines[0].qty, 0.001)
     }
 
     @Test
