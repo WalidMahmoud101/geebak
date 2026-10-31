@@ -132,6 +132,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- التحديثات ----------
     val update = MutableStateFlow<UpdateState>(UpdateState.Idle)
+    /** رسالة عامة من جيبك لسه ماتقفلتش */
+    val news = MutableStateFlow<com.nabd.money.util.News.Message?>(null)
+
+    fun dismissNews() {
+        news.value?.let { settings.dismissedNews = it.id }
+        news.value = null
+    }
     private var updateDownload: kotlinx.coroutines.Job? = null
     /** نتيجة "اتحقق" وقت التنزيل، علشان التنزيل نفسه مايقفش */
     val updateNote = MutableStateFlow<String?>(null)
@@ -230,6 +237,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     init {
         viewModelScope.launch(Dispatchers.IO) { engine.runPeriodicInsights(notify = false) }
         checkForUpdate()
+        viewModelScope.launch {
+            com.nabd.money.util.News.latest()?.takeIf { it.id > settings.dismissedNews }?.let { news.value = it }
+        }
         viewModelScope.launch { runCatching { settings.syncRates() }; runCatching { settings.syncGold() } }
     }
 

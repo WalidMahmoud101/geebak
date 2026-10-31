@@ -843,7 +843,7 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                     Switch(checked = notify, onCheckedChange = { notify = it })
                 }
                 Text(
-                    "بياناتك المالية على الموبايل بس. النت بيستخدم للتحديثات وبس.",
+                    "بياناتك المالية على الموبايل بس. النت بيستخدم للتحديثات ورسايل جيبك والأسعار، من غير بيانات مالية.",
                     style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint
                 )
             }

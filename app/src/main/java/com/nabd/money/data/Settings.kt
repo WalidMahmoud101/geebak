@@ -189,7 +189,7 @@ class Settings(context: Context) {
     }
 
     /** مفاتيح خاصة بالموبايل ده بس، مابتتنقلش في النسخة */
-    private val deviceOnly = setOf("backup_folder", "last_auto_backup_day", "did_initial_scan", "notified_update")
+    private val deviceOnly = setOf("backup_folder", "last_auto_backup_day", "did_initial_scan", "notified_update", "notified_news", "dismissed_news")
 
     fun exportPrefs(): org.json.JSONObject {
         val o = org.json.JSONObject()
@@ -247,6 +247,14 @@ class Settings(context: Context) {
         _salary.value = readSalary()
         _hiddenAccounts.value = readHiddenAccounts()
     }
+
+    /** آخر رسالة عامة اتبعت عنها إشعار، وآخر رسالة قفلتها من الرئيسية */
+    var notifiedNews: Int
+        get() = sp.getInt("notified_news", 0)
+        set(v) = sp.edit().putInt("notified_news", v).apply()
+    var dismissedNews: Int
+        get() = sp.getInt("dismissed_news", 0)
+        set(v) = sp.edit().putInt("dismissed_news", v).apply()
 
     /** آخر نسخة اتبعت عنها إشعار تحديث */
     var notifiedUpdate: Int

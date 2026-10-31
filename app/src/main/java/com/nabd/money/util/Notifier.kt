@@ -57,6 +57,10 @@ object Notifier {
         post(ctx, CH_ALERTS, 98, "تحديث جديد: $name", notes.ifBlank { "افتح جيبك ودوس \"نزّل وثبّت\"." })
     }
 
+    fun news(ctx: Context, title: String, body: String) {
+        post(ctx, CH_ALERTS, 97, title, body.ifBlank { title })
+    }
+
     fun digest(ctx: Context, title: String, body: String) {
         post(ctx, CH_ALERTS, 99, title, body)
     }

@@ -29,6 +29,13 @@ class DigestWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 com.nabd.money.util.Notifier.update(applicationContext, r.name, r.notes.lineSequence().take(3).joinToString("\n"))
             }
         }
+        // رسالة عامة جديدة: إشعار مرة واحدة لكل رسالة
+        com.nabd.money.util.News.latest()?.let { m ->
+            if (m.id > app.settings.notifiedNews) {
+                app.settings.notifiedNews = m.id
+                com.nabd.money.util.Notifier.news(applicationContext, m.title, m.body)
+            }
+        }
         return Result.success()
     }
 

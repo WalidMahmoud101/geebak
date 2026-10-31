@@ -111,6 +111,7 @@ fun HomeScreen(
     val salary by vm.salary.collectAsStateWithLifecycle()
     val companyPending by vm.companyPending.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
+    val news by vm.news.collectAsStateWithLifecycle()
     val stockItems by vm.stockItems.collectAsStateWithLifecycle()
     vm.usdRate.collectAsStateWithLifecycle().value
     var salaryDialog by remember { mutableStateOf(false) }
@@ -149,6 +150,21 @@ fun HomeScreen(
             )
         }
         updateCard(update, vm)
+        news?.let { m ->
+            item(key = "news") {
+                GlassCard(Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        IconBubble(Icons.Rounded.Notifications, NabdColors.Gold, 38.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(m.title, style = MaterialTheme.typography.titleSmall)
+                            if (m.body.isNotBlank()) Text(m.body, style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim)
+                        }
+                        IconButton(onClick = { vm.dismissNews() }) { Icon(Icons.Rounded.Close, "اقفل", tint = NabdColors.TextFaint, modifier = Modifier.size(18.dp)) }
+                    }
+                }
+            }
+        }
         item {
             BalanceCard(
                 total, counted, pending,

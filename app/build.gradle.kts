@@ -13,8 +13,8 @@ android {
         applicationId = "com.nabd.money"
         minSdk = 26
         targetSdk = 35
-        versionCode = 47
-        versionName = "5.6"
+        versionCode = 48
+        versionName = "5.7"
         // مكتبة قراءة الفواتير native: موبايلات ARM بس، علشان حجم التطبيق
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
