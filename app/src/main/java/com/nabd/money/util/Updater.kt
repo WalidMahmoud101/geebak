@@ -56,7 +56,8 @@ fun UpdateState.showsRecheck(): Boolean = this !is UpdateState.Checking && actio
  * ده الاتصال الوحيد بالنت في التطبيق، وبياناتك المالية مابتطلعش من الموبايل.
  */
 object Updater {
-    const val REPO = "WalidMahmoud101/nabd"
+    /** اسم الريبو هيتغير لـ geebak. بنجرب الاتنين علشان التحديث مايقفش قبل التغيير ولا بعده */
+    val REPOS = listOf("WalidMahmoud101/geebak", "WalidMahmoud101/nabd")
 
     data class Release(
         val versionCode: Int,
@@ -81,12 +82,14 @@ object Updater {
     suspend fun check(): Check = withContext(Dispatchers.IO) {
         var why: String? = null
         for (attempt in 1..2) {
-            val viaApi = runCatching { fromApi() }
-            viaApi.getOrNull()?.let { return@withContext Check(it, null) }
-            why = viaApi.exceptionOrNull()?.let(::explain) ?: "رد غير متوقع من السيرفر"
-            val viaPage = runCatching { fromReleasePage() }
-            viaPage.getOrNull()?.let { return@withContext Check(it, null) }
-            why = viaPage.exceptionOrNull()?.let(::explain) ?: why
+            for (repo in REPOS) {
+                val viaApi = runCatching { fromApi(repo) }
+                viaApi.getOrNull()?.let { return@withContext Check(it, null) }
+                why = viaApi.exceptionOrNull()?.let(::explain) ?: "رد غير متوقع من السيرفر"
+                val viaPage = runCatching { fromReleasePage(repo) }
+                viaPage.getOrNull()?.let { return@withContext Check(it, null) }
+                why = viaPage.exceptionOrNull()?.let(::explain) ?: why
+            }
         }
         Check(null, why)
     }
@@ -102,8 +105,8 @@ object Updater {
         return c
     }
 
-    private fun fromApi(): Release? {
-        val c = open("https://api.github.com/repos/$REPO/releases/latest")
+    private fun fromApi(repo: String): Release? {
+        val c = open("https://api.github.com/repos/$repo/releases/latest")
         c.setRequestProperty("Accept", "application/vnd.github+json")
         if (c.responseCode != 200) throw HttpFail(c.responseCode)
         val o = JSONObject(c.inputStream.bufferedReader().use { it.readText() })
@@ -121,21 +124,29 @@ object Updater {
     }
 
     /** من غير API: github.com/.../releases/latest بيحوّل لصفحة آخر نسخة (v17)، ومنها نعرف رقم النسخة ورابط الملف */
-    private fun fromReleasePage(): Release? {
-        val c = open("https://github.com/$REPO/releases/latest", redirects = false)
-        c.requestMethod = "HEAD"
-        if (c.responseCode !in 300..399) throw HttpFail(c.responseCode)
-        return releaseFromLocation(c.getHeaderField("Location"))
+    private fun fromReleasePage(repo: String): Release? {
+        var url = "https://github.com/$repo/releases/latest"
+        // بعد تغيير اسم الريبو، GitHub بيحوّل للاسم الجديد الأول، وبعدها لصفحة النسخة
+        repeat(3) {
+            val c = open(url, redirects = false)
+            c.requestMethod = "HEAD"
+            if (c.responseCode !in 300..399) throw HttpFail(c.responseCode)
+            val location = c.getHeaderField("Location") ?: return null
+            releaseFromLocation(location)?.let { return it }
+            url = URL(URL(url), location).toString()
+        }
+        return null
     }
 
     fun releaseFromLocation(location: String?): Release? {
         val tag = location?.substringAfter("/releases/tag/", "")?.substringBefore('?')?.trim('/').orEmpty()
         val code = tag.filter { it.isDigit() }.toIntOrNull() ?: return null
+        val repo = location?.substringAfter("github.com/", "")?.substringBefore("/releases/")?.takeIf { it.isNotEmpty() } ?: REPOS.last()
         return Release(
             versionCode = code,
             name = "جيبك (النسخة $code)",
             notes = "",
-            apkUrl = "https://github.com/$REPO/releases/download/$tag/nabd.apk",
+            apkUrl = "https://github.com/$repo/releases/download/$tag/nabd.apk",
             sizeBytes = 0,
         )
     }

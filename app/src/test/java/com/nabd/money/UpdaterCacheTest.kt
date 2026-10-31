@@ -54,6 +54,11 @@ class UpdaterCacheTest {
         assertEquals(17, r.versionCode)
         assertEquals("https://github.com/WalidMahmoud101/nabd/releases/download/v17/nabd.apk", r.apkUrl)
         assertNull(Updater.releaseFromLocation(null))
+        // نفس الكود لازم يشتغل قبل تغيير اسم الريبو وبعده، والملف بينزل من الاسم اللي رد
+        assertEquals("https://github.com/WalidMahmoud101/geebak/releases/download/v50/nabd.apk", Updater.releaseFromLocation("https://github.com/WalidMahmoud101/geebak/releases/tag/v50")!!.apkUrl)
+        assertEquals("https://github.com/WalidMahmoud101/nabd/releases/download/v50/nabd.apk", Updater.releaseFromLocation("https://github.com/WalidMahmoud101/nabd/releases/tag/v50")!!.apkUrl)
+        // تحويل تغيير الاسم مش صفحة نسخة، فبيتتبع
+        assertNull(Updater.releaseFromLocation("https://github.com/WalidMahmoud101/geebak/releases/latest"))
         assertNull(Updater.releaseFromLocation("https://github.com/x/y/releases"))
     }
 
