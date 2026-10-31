@@ -75,7 +75,7 @@ import com.nabd.money.util.action
 import com.nabd.money.util.showsRecheck
 import com.nabd.money.util.status
 
-const val REPO_URL = "https://github.com/WalidMahmoud101/nabd"
+const val REPO_URL = "https://github.com/WalidMahmoud101/geebak"
 
 /** أرقام حقيقية من بياناتك على الموبايل (مابتتبعتش لأي مكان) */
 data class AboutStats(val transactions: Int, val auto: Int, val manual: Int, val accounts: Int, val since: Long?) {

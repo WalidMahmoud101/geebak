@@ -44,4 +44,4 @@
 نص الترخيص الكامل: <https://www.apache.org/licenses/LICENSE-2.0>
 
 ---
-لو لقيت مكتبة أو خط ناقص من القايمة دي، [بلّغ عنه](https://github.com/WalidMahmoud101/nabd/issues) وهنضيفه.
+لو لقيت مكتبة أو خط ناقص من القايمة دي، [بلّغ عنه](https://github.com/WalidMahmoud101/geebak/issues) وهنضيفه.

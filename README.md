@@ -7,13 +7,13 @@
 تطبيق أندرويد بالعربي لإدارة فلوسك: بيقرا رسايل البنك والمحافظ وإشعارات التطبيقات ويسجل كل حاجة لوحده،
 ويقولك فلوسك راحت فين، والشركة مديونالك بكام، وسعر الدهب والدولار النهاردة.
 
-[![النسخة](https://img.shields.io/github/v/release/WalidMahmoud101/nabd?label=%D8%A2%D8%AE%D8%B1%20%D9%86%D8%B3%D8%AE%D8%A9&color=0F9D75)](https://github.com/WalidMahmoud101/nabd/releases/latest)
+[![النسخة](https://img.shields.io/github/v/release/WalidMahmoud101/geebak?label=%D8%A2%D8%AE%D8%B1%20%D9%86%D8%B3%D8%AE%D8%A9&color=0F9D75)](https://github.com/WalidMahmoud101/geebak/releases/latest)
 ![Android](https://img.shields.io/badge/Android-8%2B-3DDC84?logo=android&logoColor=white)
 [![الترخيص](https://img.shields.io/badge/%D8%A7%D9%84%D8%AA%D8%B1%D8%AE%D9%8A%D8%B5-MIT-blue)](LICENSE)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material3-4285F4?logo=jetpackcompose&logoColor=white)
 
-[**⬇️ نزّل آخر نسخة**](https://github.com/WalidMahmoud101/nabd/releases/latest) · [**🌐 صفحة التطبيق**](https://walidmahmoud101.github.io/nabd/about.html)
+[**⬇️ نزّل آخر نسخة**](https://github.com/WalidMahmoud101/geebak/releases/latest) · [**🌐 صفحة التطبيق**](https://walidmahmoud101.github.io/geebak/about.html)
 
 </div>
 
@@ -105,7 +105,7 @@
 - النسخة الاحتياطية ملف JSON بتحفظه في المكان اللي تختاره.
 
 ## التثبيت
-1. نزّل `nabd.apk` من [آخر نسخة](https://github.com/WalidMahmoud101/nabd/releases/latest) وثبّته (اسمح بالتثبيت من المصدر).
+1. نزّل `nabd.apk` من [آخر نسخة](https://github.com/WalidMahmoud101/geebak/releases/latest) وثبّته (اسمح بالتثبيت من المصدر).
 2. افتح التطبيق وادي صلاحيات الرسايل، وفعّل «الوصول للإشعارات» لجيبك.
 3. التحديثات بعد كده بتوصل من جوا التطبيق: كارت **«نزّل وثبّت»** في الرئيسية.
 
@@ -146,6 +146,6 @@
 
 <div align="center">
 
-اتعمل بحب في مصر 🇪🇬 · [الإبلاغ عن مشكلة](https://github.com/WalidMahmoud101/nabd/issues)
+اتعمل بحب في مصر 🇪🇬 · [الإبلاغ عن مشكلة](https://github.com/WalidMahmoud101/geebak/issues)
 
 </div>
