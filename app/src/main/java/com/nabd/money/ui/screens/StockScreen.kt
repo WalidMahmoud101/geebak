@@ -316,6 +316,10 @@ fun StockContent(
     val catalogHits = CarrefourCatalog.search(query, category?.takeIf { inCarrefour }).filter { StockCatalog.key(it.first) !in have }.take(8)
     // اللي بتدوّر عليه مش موجود؟ يبقى ضيفه من مكانك
     val canQuickAdd = q.isNotEmpty() && items.none { it.key == q }
+    // الخانة بتتخمّن من الاسم، وتقدر تغيّرها قبل ما تضيف
+    var quickTarget by remember(query) { mutableStateOf<String?>(null) }
+    val target = quickTarget ?: StockCatalog.targetFor(query, category)
+    val addQuick = { onAddTo(query.trim(), target) }
 
     LazyColumn(modifier, contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
@@ -375,7 +379,7 @@ fun StockContent(
                     placeholder = { Text("دوّر على حاجة أو اكتب صنف جديد") }, leadingIcon = { Icon(Icons.Rounded.Search, null) },
                     trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Rounded.Close, "امسح") } },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { if (canQuickAdd) onQuickAdd(query.trim()) }),
+                    keyboardActions = KeyboardActions(onDone = { if (canQuickAdd) addQuick() }),
                 )
             }
             if (catalogHits.isNotEmpty()) item {
@@ -396,10 +400,9 @@ fun StockContent(
                 }
             }
             if (canQuickAdd) item {
-                val target = StockCatalog.targetFor(query, category)
                 GlassCard(Modifier.fillMaxWidth(), padding = 4.dp) {
                     Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onQuickAdd(query.trim()) }.padding(horizontal = 8.dp, vertical = 8.dp),
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = addQuick).padding(horizontal = 8.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconBubble(Icons.Rounded.Add, NabdColors.Mint, 34.dp)
@@ -408,6 +411,9 @@ fun StockContent(
                             Text("ضيف «${query.trim()}»", style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text("في $target", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim, maxLines = 1)
                         }
+                    }
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        categories.forEach { c -> SelectChip(c, target == c, stockColor(c), stockIcon(c)) { quickTarget = c } }
                     }
                 }
             }
@@ -661,8 +667,8 @@ private fun StockAddSheet(items: List<StockItem>, initialOut: Boolean, initialCa
     var quantity by remember { mutableStateOf("") }
     val carrefourMode = initialCategory == StockCatalog.CARREFOUR
     var category by remember { mutableStateOf(initialCategory?.takeIf { !carrefourMode } ?: if (carrefourMode) StockCatalog.PANTRY else StockCatalog.FOOD) }
-    // طول ما انت مااخترتش تصنيف بإيدك، بنخمّنه من الاسم
-    var picked by remember { mutableStateOf(initialCategory != null && !carrefourMode) }
+    // طول ما انت مااخترتش خانة بإيدك، بنخمّنها من الاسم، حتى لو الفلتر واقف على خانة تانية
+    var picked by remember { mutableStateOf(false) }
     var out by remember { mutableStateOf(initialOut) }
     var newCategory by remember { mutableStateOf(false) }
     var custom by remember { mutableStateOf("") }
@@ -671,7 +677,8 @@ private fun StockAddSheet(items: List<StockItem>, initialOut: Boolean, initialCa
     val nameFocus = remember { FocusRequester() }
     val cats = (StockCatalog.builtIn + items.map { it.category }).distinct().filter { it !in StockCatalog.carrefour }
     val have = items.map { it.key }.toSet()
-    val guessed = name.takeIf { !picked && it.isNotBlank() }?.let { StockCatalog.targetFor(it, initialCategory.takeIf { carrefourMode }) }
+    val guessed = name.takeIf { !picked && it.isNotBlank() }
+        ?.let { if (carrefourMode) StockCatalog.guessCarrefour(it) else StockCatalog.guessCategory(it).takeIf { g -> g != StockCatalog.OTHER } }
     val chosen = if (newCategory) custom.trim() else guessed ?: category
     fun add(n: String, into: String = chosen) {
         if (n.isBlank() || into.isEmpty()) return
@@ -735,7 +742,7 @@ private fun StockAddSheet(items: List<StockItem>, initialOut: Boolean, initialCa
                     Icon(Icons.Rounded.Add, "ضيف ${item}", tint = NabdColors.Mint, modifier = Modifier.size(20.dp))
                 }
             }
-            Text("التصنيف", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+            Text("هتتضاف في: ${chosen.ifEmpty { "اختار خانة" }}. غيّرها من هنا", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 cats.forEach { c -> SelectChip(c, !newCategory && chosen == c, stockColor(c), stockIcon(c)) { category = c; picked = true; newCategory = false } }
                 SelectChip("تصنيف جديد", newCategory, NabdColors.Mint, Icons.Rounded.Add) { newCategory = true }
@@ -781,7 +788,6 @@ private fun StockItemSheet(vm: AppViewModel, item: StockItem, history: List<Stoc
     var store by remember { mutableStateOf("") }
     var editing by remember { mutableStateOf(false) }
     var name by remember(item.name) { mutableStateOf(item.name) }
-    var category by remember(item.category) { mutableStateOf(item.category) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
     var quantity by remember(item.quantity) { mutableStateOf(item.quantity?.let(StockCatalog::quantityText).orEmpty()) }
@@ -801,13 +807,19 @@ private fun StockItemSheet(vm: AppViewModel, item: StockItem, history: List<Stoc
             }
             if (editing) {
                 OutlinedTextField(name, { name = it; error = null }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp), label = { Text("الاسم") })
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    (StockCatalog.builtIn + items.map { it.category } + StockCatalog.carrefour).distinct().forEach { c -> SelectChip(c, category == c, stockColor(c), stockIcon(c)) { category = c } }
-                }
                 error?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = NabdColors.Danger) }
                 GradientButton("احفظ التعديل", Modifier.fillMaxWidth()) {
                     scope.launch {
-                        if (vm.editStock(item, name, category)) editing = false else error = "فيه حاجة تانية بنفس الاسم"
+                        if (vm.editStock(item, name, item.category)) editing = false else error = "فيه حاجة تانية بنفس الاسم"
+                    }
+                }
+            }
+            // الخانة بتتغير بلمسة، من غير ما تدخل على التعديل
+            Text("الخانة", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                (listOf(item.category) + StockCatalog.builtIn + items.map { it.category } + StockCatalog.carrefour).distinct().forEach { c ->
+                    SelectChip(c, item.category == c, stockColor(c), stockIcon(c)) {
+                        if (c != item.category) scope.launch { vm.editStock(item, item.name, c) }
                     }
                 }
             }

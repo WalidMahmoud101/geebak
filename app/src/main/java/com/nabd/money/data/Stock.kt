@@ -158,6 +158,8 @@ class StockStore(private val db: NabdDatabase) {
         if (key.isEmpty()) return@withTransaction null
         val existing = dao.stockItemsOnce().firstOrNull { it.key == key }
         if (existing != null) {
+            // ضفته تاني في خانة تانية: يبقى عايزه هناك، من غير ما يتكرر
+            if (existing.category != category) dao.updateStockItem(existing.copy(category = category))
             if (out && !existing.isOut) setOut(existing.id, true)
             if (quantity != null) setQuantity(existing.id, quantity)
             return@withTransaction dao.stockItem(existing.id)

@@ -136,6 +136,20 @@ class StockTest {
     }
 
     @Test
+    fun addingAnExistingItemToAnotherCategoryMovesIt() = runBlocking {
+        store.clear()
+        val salt = store.add("ملح", StockCatalog.KITCHEN)!!
+        store.addPrice(salt.id, 10.0)
+        val moved = store.add("ملح", StockCatalog.SPICES)!!
+        assertEquals(salt.id, moved.id)
+        assertEquals(StockCatalog.SPICES, moved.category)
+        assertEquals(1, dao.stockItemsOnce().size)
+        assertEquals(1, dao.stockPricesOnce().size)
+        assertTrue(store.edit(moved, moved.name, StockCatalog.CARE))
+        assertEquals(StockCatalog.CARE, dao.stockItem(salt.id)!!.category)
+    }
+
+    @Test
     fun spicesHaveTheirOwnCategory() {
         assertTrue(StockCatalog.SPICES in StockCatalog.builtIn)
         assertEquals(StockCatalog.SPICES, StockCatalog.guessCategory("ملح طعام"))
