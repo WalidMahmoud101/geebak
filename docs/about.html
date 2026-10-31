@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>نبض — نبض فلوسك لحظة بلحظة</title>
-<meta name="description" content="نبض: تطبيق أندرويد بالعربي بيقرا رسايل البنك والمحافظ ويسجل فلوسك لوحده. حسابات، مصاريف شركة، فاتورة وExcel، سعر الدولار والدهب، تسجيل بالصوت. مفتوح المصدر وبياناتك على موبايلك.">
+<meta name="description" content="نبض: تطبيق أندرويد بالعربي بيقرا رسايل البنك والمحافظ ويسجل فلوسك لوحده. حسابات، مصاريف شركة، فاتورة وExcel، مخزون البيت وقايمة الشرا، قراءة فواتير السوبر ماركت، سعر الدولار والدهب، تسجيل بالصوت. مفتوح المصدر وبياناتك على موبايلك.">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#FFFFFF">
 <meta property="og:title" content="نبض — نبض فلوسك لحظة بلحظة">
@@ -111,6 +111,16 @@ header{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1p
 .entry.said .quote{color:var(--ink);font-family:var(--display);font-weight:700;font-size:clamp(32px,4.4vw,54px);line-height:1.5;margin:10px 0 8px}
 .entry.said .quote span{display:inline-block;font:400 19px/1 "Plex",sans-serif;color:var(--dim);margin-inline:10px}
 
+/* المخزون: قسمه الكهرماني، زي فئة من الجنيه */
+.stock{background:#FBF1DC;--dim:#6B5A35;--line:#E9D9B5}
+.stock .entry h3{color:var(--gold)}
+.stock-body{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:56px;align-items:start;margin-top:56px}
+.stock .ledger{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 40px;margin-top:0}
+.stock .entry{padding-bottom:30px}
+.stock-phones{display:grid;grid-template-columns:1fr 1fr;gap:16px;position:sticky;top:96px}
+.stock-phones .phone{padding:6px;border-radius:28px}
+.stock-phones .phone img{border-radius:22px}
+
 /* البنوك */
 .banks{margin-top:24px}
 .banks h3{color:var(--dim);font-weight:400;font-size:19px}
@@ -194,6 +204,8 @@ footer a{color:var(--ink)}
   .phones .front{width:280px}
   .reading{grid-template-columns:1fr;gap:32px}
   .ledger,.entry.paper{gap:0 44px}
+  .stock-body{grid-template-columns:1fr;gap:32px}
+  .stock-phones{position:static;max-width:560px}
 }
 @media(max-width:820px){
   .wrap{padding:0 20px}
@@ -211,7 +223,7 @@ footer a{color:var(--ink)}
   .phones{height:430px;min-height:0;margin-top:8px}
   .phones .front{position:relative;bottom:auto;width:min(290px,76vw);margin-inline:auto;inset-inline:auto}
   .sec{padding:72px 0}
-  .ledger,.entry.paper,.steps,.faq,.two{grid-template-columns:1fr}
+  .ledger,.entry.paper,.steps,.faq,.two,.stock .ledger{grid-template-columns:1fr}
   .entry.paper{gap:22px}
   .entry.said{padding:28px 22px 30px}
   .steps{padding-top:0;gap:30px;margin-top:36px}
@@ -238,7 +250,7 @@ footer a{color:var(--ink)}
       نبض
     </a>
     <nav aria-label="أقسام الصفحة">
-      <a href="#features">المميزات</a><a href="#screens">الصور</a><a href="#privacy">الخصوصية</a><a href="#licenses">التراخيص</a><a href="#faq">أسئلة</a>
+      <a href="#features">المميزات</a><a href="#stock">المخزون</a><a href="#screens">الصور</a><a href="#privacy">الخصوصية</a><a href="#licenses">التراخيص</a><a href="#faq">أسئلة</a>
     </nav>
     <a class="btn" href="https://github.com/WalidMahmoud101/nabd/releases/latest">نزّل</a>
   </div>
@@ -250,12 +262,12 @@ footer a{color:var(--ink)}
   <div class="wrap">
     <h1>نبض فلوسك<br>لحظة بلحظة</h1>
     <div class="hero-body">
-      <p class="lead">تطبيق أندرويد بالعربي بيقرا رسايل البنك والمحافظ وإشعارات التطبيقات ويسجل كل حاجة لوحده، ويقولك فلوسك راحت فين، والشركة مديونالك بكام، وسعر الدولار والدهب النهاردة.</p>
+      <p class="lead">تطبيق أندرويد بالعربي بيقرا رسايل البنك والمحافظ وإشعارات التطبيقات ويسجل كل حاجة لوحده، ويقولك فلوسك راحت فين، والشركة مديونالك بكام، وإيه اللي خلص من البيت، وسعر الدولار والدهب النهاردة.</p>
       <div class="cta">
         <a class="btn" href="https://github.com/WalidMahmoud101/nabd/releases/latest"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13M6 11l6 6 6-6M4 21h16"/></svg>نزّل آخر نسخة</a>
         <a class="btn quiet" href="https://github.com/WalidMahmoud101/nabd">الكود على GitHub</a>
       </div>
-      <ul class="facts"><li>22 وكيل شغالين</li><li>بياناتك على موبايلك بس</li><li>مفتوح المصدر (MIT)</li><li>تحديث تلقائي</li></ul>
+      <ul class="facts"><li>22 وكيل شغالين</li><li>مخزون البيت وقايمة الشرا</li><li>بياناتك على موبايلك بس</li><li>مفتوح المصدر (MIT)</li><li>تحديث تلقائي</li></ul>
     </div>
     <div class="phones">
       <div class="phone back"><img src="screenshots/web/2_txns_light.webp" width="784" height="1700" loading="lazy" alt="شاشة العمليات"></div>
@@ -280,10 +292,10 @@ footer a{color:var(--ink)}
   </article>
 
   <div class="ledger">
-    <article class="entry"><h3>كل حساباتك</h3><p>إجمالي فلوسك، وإجمالي كل بنك ومحفظة وكارت. وتضيف Binance وTrust Wallet وVisa وGoogle Pay بإيدك بالمبلغ اللي معاك، وإشعاراتها بتتسجل عليها.</p></article>
+    <article class="entry"><h3>كل حساباتك</h3><p>إجمالي فلوسك، وإجمالي كل بنك ومحفظة وكارت. وتضيف Binance وTrust Wallet وVisa وGoogle Pay بإيدك بالمبلغ اللي معاك، وإشعاراتها بتتسجل عليها. وكل حساب بمزاجك: يتحسب في الإجمالي أو لأ، وتعدّله في أي وقت.</p></article>
     <article class="entry"><h3>مصاريف الشركة والعهدة</h3><p>اللي دفعته للشغل بالكمية والسعر، وفلوس الشركة اللي معاك، والصافي بينكم. والتحويل منها يقفل المصاريف المستحقة لوحده.</p></article>
     <article class="entry paper">
-      <div><h3>فاتورة PDF وExcel</h3><p>فاتورة باسم نبض جاهزة للطباعة وملف Excel للمحاسب بإجمالي بمعادلة، من مصاريف الشركة بضغطة.</p></div>
+      <div><h3>فاتورة PDF وExcel</h3><p>فاتورة باسم نبض جاهزة للطباعة وملف Excel للمحاسب بإجمالي بمعادلة، من مصاريف الشركة بضغطة. وكل فاتورة بتتحفظ برقمها وتبحث بيه.</p></div>
       <figure><img src="screenshots/web/invoice.webp" width="952" height="1347" loading="lazy" alt="فاتورة مصاريف من نبض ببيانات تجريبية"></figure>
     </article>
     <article class="entry said">
@@ -294,12 +306,35 @@ footer a{color:var(--ink)}
     <article class="entry"><h3>الدولار والدهب</h3><p>سعر الدولار بيتحدث لوحده، واضغط على إجمالي فلوسك يتحول للدولار. وسعر الدهب بالجنيه لعيار 24 و21 و18 و14 والجنيه الدهب.</p></article>
     <article class="entry"><h3>المرتب بيتعلم</h3><p>اكتب اسم الشركة مرة واحدة، وأي تحويل منها يتسجل مرتب. بيتعلم يوم القبض وينبهك لو اتأخر.</p></article>
     <article class="entry"><h3>تصنيفات وقواعد بتظبطها</h3><p>صناديق للبيت والشغل والعربية، وقواعد من جزء من الرسالة بتعدلها وقت ما تحب، وفلتر قوي وإخفاء عمليات وحسابات.</p></article>
-    <article class="entry"><h3>نسخ احتياطي وتحديث</h3><p>نسخة على Google Drive أو الموبايل ورجوع منها، و«ابدأ من جديد» بزرار تراجع، وتحديث تلقائي من GitHub بنفس بياناتك.</p></article>
+    <article class="entry"><h3>نسخ احتياطي وتحديث</h3><p>نسخة على Google Drive أو الموبايل ورجوع منها، و«ابدأ من جديد» بزرار تراجع، وتحديث تلقائي من GitHub بنفس بياناتك مع زرار «وقّف» وقت التنزيل. والنسخة بتشيل المخزون وأسعاره كمان.</p></article>
   </div>
 
   <div class="banks">
     <h3>بيفهم رسايل</h3>
     <ul><li>البنك الأهلي</li><li>CIB</li><li>بنك مصر</li><li>QNB</li><li>أي بنك تاني</li><li>InstaPay</li><li>فودافون كاش</li><li>أورنج كاش</li><li>e&amp; كاش</li><li>WE Pay</li><li>فوري</li><li>Google Pay</li><li>Binance</li><li>Trust Wallet</li><li>RedotPay</li><li>Kast</li></ul>
+  </div>
+</div></section>
+
+<section class="sec stock" id="stock"><div class="wrap">
+  <div class="stock-head">
+    <div>
+      <h2>مخزون البيت وقايمة الشرا</h2>
+      <p class="sub">اعرف إيه اللي في البيت وإيه اللي خلص، وصوّر الفاتورة تعرف السعر غالي ولا رخيص.</p>
+    </div>
+  </div>
+  <div class="stock-body">
+    <div class="ledger">
+      <article class="entry"><h3>قايمة الشرا لوحدها</h3><p>علّم اللي خلص بلمسة، يدخل القايمة بآخر سعر والمبلغ المتوقع. ولما تجيبه، اكتب جبت كام وبكام أو سيب السعر فاضي.</p></article>
+      <article class="entry"><h3>الكمية في البيت</h3><p>تحت سعر كل صنف الكمية بزرارين. لما توصل صفر ينزل على قايمة الشرا، والفاتورة بتزوّدها لوحدها.</p></article>
+      <article class="entry"><h3>صوّر الفاتورة</h3><p>الأصناف والأسعار والأوزان والخصم بتتقرا على موبايلك، حتى لو الفاتورة مايلة أو على سجادة. وتراجعها وتعدّلها قبل الحفظ.</p></article>
+      <article class="entry"><h3>غالي ولا رخيص</h3><p>كل سعر جديد بيتقارن بآخر مرة: غالي +14% أو رخيص −13% أو زي اللي فات. والحجم المختلف مابيتخلطش.</p></article>
+      <article class="entry"><h3>خانة كارفور</h3><p>12 قسم زي السوبر ماركت، وفيها 331 صنف تضيفهم بلمسة. والأسعار بتيجي من فواتيرك، مش من كارفور.</p></article>
+      <article class="entry"><h3>ضيف وابحث بسرعة</h3><p>دوّر في كل التصنيفات والأقسام مرة واحدة، وفلتر بالنوع والحالة، وضيف أي صنف جديد في التصنيف اللي واقف عليه. وتمسح تصنيف أو المخزون كله بزرار رجوع.</p></article>
+    </div>
+    <div class="stock-phones">
+      <div class="phone"><img src="screenshots/web/6_stock_light.webp" width="784" height="1700" loading="lazy" alt="شاشة المخزون بالكمية وشارات غالي ورخيص"></div>
+      <div class="phone"><img src="screenshots/web/8_receipt_light.webp" width="784" height="1700" loading="lazy" alt="مراجعة الفاتورة قبل الحفظ"></div>
+    </div>
   </div>
 </div></section>
 
@@ -331,6 +366,10 @@ footer a{color:var(--ink)}
     <figure><div class="phone"><img src="screenshots/web/3_reports_light.webp" width="784" height="1700" loading="lazy" alt="التقارير"></div><figcaption>التقارير</figcaption></figure>
     <figure><div class="phone"><img src="screenshots/web/4_accounts_light.webp" width="784" height="1700" loading="lazy" alt="الحسابات"></div><figcaption>الحسابات</figcaption></figure>
     <figure><div class="phone"><img src="screenshots/web/5_company_light.webp" width="784" height="1700" loading="lazy" alt="مصاريف الشركة"></div><figcaption>مصاريف الشركة</figcaption></figure>
+    <figure><div class="phone"><img src="screenshots/web/6_stock_light.webp" width="784" height="1700" loading="lazy" alt="المخزون"></div><figcaption>المخزون</figcaption></figure>
+    <figure><div class="phone"><img src="screenshots/web/7_shopping_light.webp" width="784" height="1700" loading="lazy" alt="قايمة الشرا"></div><figcaption>قايمة الشرا</figcaption></figure>
+    <figure><div class="phone"><img src="screenshots/web/8_receipt_light.webp" width="784" height="1700" loading="lazy" alt="مراجعة الفاتورة"></div><figcaption>مراجعة الفاتورة</figcaption></figure>
+    <figure><div class="phone"><img src="screenshots/web/9_carrefour_light.webp" width="784" height="1700" loading="lazy" alt="أقسام كارفور"></div><figcaption>أقسام كارفور</figcaption></figure>
     <figure class="sheet-shot"><img src="screenshots/web/invoice.webp" width="952" height="1347" loading="lazy" alt="الفاتورة"><figcaption>فاتورة PDF للمحاسب</figcaption></figure>
     <figure><div class="phone"><img src="screenshots/web/about_light.webp" width="784" height="1700" loading="lazy" alt="عن نبض"></div><figcaption>عن نبض</figcaption></figure>
   </div>
@@ -342,13 +381,14 @@ footer a{color:var(--ink)}
     <div class="two">
       <ul>
         <li>الرسايل والإشعارات بتتقرا على الموبايل ومابتتبعتش لأي مكان.</li>
+        <li>صورة الفاتورة بتتقرا على موبايلك من غير نت. لقطة الكاميرا بتتمسح بعدها، وصورة المعرض بتفضل مكانها.</li>
         <li>قاعدة البيانات على موبايلك، والنسخة الاحتياطية ملف بتحفظه في المكان اللي انت تختاره.</li>
         <li>الكود كله مفتوح تقدر تراجعه بنفسك.</li>
       </ul>
       <ul>
         <li><b>النت بيُستخدم لتلات حاجات بس:</b> تحديثات التطبيق من GitHub، وسعر الدولار، وسعر الدهب.</li>
         <li>مفيش بيانات مالية بتطلع في أي طلب.</li>
-        <li>الصلاحيات: قراءة الرسايل، الإشعارات، وإشعارات التطبيق.</li>
+        <li>الصلاحيات: قراءة الرسايل، الإشعارات، وإشعارات التطبيق. ومن غير صلاحية كاميرا: التصوير بتطبيق الكاميرا بتاعك.</li>
       </ul>
     </div>
 </div></section>
@@ -368,6 +408,9 @@ footer a{color:var(--ink)}
       <tr><td>AndroidX (Core، Activity، Lifecycle)</td><td>أساسيات أندرويد</td><td>Apache 2.0</td></tr>
       <tr><td>Room</td><td>قاعدة البيانات على الموبايل</td><td>Apache 2.0</td></tr>
       <tr><td>WorkManager</td><td>المراجعة الدورية في الخلفية</td><td>Apache 2.0</td></tr>
+      <tr><td>Tesseract OCR · Tesseract4Android</td><td>قراءة الفواتير على الموبايل</td><td>Apache 2.0</td></tr>
+      <tr><td>tessdata_fast (ara، eng)</td><td>نماذج القراءة جوه التطبيق</td><td>Apache 2.0</td></tr>
+      <tr><td>Leptonica · libjpeg · libpng</td><td>تجهيز صور الفواتير</td><td>BSD-2 · IJG · libpng-2.0</td></tr>
       <tr><td>IBM Plex Sans Arabic · © 2019 IBM Corp.</td><td>الخط (في التطبيق وفي الصفحة دي)</td><td>SIL OFL 1.1</td></tr>
       <tr><td>Amiri · © 2010-2022 The Amiri Project Authors</td><td>خط العناوين في الصفحة دي</td><td>SIL OFL 1.1</td></tr>
       <tr><td>JUnit 4 · Robolectric · AndroidX Test</td><td>الاختبارات فقط</td><td>EPL 1.0 · MIT · Apache 2.0</td></tr>
@@ -384,8 +427,11 @@ footer a{color:var(--ink)}
   <div>
     <details><summary>هل نبض بيبعت بياناتي لأي مكان؟</summary><p>لأ. كل حاجة على موبايلك. النت بيُستخدم لتحديث التطبيق وسعر الدولار وسعر الدهب بس، ومفيش بيانات مالية بتتبعت.</p></details>
     <details><summary>ليه محتاج صلاحية الرسايل والإشعارات؟</summary><p>علشان يقرا رسايل البنك والمحافظ ويسجل العمليات لوحده. التطبيقات زي InstaPay وBinance مابتدّيش API، فنبض بيقرا إشعاراتها اللي بتظهر على الموبايل.</p></details>
+    <details><summary>صورة الفاتورة بتروح فين؟</summary><p>مابتطلعش من موبايلك. القراءة بتتم جوه التطبيق من غير نت، واللي بيتحفظ هو الأصناف والأسعار بعد ما تراجعها.</p></details>
+    <details><summary>قراءة الفاتورة دقيقة؟</summary><p>بتتحسن بالإضاءة الكويسة والفاتورة المفرودة، بس ممكن تغلط في بعض الأرقام والأسماء، خصوصاً الأرقام العربية. علشان كده فيه شاشة مراجعة قبل الحفظ، وبتنبهك لو المجموع مش مطابق.</p></details>
+    <details><summary>نبض تبع كارفور؟</summary><p>لأ. خانة كارفور قايمة أقسام وأصناف جاهزة جوه التطبيق علشان الإضافة تبقى أسرع، من غير اتصال بكارفور ومن غير أسعار منه. والقايمة بتتحدث مع التطبيق.</p></details>
     <details><summary>ينفع على آيفون؟ وApple Pay؟</summary><p>نبض أندرويد بس. وApple Pay مابيبعتش إشعارات لأندرويد، فعملياته بتتسجل بإيدك أو بالصوت.</p></details>
-    <details><summary>هو على Google Play؟</summary><p>لأ، بسبب صلاحية الرسايل. بتنزّله من صفحة GitHub وبيتحدث لوحده من جوا التطبيق.</p></details>
+    <details><summary>هو على Google Play؟</summary><p>لأ، بسبب صلاحية الرسايل. بتنزّله من صفحة GitHub وبيتحدث من جوا التطبيق. نبض بيتحقق لما تفتحه، وكل كام ساعة في الخلفية، وبيقولك لما تنزل نسخة جديدة.</p></details>
     <details><summary>التحديث بيمسح بياناتي؟</summary><p>لأ. التحديث بيتثبّت فوق القديم بنفس المفتاح، والبيانات بتفضل. وتقدر تعمل نسخة احتياطية قبلها.</p></details>
     <details><summary>سعر الدهب ده سعر المحلات؟</summary><p>ده السعر العالمي × سعر الدولار. محلات الصاغة بتزود المصنعية والدمغة، فيه خانة علاوة أو خصم السوق المحلي تضبطها.</p></details>
     <details><summary>لقيت مشكلة أو عايز ميزة؟</summary><p>افتح <a class="link" href="https://github.com/WalidMahmoud101/nabd/issues">Issue على GitHub</a> وهنبص عليها.</p></details>
