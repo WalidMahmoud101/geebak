@@ -224,6 +224,21 @@ class StockStore(private val db: NabdDatabase) {
         dao.putStockPrices(s.prices.map { p -> moved[p.itemId]?.let { p.copy(itemId = it) } ?: p })
     }
 
+    /** شيل أصناف من قايمة الشرا. الصنف بيفضل في المخزون بأسعاره، وبيرجع اللي اتشال علشان التراجع */
+    suspend fun removeFromList(ids: List<Long>): List<StockItem> = db.withTransaction {
+        val items = dao.stockItemsOnce().filter { it.id in ids && it.isOut }
+        items.forEach { setOut(it.id, false) }
+        items
+    }
+
+    /** بيرجّع حالة الأصناف زي ما كانت قبل ما تتشال من القايمة */
+    suspend fun restoreToList(items: List<StockItem>) = db.withTransaction {
+        items.forEach { old ->
+            val now = dao.stockItem(old.id) ?: return@forEach
+            dao.updateStockItem(now.copy(isOut = old.isOut, outAt = old.outAt, quantity = old.quantity))
+        }
+    }
+
     /** سعر جديد بإيدك. لو جبت الحاجة، بترجع موجودة في البيت */
     suspend fun addPrice(id: Long, price: Double, store: String? = null, at: Long = System.currentTimeMillis(), bought: Double? = null) = db.withTransaction {
         dao.insertStockPrice(StockPrice(itemId = id, price = price, qty = bought ?: 1.0, store = store?.trim()?.takeIf { it.isNotEmpty() }, at = at))

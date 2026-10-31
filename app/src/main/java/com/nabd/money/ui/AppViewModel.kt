@@ -520,6 +520,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         stockUndo.value = null
     }
 
+    /** آخر أصناف اتشالت من قايمة الشرا، علشان زرار "رجّعهم" */
+    val shoppingUndo = MutableStateFlow<List<com.nabd.money.data.StockItem>?>(null)
+
+    fun removeFromShopping(ids: List<Long>) = viewModelScope.launch(Dispatchers.IO) { shoppingUndo.value = stock.removeFromList(ids) }
+
+    fun undoShopping() = viewModelScope.launch(Dispatchers.IO) {
+        shoppingUndo.value?.let { stock.restoreToList(it) }
+        shoppingUndo.value = null
+    }
+
     /** الفاتورة اللي بتتقرا أو بتتراجع دلوقتي. موجودة هنا علشان تعديلاتك ماتضيعش لو الشاشة لفت */
     val receipt = MutableStateFlow<ReceiptSession?>(null)
     val receiptReading = MutableStateFlow(false)

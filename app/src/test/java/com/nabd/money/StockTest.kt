@@ -150,6 +150,26 @@ class StockTest {
     }
 
     @Test
+    fun removingFromTheListKeepsItemsAndCanBeUndone() = runBlocking {
+        store.clear()
+        val a = store.add("رز", StockCatalog.FOOD, out = true, quantity = 2.0)!!
+        val b = store.add("سكر", StockCatalog.FOOD, out = true)!!
+        val c = store.add("شاي", StockCatalog.FOOD)!!
+        store.addPrice(a.id, 40.0)
+        store.setOut(a.id, true)
+        val before = dao.stockItem(a.id)!!
+        val removed = store.removeFromList(listOf(a.id, b.id, c.id))
+        assertEquals(setOf(a.id, b.id), removed.map { it.id }.toSet())
+        assertTrue(dao.stockItemsOnce().none { it.isOut })
+        assertEquals(3, dao.stockItemsOnce().size)
+        assertEquals(1, dao.stockPricesOnce().size)
+        store.restoreToList(removed)
+        assertEquals(before, dao.stockItem(a.id))
+        assertTrue(dao.stockItem(b.id)!!.isOut)
+        assertFalse(dao.stockItem(c.id)!!.isOut)
+    }
+
+    @Test
     fun spicesHaveTheirOwnCategory() {
         assertTrue(StockCatalog.SPICES in StockCatalog.builtIn)
         assertEquals(StockCatalog.SPICES, StockCatalog.guessCategory("ملح طعام"))

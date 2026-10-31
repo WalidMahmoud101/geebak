@@ -204,6 +204,7 @@ fun StockScreen(vm: AppViewModel, onBack: () -> Unit) {
     val session by vm.receipt.collectAsStateWithLifecycle()
     val message by vm.stockMessage.collectAsStateWithLifecycle()
     val undo by vm.stockUndo.collectAsStateWithLifecycle()
+    val shoppingUndo by vm.shoppingUndo.collectAsStateWithLifecycle()
     var page by rememberSaveable { mutableStateOf(0) }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -248,9 +249,10 @@ fun StockScreen(vm: AppViewModel, onBack: () -> Unit) {
         onQuickAdd = { vm.addStock(it, StockCatalog.targetFor(it, category), page == 1); query = "" },
         onAddTo = { name, dept -> vm.addStock(name, dept, page == 1); query = "" },
         onClear = { confirmClear = true },
-        undoCount = undo?.items?.size ?: 0,
-        onUndo = { vm.undoClearStock() },
-        onDismissUndo = { vm.stockUndo.value = null },
+        onRemoveFromList = { vm.removeFromShopping(it) },
+        undoText = shoppingUndo?.let { "اتشال ${it.size} من قايمة الشرا" } ?: undo?.let { "اتمسح ${it.items.size} حاجة" },
+        onUndo = { if (shoppingUndo != null) vm.undoShopping() else vm.undoClearStock() },
+        onDismissUndo = { if (shoppingUndo != null) vm.shoppingUndo.value = null else vm.stockUndo.value = null },
     )
 
     if (confirmClear) {
@@ -298,11 +300,16 @@ fun StockContent(
     onQuickAdd: (String) -> Unit = {},
     onAddTo: (String, String) -> Unit = { _, _ -> },
     onClear: () -> Unit = {},
-    undoCount: Int = 0,
+    onRemoveFromList: (List<Long>) -> Unit = {},
+    undoText: String? = null,
     onUndo: () -> Unit = {},
     onDismissUndo: () -> Unit = {},
 ) {
     val out = items.filter { it.isOut }
+    // تحديد أصناف من قايمة الشرا علشان تتشال
+    var selecting by rememberSaveable { mutableStateOf(false) }
+    var picked by remember { mutableStateOf(setOf<Long>()) }
+    fun stopSelecting() { selecting = false; picked = emptySet() }
     val categories = (StockCatalog.builtIn + items.map { it.category } + StockCatalog.carrefour).distinct()
     val q = StockCatalog.key(query)
     // فلتر الحالة مع البحث بالصنف وشرايح النوع: 0 الكل، 1 موجود، 2 خلصت
@@ -343,10 +350,10 @@ fun StockContent(
                 }
             }
         }
-        if (undoCount > 0) item {
+        if (undoText != null) item {
             GlassCard(Modifier.fillMaxWidth(), padding = 4.dp) {
                 Row(Modifier.padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("اتمسح $undoCount حاجة", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                    Text(undoText, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                     TextButton(onClick = onUndo) { Text("رجّعهم", color = NabdColors.Mint) }
                     IconButton(onClick = onDismissUndo) { Icon(Icons.Rounded.Close, "إخفاء", tint = NabdColors.TextFaint, modifier = Modifier.size(18.dp)) }
                 }
@@ -459,6 +466,20 @@ fun StockContent(
             if (out.isEmpty()) {
                 item { EmptyState(Icons.Rounded.ShoppingCart, "مفيش حاجة خلصت", "علّم أي حاجة «خلصت» من «في البيت» وهتظهر هنا وانت نازل تشتري.") }
             } else {
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (selecting) {
+                            PillButton("شيل المحدد (${picked.size})", Icons.Rounded.Delete, NabdColors.Danger, Modifier.weight(1.4f)) {
+                                if (picked.isNotEmpty()) onRemoveFromList(picked.toList())
+                                stopSelecting()
+                            }
+                            PillButton("إلغاء", null, NabdColors.TextDim, Modifier.weight(1f)) { stopSelecting() }
+                        } else {
+                            PillButton("حدد", Icons.Rounded.CheckCircle, NabdColors.Mint, Modifier.weight(1f)) { selecting = true }
+                            PillButton("شيل الكل", Icons.Rounded.Delete, NabdColors.Danger, Modifier.weight(1f)) { onRemoveFromList(out.map { it.id }) }
+                        }
+                    }
+                }
                 val estimate = out.sumOf { prices[it.id]?.firstOrNull()?.price ?: 0.0 }
                 val unknown = out.count { prices[it.id].isNullOrEmpty() }
                 if (estimate > 0) item {
@@ -475,7 +496,9 @@ fun StockContent(
                         GlassCard(Modifier.fillMaxWidth(), padding = 4.dp) {
                             inCat.forEachIndexed { i, it ->
                                 if (i > 0) HorizontalDivider(color = NabdColors.Stroke, modifier = Modifier.padding(horizontal = 10.dp))
-                                ShoppingRow(it, prices[it.id]?.firstOrNull()) { onBought(it) }
+                                ShoppingRow(it, prices[it.id]?.firstOrNull(), selecting, it.id in picked) {
+                                    if (selecting) picked = if (it.id in picked) picked - it.id else picked + it.id else onBought(it)
+                                }
                             }
                         }
                     }
@@ -602,12 +625,13 @@ private fun StepButton(label: String, description: String, enabled: Boolean, onC
 }
 
 @Composable
-private fun ShoppingRow(item: StockItem, last: StockPrice?, onBought: () -> Unit) {
+private fun ShoppingRow(item: StockItem, last: StockPrice?, selecting: Boolean, checked: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onBought).padding(horizontal = 8.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Rounded.RadioButtonUnchecked, "جبتها", tint = NabdColors.TextFaint, modifier = Modifier.size(22.dp))
+        if (checked) Icon(Icons.Rounded.CheckCircle, "متحدد", tint = NabdColors.Danger, modifier = Modifier.size(22.dp))
+        else Icon(Icons.Rounded.RadioButtonUnchecked, if (selecting) "حدد" else "جبتها", tint = NabdColors.TextFaint, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(10.dp))
         Text(item.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         last?.let { Text("كانت بـ ${Money.fmt(it.price)}", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim, maxLines = 1) }

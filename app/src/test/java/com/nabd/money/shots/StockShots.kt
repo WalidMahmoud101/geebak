@@ -85,7 +85,7 @@ class StockShots {
         StockContent(
             items, prices, 0, {}, null, {}, "مخلل", {}, reading = false,
             onBack = {}, onAdd = {}, onCamera = {}, onGallery = {}, onManualReceipt = {}, onToggle = {}, onOpen = {}, onBought = {},
-            modifier = Modifier.fillMaxSize().background(NabdColors.Bg), undoCount = 7,
+            modifier = Modifier.fillMaxSize().background(NabdColors.Bg), undoText = "اتمسح 7 حاجة",
         )
     }
 
