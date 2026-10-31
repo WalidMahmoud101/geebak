@@ -79,6 +79,7 @@ header{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:1p
 .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
 .facts{display:flex;flex-wrap:wrap;gap:6px 30px;margin-top:30px;font-size:16px;color:var(--dim)}
 .band{position:absolute;inset-inline:0;top:calc(56px + 2.44*var(--h1) - 60px);width:100%;height:clamp(290px,27vw,390px);pointer-events:none}
+.band{overflow:hidden}
 .band path{fill:none;stroke:url(#iris);stroke-width:1.15;vector-effect:non-scaling-stroke}
 .phones{grid-column:2;grid-row:1/3;position:relative;align-self:end;height:calc(100% - 40px);min-height:640px}
 .phone{background:var(--frame);padding:7px;border-radius:34px;overflow:hidden}
@@ -187,11 +188,16 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:14px 40px;align-items:center;justif
 footer div div{display:flex;flex-wrap:wrap;gap:6px 24px}
 footer a{color:var(--ink)}
 
-/* حركة واحدة بس: النقش بيترسم مرة واحدة عند الفتح */
+/* النقش بيترسم عند الفتح، وبعدها الشريط بيتحرك بهدوء */
 @media (prefers-reduced-motion:no-preference){
   .band path{stroke-dasharray:1;stroke-dashoffset:1;animation:engrave 1.9s cubic-bezier(.3,.1,.2,1) forwards;animation-delay:calc(var(--i)*14ms)}
 }
 @keyframes engrave{to{stroke-dashoffset:0}}
+@keyframes flow{to{transform:translateX(-1600px)}}
+@media (prefers-reduced-motion:no-preference){
+  #ribbon{animation:flow 46s linear infinite}
+  .band.paused #ribbon{animation-play-state:paused}
+}
 @media (prefers-reduced-motion:no-preference){.gallery{scroll-behavior:smooth}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 
@@ -304,7 +310,7 @@ footer a{color:var(--ink)}
 
 <main id="top">
 <div class="hero">
-  <svg class="band" id="band" viewBox="0 0 1600 340" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="iris" gradientUnits="userSpaceOnUse" x1="1600" y1="0" x2="0" y2="0"><stop offset="0" style="stop-color:#BFE3D4"/><stop offset=".22" style="stop-color:var(--green)"/><stop offset=".5" style="stop-color:#D99A1E"/><stop offset=".78" style="stop-color:var(--green)"/><stop offset="1" style="stop-color:#BFE3D4"/></linearGradient></defs></svg>
+  <svg class="band" id="band" viewBox="0 0 1600 340" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="iris" gradientUnits="userSpaceOnUse" x1="1600" y1="0" x2="0" y2="0" spreadMethod="repeat"><stop offset="0" style="stop-color:#BFE3D4"/><stop offset=".22" style="stop-color:var(--green)"/><stop offset=".5" style="stop-color:#D99A1E"/><stop offset=".78" style="stop-color:var(--green)"/><stop offset="1" style="stop-color:#BFE3D4"/></linearGradient></defs><g id="ribbon"></g></svg>
   <div class="wrap">
     <h1>جيبك معاك<br>لحظة بلحظة</h1>
     <div class="hero-body">
@@ -500,19 +506,26 @@ footer a{color:var(--ink)}
   var NS='http://www.w3.org/2000/svg',TAU=Math.PI*2;
   // نقش البنكنوت: حبل من خطوط رفيعة
   function band(svg){
-    var N=40,d,x,y,i,p;
+    var N=40,LOOP=1600,d,x,y,i,p,g=document.getElementById('ribbon');
+    var k1=TAU*3/LOOP,k2=TAU/LOOP;
     for(i=0;i<N;i++){
       var ph=i/N*TAU,h=74+58*Math.cos(ph);
       d='';
-      for(x=1600;x>=0;x-=5){
-        var rope=(52+26*Math.sin(x*.0043))*Math.sin(x*.0105+ph);
-        y=172+rope+h*.16*Math.sin(x*.003+ph*.2);
+      // ضعف العرض وكل الموجات بتكمّل دورة كاملة، فالحركة بتلف من غير ما تبان بدايتها
+      for(x=LOOP*2;x>=0;x-=6){
+        var rope=(52+26*Math.sin(x*k2))*Math.sin(x*k1+ph);
+        y=172+rope+h*.16*Math.sin(x*k2+ph*.2);
         d+=(d?'L':'M')+x+' '+y.toFixed(1);
       }
       p=document.createElementNS(NS,'path');
       p.setAttribute('d',d);p.setAttribute('pathLength','1');p.style.setProperty('--i',i);
-      svg.appendChild(p);
+      g.appendChild(p);
     }
+  }
+  // الشريط بيفضل يتحرك، وبيقف لما يخرج من الشاشة علشان البطارية
+  function flow(svg){
+    if(!('IntersectionObserver' in window))return;
+    new IntersectionObserver(function(es){svg.classList.toggle('paused',!es[0].isIntersecting)}).observe(svg);
   }
   // الظهور وانت بتنزل في الصفحة: مرة واحدة بس، والعناصر اللي جنب بعض ورا بعض
   function reveal(){
@@ -537,6 +550,7 @@ footer a{color:var(--ink)}
   reveal();
   pager();
   band(document.getElementById('band'));
+  flow(document.getElementById('band'));
 })();
 </script>
 </body>
