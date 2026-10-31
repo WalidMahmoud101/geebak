@@ -136,6 +136,16 @@ class StockTest {
     }
 
     @Test
+    fun spicesHaveTheirOwnCategory() {
+        assertTrue(StockCatalog.SPICES in StockCatalog.builtIn)
+        assertEquals(StockCatalog.SPICES, StockCatalog.guessCategory("ملح طعام"))
+        assertEquals(StockCatalog.SPICES, StockCatalog.guessCategory("بهارات مشكلة"))
+        assertEquals(StockCatalog.SPICES, StockCatalog.guessCategory("كمون"))
+        assertEquals(StockCatalog.KITCHEN, StockCatalog.guessCategory("زيت عباد"))
+        assertTrue(CarrefourCatalog.searchEverywhere("كركم").any { it.second == StockCatalog.SPICES })
+    }
+
+    @Test
     fun quantityFollowsTheShoppingList() = runBlocking {
         store.clear()
         val a = store.add("رز", StockCatalog.FOOD, quantity = 2.0)!!

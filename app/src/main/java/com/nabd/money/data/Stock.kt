@@ -7,6 +7,7 @@ import com.nabd.money.agents.MoneyParser
 /** تصنيفات المخزون الجاهزة، والمفتاح اللي بيخلّي نفس الصنف يتعرف بأكتر من كتابة */
 object StockCatalog {
     const val KITCHEN = "المطبخ"
+    const val SPICES = "التوابل والبهارات"
     const val BATH = "الحمام"
     const val CLEANING = "النظافة والغسيل"
     const val FOOD = "الأكل والشرب"
@@ -14,7 +15,7 @@ object StockCatalog {
     const val LUXURY = "الرفاهية"
     const val OTHER = "حاجات تانية"
 
-    val builtIn = listOf(KITCHEN, FOOD, MEAT, CLEANING, BATH, LUXURY, OTHER)
+    val builtIn = listOf(KITCHEN, SPICES, FOOD, MEAT, CLEANING, BATH, LUXURY, OTHER)
 
     /** خانة كارفور: أقسام السوبر ماركت، لمين بيرتب المخزون زي ما بيلاقيه هناك */
     const val CARREFOUR = "كارفور"
@@ -35,7 +36,8 @@ object StockCatalog {
 
     /** أمثلة بتظهر وانت بتضيف، علشان أول مرة ماتبدأش من ورقة فاضية */
     val suggestions: Map<String, List<String>> = mapOf(
-        KITCHEN to listOf("زيت", "سمنة", "ملح", "فلفل", "بهارات", "خل", "أكياس زبالة", "ورق فويل"),
+        KITCHEN to listOf("زيت", "سمنة", "خل", "أكياس زبالة", "ورق فويل"),
+        SPICES to listOf("ملح", "فلفل أسود", "بهارات مشكلة", "كمون", "كزبرة ناشفة", "كركم", "بابريكا", "قرفة", "حبهان", "قرنفل", "زنجبيل", "ورق لورا", "شطة", "ثوم بودرة", "بصل بودرة", "جوزة الطيب", "بهارات كفتة", "بهارات فراخ", "مرقة"),
         FOOD to listOf("رز", "مكرونة", "سكر", "شاي", "قهوة", "لبن", "بيض", "جبنة", "عيش", "مياه"),
         MEAT to listOf("لحمة مفرومة", "فراخ", "بانيه", "كفتة", "سجق", "برجر", "كبدة", "سمك"),
         CLEANING to listOf("مسحوق غسيل", "منعم ملابس", "سائل أطباق", "كلور", "ديتول", "سلك مواعين"),
@@ -74,7 +76,8 @@ object StockCatalog {
         CLEANING to listOf("مسحوق", "غسيل", "منعم", "كلور", "ديتول", "فلاش", "اطباق", "مواعين", "اريال", "برسيل", "تايد", "داوني", "فيري", "ariel", "persil", "tide", "downy", "fairy", "clorox", "dettol", "detergent", "softener"),
         BATH to listOf("صابون", "شامبو", "معجون", "فرشه", "تواليت", "مناديل", "شاور", "بلسم", "مزيل عرق", "حفاضات", "فوط", "soap", "shampoo", "toothpaste", "tissue", "diaper"),
         LUXURY to listOf("شوكولا", "شيكولا", "بسكويت", "مكسرات", "ايس كريم", "شيبسي", "حلويات", "جاتوه", "كيك", "نسكافيه", "chocolate", "biscuit", "chips", "nuts", "ice cream"),
-        KITCHEN to listOf("زيت", "سمن", "ملح", "فلفل", "بهارات", "خل", "فويل", "اكياس", "كمون", "oil", "salt", "spice", "foil"),
+        SPICES to listOf("ملح", "فلفل", "بهار", "توابل", "كمون", "كركم", "بابريكا", "قرفه", "حبهان", "قرنفل", "زنجبيل", "ورق لورا", "شطه", "جوزه الطيب", "كزبره ناشفه", "salt", "pepper", "spice", "cumin", "paprika"),
+        KITCHEN to listOf("زيت", "سمن", "خل", "فويل", "اكياس", "oil", "foil"),
         FOOD to listOf("رز", "ارز", "مكرونه", "سكر", "شاي", "قهوه", "لبن", "حليب", "بيض", "جبن", "عيش", "خبز", "مياه", "عصير", "زبادي", "فول", "عدس", "دقيق", "صلصه", "تونه", "خضار", "فاكهه", "rice", "pasta", "sugar", "tea", "coffee", "milk", "egg", "cheese", "bread", "water", "juice", "yogurt"),
     )
 

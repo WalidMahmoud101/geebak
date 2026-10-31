@@ -50,6 +50,7 @@ import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Restaurant
+import androidx.compose.material.icons.rounded.Spa
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material3.AlertDialog
@@ -113,6 +114,7 @@ import kotlinx.coroutines.launch
 
 fun stockIcon(category: String): ImageVector = when (category) {
     StockCatalog.KITCHEN -> Icons.Rounded.Kitchen
+    StockCatalog.SPICES -> Icons.Rounded.Spa
     StockCatalog.FOOD -> Icons.Rounded.Restaurant
     StockCatalog.MEAT -> Icons.Rounded.KebabDining
     StockCatalog.CLEANING -> Icons.Rounded.CleaningServices
@@ -130,6 +132,7 @@ fun stockIcon(category: String): ImageVector = when (category) {
 
 fun stockColor(category: String): Color = when (category) {
     StockCatalog.KITCHEN, StockCatalog.PANTRY -> NabdColors.Gold
+    StockCatalog.SPICES -> NabdColors.Danger
     StockCatalog.FOOD, StockCatalog.FRUIT_VEG, StockCatalog.DRINKS -> NabdColors.Mint
     StockCatalog.MEAT, StockCatalog.FRESH_MEAT -> NabdColors.Pink
     StockCatalog.CLEANING, StockCatalog.HOUSEHOLD, StockCatalog.FROZEN, StockCatalog.CARREFOUR -> NabdColors.Cyan
