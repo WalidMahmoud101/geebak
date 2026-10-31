@@ -16,6 +16,23 @@ object StockCatalog {
 
     val builtIn = listOf(KITCHEN, FOOD, MEAT, CLEANING, BATH, LUXURY, OTHER)
 
+    /** خانة كارفور: أقسام السوبر ماركت، لمين بيرتب المخزون زي ما بيلاقيه هناك */
+    const val CARREFOUR = "كارفور"
+    const val FRUIT_VEG = "الفواكه والخضروات"
+    const val FRESH_MEAT = "اللحوم والدواجن والأسماك"
+    const val DAIRY = "الألبان والبيض"
+    const val BAKERY = "المخبوزات"
+    const val FROZEN = "المجمدات"
+    const val PANTRY = "البقالة والمعلبات"
+    const val DRINKS = "المشروبات"
+    const val SNACKS = "المقرمشات والحلويات"
+    const val CARE = "العناية الشخصية"
+    const val BABY = "الأطفال"
+    const val HOUSEHOLD = "المنظفات ومستلزمات البيت"
+    const val PETS = "الحيوانات الأليفة"
+
+    val carrefour = listOf(FRUIT_VEG, FRESH_MEAT, DAIRY, BAKERY, FROZEN, PANTRY, DRINKS, SNACKS, CARE, BABY, HOUSEHOLD, PETS)
+
     /** أمثلة بتظهر وانت بتضيف، علشان أول مرة ماتبدأش من ورقة فاضية */
     val suggestions: Map<String, List<String>> = mapOf(
         KITCHEN to listOf("زيت", "سمنة", "ملح", "فلفل", "بهارات", "خل", "أكياس زبالة", "ورق فويل"),
@@ -24,6 +41,32 @@ object StockCatalog {
         CLEANING to listOf("مسحوق غسيل", "منعم ملابس", "سائل أطباق", "كلور", "ديتول", "سلك مواعين"),
         BATH to listOf("صابون", "شامبو", "معجون أسنان", "ورق تواليت", "مناديل", "شاور جل"),
         LUXURY to listOf("شوكولاتة", "بسكويت", "مكسرات", "آيس كريم", "عصير", "شيبسي"),
+        FRUIT_VEG to listOf("طماطم", "خيار", "بطاطس", "بصل", "موز", "تفاح", "ليمون"),
+        FRESH_MEAT to listOf("لحمة", "فراخ", "سمك", "جمبري", "كبدة"),
+        DAIRY to listOf("لبن", "بيض", "جبنة", "زبادي", "زبدة", "قشطة"),
+        BAKERY to listOf("عيش", "توست", "كرواسون", "بقسماط"),
+        FROZEN to listOf("بانيه", "خضار مجمد", "بطاطس مجمدة", "برجر", "آيس كريم"),
+        PANTRY to listOf("رز", "مكرونة", "زيت", "سكر", "ملح", "دقيق", "عدس", "فول", "تونة", "صلصة"),
+        DRINKS to listOf("مياه", "عصير", "شاي", "قهوة", "مياه غازية"),
+        SNACKS to listOf("شيبسي", "شوكولاتة", "بسكويت", "مكسرات"),
+        CARE to listOf("شامبو", "صابون", "معجون أسنان", "مزيل عرق", "شاور جل"),
+        BABY to listOf("حفاضات", "مناديل أطفال", "لبن أطفال"),
+        HOUSEHOLD to listOf("مسحوق غسيل", "سائل أطباق", "كلور", "مناديل", "أكياس زبالة", "ورق فويل"),
+        PETS to listOf("أكل قطط", "أكل كلاب"),
+    )
+
+    private val carrefourHints: List<Pair<String, List<String>>> = listOf(
+        FROZEN to listOf("مجمد", "frozen", "ايس كريم", "ice cream", "بانيه"),
+        BABY to listOf("اطفال", "حفاض", "بيبي", "baby", "diaper"),
+        PETS to listOf("قطط", "كلاب", "pet", "cat food", "dog food"),
+        FRESH_MEAT to listOf("لحم", "مفروم", "فراخ", "دجاج", "صدور", "وراك", "كفته", "سجق", "برجر", "كبده", "سمك", "جمبري", "لانشون", "بسطرمه", "chicken", "beef", "meat", "fish"),
+        FRUIT_VEG to listOf("طماطم", "خيار", "بطاطس", "بصل", "ثوم", "خس", "جزر", "فلفل رومي", "كوسه", "باذنجان", "موز", "تفاح", "برتقال", "ليمون", "عنب", "مانجو", "فاكهه", "خضار", "tomato", "banana", "apple"),
+        DAIRY to listOf("لبن", "حليب", "بيض", "جبن", "زبادي", "زبده", "قشطه", "milk", "egg", "cheese", "yogurt", "butter"),
+        BAKERY to listOf("عيش", "خبز", "توست", "كرواسون", "بقسماط", "bread", "toast"),
+        DRINKS to listOf("مياه", "عصير", "شاي", "قهوه", "نسكافيه", "بيبسي", "كولا", "water", "juice", "tea", "coffee"),
+        SNACKS to listOf("شيبسي", "شوكولا", "شيكولا", "بسكويت", "مكسرات", "حلويات", "كيك", "chips", "chocolate", "biscuit"),
+        CARE to listOf("شامبو", "صابون", "معجون", "فرشه", "بلسم", "مزيل عرق", "شاور", "soap", "shampoo", "toothpaste"),
+        HOUSEHOLD to listOf("مسحوق", "غسيل", "منعم", "كلور", "ديتول", "فلاش", "اطباق", "مواعين", "مناديل", "تواليت", "فوط", "اكياس", "فويل", "detergent", "tissue"),
     )
 
     private val hints: List<Pair<String, List<String>>> = listOf(
@@ -47,6 +90,22 @@ object StockCatalog {
     fun guessCategory(name: String): String {
         val k = key(name)
         return hints.firstOrNull { (_, words) -> words.any { k.contains(it) } }?.first ?: OTHER
+    }
+
+    fun guessCarrefour(name: String): String {
+        val k = key(name)
+        return carrefourHints.firstOrNull { (_, words) -> words.any { k.contains(it) } }?.first ?: PANTRY
+    }
+
+    /** الفلتر المختار: null = كل حاجة، وكارفور = كل أقسامه */
+    fun inFilter(itemCategory: String, filter: String?) =
+        filter == null || itemCategory == filter || (filter == CARREFOUR && itemCategory in carrefour)
+
+    /** الصنف الجديد يروح فين وانت واقف على الفلتر ده */
+    fun targetFor(name: String, filter: String?) = when (filter) {
+        null -> guessCategory(name)
+        CARREFOUR -> guessCarrefour(name)
+        else -> filter
     }
 
     fun aliasesOf(i: StockItem) = i.aliases.split('\n').filter { it.isNotBlank() }
@@ -119,7 +178,7 @@ class StockStore(private val db: NabdDatabase) {
 
     /** بيمسح المخزون كله، أو تصنيف واحد، وبيرجع اللي اتمسح */
     suspend fun clear(category: String? = null): StockSnapshot = db.withTransaction {
-        val items = dao.stockItemsOnce().filter { category == null || it.category == category }
+        val items = dao.stockItemsOnce().filter { StockCatalog.inFilter(it.category, category) }
         val ids = items.map { it.id }.toSet()
         val prices = dao.stockPricesOnce().filter { it.itemId in ids }
         items.forEach { delete(it.id) }

@@ -84,6 +84,15 @@ class StockShots {
         )
     }
 
+    private fun carrefour(mode: ThemeMode, name: String) = capture(mode, name) {
+        val shopItems = items + item(8, "لبن جهينة", StockCatalog.DAIRY) + item(9, "مياه نستله", StockCatalog.DRINKS, true)
+        StockContent(
+            shopItems, prices, 0, {}, StockCatalog.CARREFOUR, {}, "", {}, reading = false,
+            onBack = {}, onAdd = {}, onCamera = {}, onGallery = {}, onManualReceipt = {}, onToggle = {}, onOpen = {}, onBought = {},
+            modifier = Modifier.fillMaxSize().background(NabdColors.Bg),
+        )
+    }
+
     private fun review(mode: ThemeMode, name: String) {
         val text = javaClass.getResource("/receipts/supermarket_ar.txt")!!.readText()
         val session = ReceiptSession(ReceiptParser.parse(text), items, 78, ReceiptSource.CAMERA)
@@ -98,6 +107,8 @@ class StockShots {
     @Test fun shoppingDark() = stock(ThemeMode.DARK, 1, "stock_shopping_dark")
     @Test fun quickAddLight() = quickAdd(ThemeMode.LIGHT, "stock_quick_add_light")
     @Test fun quickAddDark() = quickAdd(ThemeMode.DARK, "stock_quick_add_dark")
+    @Test fun carrefourLight() = carrefour(ThemeMode.LIGHT, "stock_carrefour_light")
+    @Test fun carrefourDark() = carrefour(ThemeMode.DARK, "stock_carrefour_dark")
     @Test fun reviewLight() = review(ThemeMode.LIGHT, "stock_review_light")
     @Test fun reviewDark() = review(ThemeMode.DARK, "stock_review_dark")
 }

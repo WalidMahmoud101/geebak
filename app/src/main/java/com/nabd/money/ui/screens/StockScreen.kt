@@ -113,17 +113,23 @@ fun stockIcon(category: String): ImageVector = when (category) {
     StockCatalog.CLEANING -> Icons.Rounded.CleaningServices
     StockCatalog.BATH -> Icons.Rounded.Bathtub
     StockCatalog.LUXURY -> Icons.Rounded.AutoAwesome
-    StockCatalog.OTHER -> Icons.Rounded.LocalGroceryStore
+    StockCatalog.OTHER, StockCatalog.CARREFOUR, StockCatalog.PANTRY -> Icons.Rounded.LocalGroceryStore
+    StockCatalog.FRUIT_VEG, StockCatalog.DAIRY, StockCatalog.BAKERY, StockCatalog.DRINKS -> Icons.Rounded.Restaurant
+    StockCatalog.FRESH_MEAT -> Icons.Rounded.KebabDining
+    StockCatalog.FROZEN -> Icons.Rounded.Kitchen
+    StockCatalog.SNACKS -> Icons.Rounded.AutoAwesome
+    StockCatalog.CARE, StockCatalog.BABY -> Icons.Rounded.Bathtub
+    StockCatalog.HOUSEHOLD -> Icons.Rounded.CleaningServices
     else -> Icons.Rounded.Inventory2
 }
 
 fun stockColor(category: String): Color = when (category) {
-    StockCatalog.KITCHEN -> NabdColors.Gold
-    StockCatalog.FOOD -> NabdColors.Mint
-    StockCatalog.MEAT -> NabdColors.Pink
-    StockCatalog.CLEANING -> NabdColors.Cyan
-    StockCatalog.BATH -> NabdColors.Violet
-    StockCatalog.LUXURY -> NabdColors.Gold
+    StockCatalog.KITCHEN, StockCatalog.PANTRY -> NabdColors.Gold
+    StockCatalog.FOOD, StockCatalog.FRUIT_VEG, StockCatalog.DRINKS -> NabdColors.Mint
+    StockCatalog.MEAT, StockCatalog.FRESH_MEAT -> NabdColors.Pink
+    StockCatalog.CLEANING, StockCatalog.HOUSEHOLD, StockCatalog.FROZEN, StockCatalog.CARREFOUR -> NabdColors.Cyan
+    StockCatalog.BATH, StockCatalog.CARE, StockCatalog.BABY -> NabdColors.Violet
+    StockCatalog.LUXURY, StockCatalog.SNACKS, StockCatalog.DAIRY, StockCatalog.BAKERY -> NabdColors.Gold
     else -> NabdColors.TextDim
 }
 
@@ -230,7 +236,7 @@ fun StockScreen(vm: AppViewModel, onBack: () -> Unit) {
         onToggle = { vm.setStockOut(it, !it.isOut) },
         onOpen = { openId = it.id },
         onBought = { buying = it },
-        onQuickAdd = { vm.addStock(it, category ?: StockCatalog.guessCategory(it), page == 1); query = "" },
+        onQuickAdd = { vm.addStock(it, StockCatalog.targetFor(it, category), page == 1); query = "" },
         onClear = { confirmClear = true },
         undoCount = undo?.items?.size ?: 0,
         onUndo = { vm.undoClearStock() },
@@ -238,7 +244,7 @@ fun StockScreen(vm: AppViewModel, onBack: () -> Unit) {
     )
 
     if (confirmClear) {
-        val count = items.count { category == null || it.category == category }
+        val count = items.count { StockCatalog.inFilter(it.category, category) }
         AlertDialog(
             onDismissRequest = { confirmClear = false },
             containerColor = NabdColors.Surface,
@@ -282,9 +288,10 @@ fun StockContent(
     onDismissUndo: () -> Unit = {},
 ) {
     val out = items.filter { it.isOut }
-    val categories = (StockCatalog.builtIn + items.map { it.category }).distinct()
+    val categories = (StockCatalog.builtIn + items.map { it.category } + StockCatalog.carrefour).distinct()
     val q = StockCatalog.key(query)
-    val shown = items.filter { (category == null || it.category == category) && (q.isEmpty() || it.key.contains(q)) }
+    val shown = items.filter { StockCatalog.inFilter(it.category, category) && (q.isEmpty() || it.key.contains(q)) }
+    val inCarrefour = category == StockCatalog.CARREFOUR || category in StockCatalog.carrefour
     // اللي بتدوّر عليه مش موجود؟ يبقى ضيفه من مكانك
     val canQuickAdd = q.isNotEmpty() && items.none { it.key == q }
 
@@ -350,7 +357,7 @@ fun StockContent(
                 )
             }
             if (canQuickAdd) item {
-                val target = category ?: StockCatalog.guessCategory(query)
+                val target = StockCatalog.targetFor(query, category)
                 GlassCard(Modifier.fillMaxWidth(), padding = 4.dp) {
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onQuickAdd(query.trim()) }.padding(horizontal = 8.dp, vertical = 8.dp),
@@ -368,7 +375,13 @@ fun StockContent(
             item {
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     SelectChip("كل حاجة", category == null) { onCategory(null) }
-                    categories.forEach { c -> SelectChip(c, category == c, stockColor(c), stockIcon(c)) { onCategory(c) } }
+                    SelectChip(StockCatalog.CARREFOUR, inCarrefour, stockColor(StockCatalog.CARREFOUR), stockIcon(StockCatalog.CARREFOUR)) { onCategory(StockCatalog.CARREFOUR) }
+                    categories.filter { it !in StockCatalog.carrefour }.forEach { c -> SelectChip(c, category == c, stockColor(c), stockIcon(c)) { onCategory(c) } }
+                }
+            }
+            if (inCarrefour) item {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    StockCatalog.carrefour.forEach { c -> SelectChip(c, category == c, stockColor(c), stockIcon(c)) { onCategory(if (category == c) StockCatalog.CARREFOUR else c) } }
                 }
             }
             if (items.isEmpty()) {
@@ -380,7 +393,7 @@ fun StockContent(
             categories.forEach { c ->
                 val inCat = shown.filter { it.category == c }
                 if (inCat.isEmpty()) return@forEach
-                if (category == null) item(key = "h$c") { SectionHeader(c) }
+                if (category == null || category == StockCatalog.CARREFOUR) item(key = "h$c") { SectionHeader(c) }
                 item(key = "g$c") {
                     GlassCard(Modifier.fillMaxWidth(), padding = 4.dp) {
                         inCat.forEachIndexed { i, it ->
@@ -423,7 +436,7 @@ fun StockContent(
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onManualReceipt).padding(8.dp),
             )
         }
-        if (page == 0 && items.any { category == null || it.category == category }) item {
+        if (page == 0 && items.any { StockCatalog.inFilter(it.category, category) }) item {
             PillButton(if (category == null) "امسح المخزون كله" else "امسح كل «$category»", Icons.Rounded.Delete, NabdColors.Danger, Modifier.fillMaxWidth(), onClick = onClear)
         }
     }
@@ -521,16 +534,17 @@ private fun BoughtSheet(item: StockItem, history: List<StockPrice>, onSave: (Dou
 @Composable
 private fun StockAddSheet(items: List<StockItem>, initialOut: Boolean, initialCategory: String?, onAdd: (String, String, Boolean) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf(initialCategory ?: StockCatalog.FOOD) }
+    val carrefourMode = initialCategory == StockCatalog.CARREFOUR
+    var category by remember { mutableStateOf(initialCategory?.takeIf { !carrefourMode } ?: if (carrefourMode) StockCatalog.PANTRY else StockCatalog.FOOD) }
     // طول ما انت مااخترتش تصنيف بإيدك، بنخمّنه من الاسم
-    var picked by remember { mutableStateOf(initialCategory != null) }
+    var picked by remember { mutableStateOf(initialCategory != null && !carrefourMode) }
     var out by remember { mutableStateOf(initialOut) }
     var newCategory by remember { mutableStateOf(false) }
     var custom by remember { mutableStateOf("") }
     var added by remember { mutableStateOf<List<String>>(emptyList()) }
-    val cats = (StockCatalog.builtIn + items.map { it.category }).distinct()
+    val cats = (StockCatalog.builtIn + items.map { it.category }).distinct().filter { it !in StockCatalog.carrefour }
     val have = items.map { it.key }.toSet()
-    val guessed = name.takeIf { !picked && it.isNotBlank() }?.let(StockCatalog::guessCategory)
+    val guessed = name.takeIf { !picked && it.isNotBlank() }?.let { StockCatalog.targetFor(it, initialCategory.takeIf { carrefourMode }) }
     val chosen = if (newCategory) custom.trim() else guessed ?: category
     fun add(n: String) {
         if (n.isBlank() || chosen.isEmpty()) return
@@ -554,6 +568,10 @@ private fun StockAddSheet(items: List<StockItem>, initialOut: Boolean, initialCa
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 cats.forEach { c -> SelectChip(c, !newCategory && chosen == c, stockColor(c), stockIcon(c)) { category = c; picked = true; newCategory = false } }
                 SelectChip("تصنيف جديد", newCategory, NabdColors.Mint, Icons.Rounded.Add) { newCategory = true }
+            }
+            Text("أقسام كارفور", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                StockCatalog.carrefour.forEach { c -> SelectChip(c, !newCategory && chosen == c, stockColor(c), stockIcon(c)) { category = c; picked = true; newCategory = false } }
             }
             if (newCategory) {
                 OutlinedTextField(custom, { custom = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp), label = { Text("اسم التصنيف") })
@@ -607,7 +625,7 @@ private fun StockItemSheet(vm: AppViewModel, item: StockItem, history: List<Stoc
             if (editing) {
                 OutlinedTextField(name, { name = it; error = null }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp), label = { Text("الاسم") })
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    (StockCatalog.builtIn + items.map { it.category }).distinct().forEach { c -> SelectChip(c, category == c, stockColor(c), stockIcon(c)) { category = c } }
+                    (StockCatalog.builtIn + items.map { it.category } + StockCatalog.carrefour).distinct().forEach { c -> SelectChip(c, category == c, stockColor(c), stockIcon(c)) { category = c } }
                 }
                 error?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = NabdColors.Danger) }
                 GradientButton("احفظ التعديل", Modifier.fillMaxWidth()) {

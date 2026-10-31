@@ -270,7 +270,7 @@ private fun LinkDialog(l: ReviewLine, items: List<StockItem>, onPick: (ReviewLin
                 }
                 Text("صنف جديد في", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    (StockCatalog.builtIn + items.map { it.category }).distinct().forEach { c ->
+                    (StockCatalog.builtIn + items.map { it.category } + StockCatalog.carrefour).distinct().forEach { c ->
                         SelectChip(c, l.itemId == null && l.category == c, stockColor(c), stockIcon(c)) { onPick(l.copy(itemId = null, category = c)) }
                     }
                 }

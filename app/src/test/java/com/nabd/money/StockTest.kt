@@ -93,6 +93,23 @@ class StockTest {
     }
 
     @Test
+    fun carrefourSectionGuessesDepartmentsAndFilters() = runBlocking {
+        assertEquals(StockCatalog.FROZEN, StockCatalog.guessCarrefour("بانيه فراخ مجمد"))
+        assertEquals(StockCatalog.DAIRY, StockCatalog.guessCarrefour("جبنة رومي"))
+        assertEquals(StockCatalog.PANTRY, StockCatalog.guessCarrefour("مخلل"))
+        assertEquals(StockCatalog.PANTRY, StockCatalog.targetFor("مخلل", StockCatalog.CARREFOUR))
+        assertEquals(StockCatalog.DAIRY, StockCatalog.targetFor("مخلل", StockCatalog.DAIRY))
+        assertTrue(StockCatalog.inFilter(StockCatalog.DRINKS, StockCatalog.CARREFOUR))
+        assertFalse(StockCatalog.inFilter(StockCatalog.KITCHEN, StockCatalog.CARREFOUR))
+        store.clear()
+        store.add("جبنة", StockCatalog.DAIRY)
+        store.add("شاي", StockCatalog.DRINKS)
+        store.add("زيت", StockCatalog.KITCHEN)
+        assertEquals(2, store.clear(StockCatalog.CARREFOUR).items.size)
+        assertEquals(listOf("زيت"), app.db.dao().stockItemsOnce().map { it.name })
+    }
+
+    @Test
     fun smallPiasterChangesAreNotExpensive() {
         assertEquals(PriceLevel.SAME, PriceCheck.check(5.25, listOf(p(5.0, 1))).level)
         assertEquals(PriceLevel.EXPENSIVE, PriceCheck.check(6.0, listOf(p(5.0, 1))).level)
