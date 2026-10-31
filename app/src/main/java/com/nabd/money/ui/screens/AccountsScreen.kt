@@ -1,6 +1,8 @@
 package com.nabd.money.ui.screens
 
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -76,7 +78,8 @@ fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
     vm.usdRate.collectAsStateWithLifecycle().value
     val tidyMessage by vm.tidyMessage.collectAsStateWithLifecycle()
     val hidden by vm.hiddenAccounts.collectAsStateWithLifecycle()
-    var showHidden by remember { mutableStateOf(false) }
+    // مفتوحة من الأول، علشان الحساب اللي اتخفى يفضل قدامك وتقدر تعدّله
+    var showHidden by remember { mutableStateOf(true) }
     var adding by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var openId by remember { mutableStateOf<Long?>(null) }
@@ -133,33 +136,7 @@ fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
             }
             if (hidden.isNotEmpty()) {
                 item {
-                    GlassCard(Modifier.fillMaxWidth(), padding = 10.dp) {
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { showHidden = !showHidden },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Rounded.VisibilityOff, null, tint = NabdColors.TextDim, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("حسابات مخفية (${hidden.size})", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                            Text(if (showHidden) "اقفل" else "افتح", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
-                        }
-                        if (showHidden) {
-                            Text(
-                                "مابتتحسب في إجمالي فلوسك ولا عملياتها في أي قايمة أو تقرير. الرسايل الجاية ليها بتتسجل بس مابتظهرش.",
-                                style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint, modifier = Modifier.padding(top = 6.dp)
-                            )
-                            hidden.forEach { h ->
-                                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text(h.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(
-                                        "رجّعه", style = MaterialTheme.typography.labelLarge, color = NabdColors.Mint,
-                                        modifier = Modifier.clip(RoundedCornerShape(50)).background(NabdColors.Mint.copy(alpha = 0.12f))
-                                            .clickable { vm.setAccountHidden(h, false) }.padding(horizontal = 12.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    HiddenAccountsCard(hidden, showHidden, { showHidden = !showHidden }, { openId = it.id }) { vm.setAccountHidden(it, false) }
                 }
             }
         }
@@ -185,8 +162,44 @@ fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
         }
     }
     openId?.let { id ->
-        accounts.firstOrNull { it.id == id }?.let { a ->
-            AccountSheet(vm, a, accounts, onDismiss = { openId = null }, onEdit = onEdit)
+        (accounts + hidden).firstOrNull { it.id == id }?.let { a ->
+            AccountSheet(vm, a, accounts, isHidden = hidden.any { it.id == id }, onDismiss = { openId = null }, onEdit = onEdit)
+        }
+    }
+}
+
+/** المخفي مش محسوب في الإجمالي، بس لازم يفضل ينفع تفتحه وتعدّل رصيده */
+@Composable
+internal fun HiddenAccountsCard(hidden: List<Account>, open: Boolean, onToggle: () -> Unit, onOpen: (Account) -> Unit, onRestore: (Account) -> Unit) {
+    GlassCard(Modifier.fillMaxWidth(), padding = 10.dp) {
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onToggle),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Rounded.VisibilityOff, null, tint = NabdColors.TextDim, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("حسابات مخفية (${hidden.size})", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            Text(if (open) "اقفل" else "افتح", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+        }
+        if (open) {
+            Text(
+                "دوس على الحساب تعدّل رصيده. مابيتحسبش في إجمالي فلوسك، وعملياته مابتظهرش في القوايم والتقارير.",
+                style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint, modifier = Modifier.padding(top = 6.dp)
+            )
+            hidden.forEach { h ->
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).clickable { onOpen(h) }.padding(vertical = 2.dp)) {
+                        Text(h.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(Money.fmt(h.balance, h.currency), style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim, maxLines = 1)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "رجّعه", style = MaterialTheme.typography.labelLarge, color = NabdColors.Mint,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(NabdColors.Mint.copy(alpha = 0.12f))
+                            .clickable { onRestore(h) }.padding(horizontal = 12.dp, vertical = 4.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -211,14 +224,16 @@ private fun NeedBalanceCard(count: Int, onClick: () -> Unit) {
 
 /** كارت لكل بنك أو تطبيق: الإجمالي فوق، والحسابات والكروت جواه */
 @Composable
-private fun InstitutionCard(
+internal fun InstitutionCard(
     inst: Institution,
     egp: (Account) -> Double,
     onOpen: (Account) -> Unit,
     onSetBalance: (Account) -> Unit,
 ) {
     val first = inst.accounts.first()
-    GlassCard(Modifier.fillMaxWidth(), padding = 10.dp) {
+    // بنك بحساب واحد: الكارت نفسه بيفتح الحساب، وإلا مايبقاش فيه طريقة تعدّله
+    val single = inst.accounts.size == 1
+    GlassCard(Modifier.fillMaxWidth(), padding = 10.dp, onClick = if (single) ({ onOpen(first) }) else null) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(Brush.linearGradient(first.colors())),
@@ -244,6 +259,7 @@ private fun InstitutionCard(
                     color = if (inst.countedCount > 0) NabdColors.Mint else NabdColors.TextFaint
                 )
             }
+            if (single) Icon(Icons.Rounded.ChevronLeft, null, tint = NabdColors.TextFaint, modifier = Modifier.size(20.dp))
         }
         // بنك بحساب واحد: الإجمالي فوق كفاية، إلا لو محتاج رصيده
         val showRows = inst.accounts.size > 1 || NetWorth.exclusion(first, egp(first)) == Exclusion.UNKNOWN
@@ -300,7 +316,7 @@ private fun InstitutionCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AccountSheet(vm: AppViewModel, a: Account, all: List<Account>, onDismiss: () -> Unit, onEdit: (Txn) -> Unit) {
+private fun AccountSheet(vm: AppViewModel, a: Account, all: List<Account>, isHidden: Boolean, onDismiss: () -> Unit, onEdit: (Txn) -> Unit) {
     val txns by vm.txnsFor(a.id).collectAsState(initial = emptyList())
     var editBalance by remember { mutableStateOf(false) }
     var rename by remember { mutableStateOf(false) }
@@ -345,7 +361,8 @@ private fun AccountSheet(vm: AppViewModel, a: Account, all: List<Account>, onDis
                     PillButton(if (a.isCredit) "الحد المتاح" else "الرصيد الحقيقي", Icons.Rounded.Edit, NabdColors.Mint, Modifier.weight(1f)) { editBalance = true }
                     PillButton("الاسم", Icons.Rounded.Edit, NabdColors.Cyan, Modifier.weight(0.7f)) { rename = true }
                     PillButton("دمج", Icons.Rounded.CallMerge, NabdColors.Violet, Modifier.weight(0.7f)) { merging = true }
-                    PillButton("إخفاء", Icons.Rounded.VisibilityOff, NabdColors.Gold, Modifier.weight(0.7f)) { vm.setAccountHidden(a, true); onDismiss() }
+                    if (isHidden) PillButton("إظهار", Icons.Rounded.Visibility, NabdColors.Gold, Modifier.weight(0.7f)) { vm.setAccountHidden(a, false) }
+                    else PillButton("إخفاء", Icons.Rounded.VisibilityOff, NabdColors.Gold, Modifier.weight(0.7f)) { vm.setAccountHidden(a, true); onDismiss() }
                     PillButton("حذف", Icons.Rounded.Delete, NabdColors.Danger, Modifier.weight(0.7f)) { confirmDelete = true }
                 }
             }
