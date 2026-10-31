@@ -88,6 +88,7 @@ import com.nabd.money.ui.theme.NabdColors
 import com.nabd.money.util.Dates
 import com.nabd.money.util.Money
 import com.nabd.money.util.action
+import com.nabd.money.util.showsRecheck
 import com.nabd.money.util.status
 import java.time.Instant
 import java.time.LocalDate
@@ -791,14 +792,16 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
             // بيتحرك لتحت على الشاشات الصغيرة، والتحديث فوق علشان يبان على طول
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val update by vm.update.collectAsState()
+                val updateNote by vm.updateNote.collectAsState()
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("الإصدار ${com.nabd.money.BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            update.status(),
+                            updateNote ?: update.status(),
                             style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim
                         )
                     }
+                    if (update.showsRecheck()) TextButton(onClick = { vm.recheckUpdate() }) { Text("اتحقق", color = NabdColors.TextDim) }
                     update.action()?.let { TextButton(onClick = { vm.updateAction() }) { Text(it) } }
                 }
                 HorizontalDivider(color = NabdColors.Stroke)

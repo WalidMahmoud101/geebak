@@ -2,6 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
+<script>document.documentElement.classList.add("js")</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>جيبك — كل اللي في جيبك، لحظة بلحظة</title>
 <meta name="description" content="جيبك: تطبيق أندرويد بالعربي بيقرا رسايل البنك والمحافظ ويسجل فلوسك لوحده. حسابات، مصاريف شركة، فاتورة وExcel، مخزون البيت وقايمة الشرا، قراءة فواتير السوبر ماركت، سعر الدولار والدهب، تسجيل بالصوت. مفتوح المصدر وبياناتك على موبايلك.">
@@ -238,6 +239,51 @@ footer a{color:var(--ink)}
   td:last-child{white-space:normal}
   th,td{font-size:15px;padding-inline-end:12px}
 }
+
+/* الحركة: كل حاجة بتظهر مرة واحدة بهدوء، والعملة بتقع في الجيب */
+.js .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1);transition-delay:var(--d,0ms)}
+.js .reveal.in{opacity:1;transform:none}
+.logo svg .coin{transform-box:fill-box;transform-origin:center}
+.js .tok{transition:background-color .5s,border-color .5s,color .5s;transition-delay:var(--d,0ms)}
+.js .sms:not(.in) .tok{background:transparent;border-bottom-color:transparent;color:var(--ink)}
+.js .sms .tok i{transition:opacity .4s,transform .4s;transition-delay:var(--d,0ms)}
+.js .sms:not(.in) .tok i{opacity:0;transform:translateY(6px)}
+.js .beat path{stroke-dashoffset:0}
+.js .steps:not(.in) .beat{clip-path:inset(0 0 0 100%)}
+.js .beat{transition:clip-path 1.5s cubic-bezier(.3,.1,.2,1)}
+.js .beat{clip-path:inset(0)}
+.phone img,.gallery img{transition:transform .5s cubic-bezier(.2,.7,.2,1)}
+@media(hover:hover){
+  .gallery figure:hover img{transform:translateY(-6px) scale(1.02)}
+  .btn{transition:background .25s,border-color .25s,color .25s,transform .25s}
+  .btn:hover{transform:translateY(-2px)}
+  .stock .entry{transition:transform .3s}
+  .stock .entry:hover{transform:translateX(-6px)}
+}
+@media (prefers-reduced-motion:no-preference){
+  .logo .coin{animation:drop .9s cubic-bezier(.3,1.4,.5,1) .35s both}
+  .hero h1{animation:rise .9s cubic-bezier(.2,.7,.2,1) both}
+  .hero .lead,.hero .cta,.hero .facts{animation:rise .8s cubic-bezier(.2,.7,.2,1) both}
+  .hero .lead{animation-delay:.18s}.hero .cta{animation-delay:.3s}.hero .facts{animation-delay:.42s}
+  .phones .front{animation:phone 1s cubic-bezier(.2,.7,.2,1) .25s both}
+  .phones .back{animation:phone 1s cubic-bezier(.2,.7,.2,1) .4s both}
+  .step::before{transition:color .4s}
+  @supports (animation-timeline:view()){
+    .stock-phones .phone:first-child{animation:drift linear both;animation-timeline:view();animation-range:entry 0% exit 100%}
+    .stock-phones .phone:last-child{animation:drift2 linear both;animation-timeline:view();animation-range:entry 0% exit 100%}
+  }
+}
+@media (prefers-reduced-motion:reduce){
+  .js .reveal{opacity:1;transform:none;transition:none}
+  .js .sms:not(.in) .tok{background:color-mix(in srgb,var(--c) 13%,transparent);border-bottom-color:var(--c);color:var(--c)}
+  .js .sms:not(.in) .tok i{opacity:1;transform:none}
+  .js .steps:not(.in) .beat{clip-path:none}
+}
+@keyframes drop{0%{opacity:0;transform:translateY(-70px)}60%{opacity:1}100%{opacity:1;transform:none}}
+@keyframes rise{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+@keyframes phone{from{opacity:0;transform:translateY(46px)}to{opacity:1;transform:none}}
+@keyframes drift{from{transform:translateY(34px)}to{transform:translateY(-34px)}}
+@keyframes drift2{from{transform:translateY(-22px)}to{transform:translateY(46px)}}
 </style>
 </head>
 <body>
@@ -246,7 +292,7 @@ footer a{color:var(--ink)}
 <header>
   <div class="wrap nav">
     <a class="logo" href="#top" aria-label="جيبك">
-      <svg viewBox="0 0 108 108" aria-hidden="true"><rect width="108" height="108" rx="26" fill="#0B5F49"/><path d="M38 34H68Q78 34 72 42C60 50 30 58 34 74C37 86 60 88 76 76" fill="none" stroke="#FFF6E6" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><circle cx="55" cy="62" r="8.5" fill="#F4B740"/></svg>
+      <svg viewBox="0 0 108 108" aria-hidden="true"><rect width="108" height="108" rx="26" fill="#0B5F49"/><path d="M38 34H68Q78 34 72 42C60 50 30 58 34 74C37 86 60 88 76 76" fill="none" stroke="#FFF6E6" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><circle class="coin" cx="55" cy="62" r="8.5" fill="#F4B740"/></svg>
       جيبك
     </a>
     <nav aria-label="أقسام الصفحة">
@@ -468,6 +514,17 @@ footer a{color:var(--ink)}
       svg.appendChild(p);
     }
   }
+  // الظهور وانت بتنزل في الصفحة: مرة واحدة بس، والعناصر اللي جنب بعض ورا بعض
+  function reveal(){
+    var picks='h2,.sub,.reading>div,.entry,.banks,.step,.stock-phones,.two li,.mit,.tablewrap,details';
+    var list=[].slice.call(document.querySelectorAll('main section '+picks.split(',').join(',main section ')));
+    list.forEach(function(el,i){el.classList.add('reveal');el.style.setProperty('--d',(i%4)*70+'ms')});
+    var live=list.concat([].slice.call(document.querySelectorAll('.sms,.steps')));
+    [].forEach.call(document.querySelectorAll('.sms .tok'),function(t,i){t.style.setProperty('--d',300+i*260+'ms')});
+    if(!('IntersectionObserver' in window)){live.forEach(function(el){el.classList.add('in')});return}
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{rootMargin:'0px 0px -8% 0px',threshold:.08});
+    live.forEach(function(el){io.observe(el)});
+  }
   // أزرار المعرض للماوس، واللمس بيسحب عادي
   function pager(){
     var g=document.getElementById('gallery'),box=document.getElementById('pager'),prev=document.getElementById('prev'),next=document.getElementById('next');
@@ -477,6 +534,7 @@ footer a{color:var(--ink)}
     prev.onclick=function(){move(1)};next.onclick=function(){move(-1)};
     g.addEventListener('scroll',sync,{passive:true});box.hidden=false;sync();
   }
+  reveal();
   pager();
   band(document.getElementById('band'));
 })();

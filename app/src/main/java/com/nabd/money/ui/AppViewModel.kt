@@ -133,6 +133,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- التحديثات ----------
     val update = MutableStateFlow<UpdateState>(UpdateState.Idle)
     private var updateDownload: kotlinx.coroutines.Job? = null
+    /** نتيجة "اتحقق" وقت التنزيل، علشان التنزيل نفسه مايقفش */
+    val updateNote = MutableStateFlow<String?>(null)
 
     /** زرار التحديث في أي مكان: بيعمل الخطوة اللي عليها الدور */
     fun updateAction() {
@@ -145,6 +147,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** "اتحقق" جنب الأزرار: وقت التنزيل بيدور من غير ما يوقفه، ولو فيه أحدث بيتحول ليها */
+    fun recheckUpdate() {
+        val current = update.value as? UpdateState.Downloading ?: return checkForUpdate(manual = true)
+        viewModelScope.launch {
+            updateNote.value = "بيدور على نسخة أحدث…"
+            val found = Updater.check()
+            val stillSame = (update.value as? UpdateState.Downloading)?.release == current.release
+            when {
+                !stillSame -> updateNote.value = null
+                Updater.isNewer(found.release, current.release) -> {
+                    updateNote.value = "لقيت نسخة أحدث، بينزلها بدل القديمة"
+                    stopUpdate()
+                    downloadAndInstall(found.release!!)
+                }
+                found.release == null -> updateNote.value = "مقدرتش أتحقق، التنزيل مكمّل"
+                else -> updateNote.value = "ده آخر تحديث، التنزيل مكمّل"
+            }
+        }
+    }
+
     fun stopUpdate() {
         val u = update.value as? UpdateState.Downloading ?: return
         updateDownload?.cancel()
@@ -154,6 +176,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun checkForUpdate(manual: Boolean = false) {
         if (update.value is UpdateState.Checking || update.value is UpdateState.Downloading) return
         viewModelScope.launch {
+            updateNote.value = null
             update.value = UpdateState.Checking
             val app = getApplication<Application>()
             // الفحص ساعات بيخلص في لحظة، فلازم تشوف إن الزرار اشتغل

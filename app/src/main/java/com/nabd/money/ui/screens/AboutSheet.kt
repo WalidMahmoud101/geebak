@@ -72,6 +72,7 @@ import com.nabd.money.ui.theme.HeroGradient
 import com.nabd.money.ui.theme.NabdColors
 import com.nabd.money.util.Dates
 import com.nabd.money.util.action
+import com.nabd.money.util.showsRecheck
 import com.nabd.money.util.status
 
 const val REPO_URL = "https://github.com/WalidMahmoud101/nabd"
@@ -132,6 +133,7 @@ fun AboutContent(
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
     updateButton: String? = "اتحقق",
+    onRecheck: (() -> Unit)? = null,
 ) {
     Column(
         modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 28.dp),
@@ -217,6 +219,12 @@ fun AboutContent(
                 Column(Modifier.weight(1f)) {
                     Text("الإصدار $versionName", style = MaterialTheme.typography.titleSmall)
                     Text(updateText, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
+                }
+                onRecheck?.let {
+                    Text(
+                        "اتحقق", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).clickable(onClick = it).padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
                 }
                 updateButton?.let {
                     Text(
@@ -340,7 +348,8 @@ fun AboutSheet(vm: AppViewModel, onDismiss: () -> Unit) {
         )
     }
     val agentNames = remember { AgentRegistry.all.map { it.name.removePrefix("وكيل ").trim() } }
-    val updateText = update.status()
+    val updateNote by vm.updateNote.collectAsStateWithLifecycle()
+    val updateText = updateNote ?: update.status()
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -351,6 +360,7 @@ fun AboutSheet(vm: AppViewModel, onDismiss: () -> Unit) {
             stats = stats, agentNames = agentNames, updateText = updateText,
             updateButton = update.action(),
             onCheckUpdate = { vm.updateAction() },
+            onRecheck = if (update.showsRecheck()) ({ vm.recheckUpdate() }) else null,
             onOpen = { url -> runCatching { uri.openUri(url) } },
         )
     }

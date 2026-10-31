@@ -47,6 +47,9 @@ fun UpdateState.action(): String? = when (this) {
     else -> "اتحقق"
 }
 
+/** "اتحقق" بيفضل جنب أي زرار تاني، إلا لو هو نفسه الزرار الأساسي أو الفحص شغال */
+fun UpdateState.showsRecheck(): Boolean = this !is UpdateState.Checking && action() != "اتحقق"
+
 /**
  * التحديث التلقائي من GitHub Releases: كل نسخة جديدة بتتنشر كـ release اسمه v<versionCode>
  * وجواه ملف nabd.apk. التطبيق بيشيك، ينزل، ويفتح شاشة التثبيت.
@@ -62,6 +65,9 @@ object Updater {
         val apkUrl: String,
         val sizeBytes: Long,
     )
+
+    /** لقينا نسخة أحدث من اللي بينزل دلوقتي؟ */
+    fun isNewer(found: Release?, current: Release): Boolean = found != null && found.versionCode > current.versionCode
 
     /** نتيجة الفحص: نسخة، أو سبب إننا ماقدرناش نوصل (علشان نقولك ليه بالظبط) */
     data class Check(val release: Release?, val error: String?)

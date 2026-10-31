@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.nabd.money.util.UpdateState
 import com.nabd.money.util.Updater
 import com.nabd.money.util.action
+import com.nabd.money.util.showsRecheck
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -14,6 +15,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -79,6 +81,26 @@ class UpdaterDownloadTest {
         assertNotNull(file)
         assertEquals(200_000L, file!!.length())
         s.close()
+    }
+
+    @Test
+    fun checkStaysNextToEveryOtherButton() {
+        val r = Updater.Release(9, "جيبك", "", "", 0)
+        assertTrue(UpdateState.Downloading(r, 0.4f).showsRecheck())
+        assertTrue(UpdateState.Available(r).showsRecheck())
+        assertTrue(UpdateState.Ready(r, File("x")).showsRecheck())
+        // "اتحقق" هو الزرار الأساسي أو الفحص شغال: مانكررهوش
+        assertFalse(UpdateState.Idle.showsRecheck())
+        assertFalse(UpdateState.UpToDate.showsRecheck())
+        assertFalse(UpdateState.Checking.showsRecheck())
+    }
+
+    @Test
+    fun onlyAHigherVersionReplacesTheDownload() {
+        val current = Updater.Release(9, "جيبك", "", "", 0)
+        assertTrue(Updater.isNewer(current.copy(versionCode = 10), current))
+        assertFalse(Updater.isNewer(current, current))
+        assertFalse(Updater.isNewer(null, current))
     }
 
     @Test

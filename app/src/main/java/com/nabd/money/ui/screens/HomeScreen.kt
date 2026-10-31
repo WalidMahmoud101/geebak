@@ -601,13 +601,21 @@ private fun LazyListScope.updateCard(update: UpdateState, vm: AppViewModel) {
                     Box(Modifier.weight(1f)) { ProgressBar(update.progress, NabdColors.Mint) }
                     Spacer(Modifier.width(10.dp))
                     Text("${(update.progress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, color = NabdColors.TextDim)
+                    TextButton(onClick = { vm.recheckUpdate() }) { Text("اتحقق", color = NabdColors.TextDim) }
                     TextButton(onClick = { vm.stopUpdate() }) { Text("وقّف", color = NabdColors.Danger) }
                 }
-                is UpdateState.Ready -> GradientButton("ثبّت دلوقتي", Modifier.fillMaxWidth()) {
-                    com.nabd.money.util.Updater.install(vm.getApplication(), update.file)
+                is UpdateState.Ready -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    GradientButton("ثبّت دلوقتي", Modifier.weight(1f)) { com.nabd.money.util.Updater.install(vm.getApplication(), update.file) }
+                    TextButton(onClick = { vm.recheckUpdate() }) { Text("اتحقق", color = NabdColors.TextDim) }
                 }
-                is UpdateState.Available -> GradientButton("نزّل وثبّت", Modifier.fillMaxWidth()) { vm.downloadAndInstall(update.release) }
+                is UpdateState.Available -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    GradientButton("نزّل وثبّت", Modifier.weight(1f)) { vm.downloadAndInstall(update.release) }
+                    TextButton(onClick = { vm.recheckUpdate() }) { Text("اتحقق", color = NabdColors.TextDim) }
+                }
                 else -> Unit
+            }
+            vm.updateNote.collectAsStateWithLifecycle().value?.let {
+                Text(it, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim, modifier = Modifier.padding(top = 6.dp))
             }
         }
     }
