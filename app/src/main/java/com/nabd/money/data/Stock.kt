@@ -75,6 +75,9 @@ object StockCatalog {
     }
 }
 
+/** اللي اتمسح من المخزون، علشان يرجع لو المسح كان بالغلط */
+data class StockSnapshot(val items: List<StockItem>, val prices: List<StockPrice>)
+
 /** سطر جاهز للحفظ من شاشة مراجعة الفاتورة */
 data class ReceiptEntry(val name: String, val qty: Double, val price: Double, val category: String, val itemId: Long? = null)
 
@@ -112,6 +115,23 @@ class StockStore(private val db: NabdDatabase) {
     suspend fun delete(id: Long) = db.withTransaction {
         dao.deletePricesOf(id)
         dao.deleteStockItem(id)
+    }
+
+    /** بيمسح المخزون كله، أو تصنيف واحد، وبيرجع اللي اتمسح */
+    suspend fun clear(category: String? = null): StockSnapshot = db.withTransaction {
+        val items = dao.stockItemsOnce().filter { category == null || it.category == category }
+        val ids = items.map { it.id }.toSet()
+        val prices = dao.stockPricesOnce().filter { it.itemId in ids }
+        items.forEach { delete(it.id) }
+        StockSnapshot(items, prices)
+    }
+
+    /** لو ضفت نفس الصنف بعد المسح، أسعاره القديمة بترجع عليه ومابيتكررش */
+    suspend fun restore(s: StockSnapshot) = db.withTransaction {
+        val now = dao.stockItemsOnce().associateBy { it.key }
+        dao.putStockItems(s.items.filter { it.key !in now })
+        val moved = s.items.mapNotNull { old -> now[old.key]?.let { old.id to it.id } }.toMap()
+        dao.putStockPrices(s.prices.map { p -> moved[p.itemId]?.let { p.copy(itemId = it) } ?: p })
     }
 
     /** سعر جديد بإيدك. لو جبت الحاجة، بترجع موجودة في البيت */

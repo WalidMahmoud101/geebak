@@ -486,6 +486,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun addStockPrice(item: com.nabd.money.data.StockItem, price: Double, store: String?) = viewModelScope.launch(Dispatchers.IO) { stock.addPrice(item.id, price, store) }
     fun deleteStockPrice(p: com.nabd.money.data.StockPrice) = viewModelScope.launch(Dispatchers.IO) { dao.deleteStockPrice(p.id) }
 
+    /** آخر مسح، علشان زرار "رجّعهم" */
+    val stockUndo = MutableStateFlow<com.nabd.money.data.StockSnapshot?>(null)
+
+    fun clearStock(category: String?) = viewModelScope.launch(Dispatchers.IO) { stockUndo.value = stock.clear(category) }
+
+    fun undoClearStock() = viewModelScope.launch(Dispatchers.IO) {
+        stockUndo.value?.let { stock.restore(it) }
+        stockUndo.value = null
+    }
+
     /** الفاتورة اللي بتتقرا أو بتتراجع دلوقتي. موجودة هنا علشان تعديلاتك ماتضيعش لو الشاشة لفت */
     val receipt = MutableStateFlow<ReceiptSession?>(null)
     val receiptReading = MutableStateFlow(false)

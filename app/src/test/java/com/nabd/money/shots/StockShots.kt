@@ -76,6 +76,14 @@ class StockShots {
         )
     }
 
+    private fun quickAdd(mode: ThemeMode, name: String) = capture(mode, name) {
+        StockContent(
+            items, prices, 0, {}, null, {}, "مخلل", {}, reading = false,
+            onBack = {}, onAdd = {}, onCamera = {}, onGallery = {}, onManualReceipt = {}, onToggle = {}, onOpen = {}, onBought = {},
+            modifier = Modifier.fillMaxSize().background(NabdColors.Bg), undoCount = 7,
+        )
+    }
+
     private fun review(mode: ThemeMode, name: String) {
         val text = javaClass.getResource("/receipts/supermarket_ar.txt")!!.readText()
         val session = ReceiptSession(ReceiptParser.parse(text), items, 78, ReceiptSource.CAMERA)
@@ -88,6 +96,8 @@ class StockShots {
     @Test fun homeDark() = stock(ThemeMode.DARK, 0, "stock_home_dark")
     @Test fun shoppingLight() = stock(ThemeMode.LIGHT, 1, "stock_shopping_light")
     @Test fun shoppingDark() = stock(ThemeMode.DARK, 1, "stock_shopping_dark")
+    @Test fun quickAddLight() = quickAdd(ThemeMode.LIGHT, "stock_quick_add_light")
+    @Test fun quickAddDark() = quickAdd(ThemeMode.DARK, "stock_quick_add_dark")
     @Test fun reviewLight() = review(ThemeMode.LIGHT, "stock_review_light")
     @Test fun reviewDark() = review(ThemeMode.DARK, "stock_review_dark")
 }

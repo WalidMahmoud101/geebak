@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -78,6 +79,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -187,12 +189,14 @@ fun StockScreen(vm: AppViewModel, onBack: () -> Unit) {
     val reading by vm.receiptReading.collectAsStateWithLifecycle()
     val session by vm.receipt.collectAsStateWithLifecycle()
     val message by vm.stockMessage.collectAsStateWithLifecycle()
+    val undo by vm.stockUndo.collectAsStateWithLifecycle()
     var page by rememberSaveable { mutableStateOf(0) }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     var adding by remember { mutableStateOf(false) }
     var openId by remember { mutableStateOf<Long?>(null) }
     var buying by remember { mutableStateOf<StockItem?>(null) }
+    var confirmClear by remember { mutableStateOf(false) }
     // الكاميرا ممكن تخلّي أندرويد يقفل التطبيق، فالمسار لازم يعيش بعد الرجوع
     var pendingCapture by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -226,7 +230,24 @@ fun StockScreen(vm: AppViewModel, onBack: () -> Unit) {
         onToggle = { vm.setStockOut(it, !it.isOut) },
         onOpen = { openId = it.id },
         onBought = { buying = it },
+        onQuickAdd = { vm.addStock(it, category ?: StockCatalog.guessCategory(it), page == 1); query = "" },
+        onClear = { confirmClear = true },
+        undoCount = undo?.items?.size ?: 0,
+        onUndo = { vm.undoClearStock() },
+        onDismissUndo = { vm.stockUndo.value = null },
     )
+
+    if (confirmClear) {
+        val count = items.count { category == null || it.category == category }
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            containerColor = NabdColors.Surface,
+            title = { Text(if (category == null) "تمسح المخزون كله؟" else "تمسح كل «$category»؟", style = MaterialTheme.typography.titleMedium) },
+            text = { Text("$count حاجة وكل أسعارها هيتمسحوا. تقدر ترجّعهم بعد المسح على طول.", color = NabdColors.TextDim) },
+            confirmButton = { TextButton(onClick = { vm.clearStock(category); category = null; confirmClear = false }) { Text("امسح", color = NabdColors.Danger) } },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("إلغاء") } },
+        )
+    }
 
     if (adding) StockAddSheet(items, initialOut = page == 1, initialCategory = category, onAdd = { n, c, o -> vm.addStock(n, c, o) }) { adding = false }
     buying?.let { item ->
@@ -254,11 +275,18 @@ fun StockContent(
     onBack: () -> Unit, onAdd: () -> Unit, onCamera: () -> Unit, onGallery: () -> Unit, onManualReceipt: () -> Unit,
     onToggle: (StockItem) -> Unit, onOpen: (StockItem) -> Unit, onBought: (StockItem) -> Unit,
     modifier: Modifier = Modifier,
+    onQuickAdd: (String) -> Unit = {},
+    onClear: () -> Unit = {},
+    undoCount: Int = 0,
+    onUndo: () -> Unit = {},
+    onDismissUndo: () -> Unit = {},
 ) {
     val out = items.filter { it.isOut }
     val categories = (StockCatalog.builtIn + items.map { it.category }).distinct()
     val q = StockCatalog.key(query)
     val shown = items.filter { (category == null || it.category == category) && (q.isEmpty() || it.key.contains(q)) }
+    // اللي بتدوّر عليه مش موجود؟ يبقى ضيفه من مكانك
+    val canQuickAdd = q.isNotEmpty() && items.none { it.key == q }
 
     LazyColumn(modifier, contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
@@ -279,6 +307,15 @@ fun StockContent(
                     Icon(Icons.Rounded.Add, null, tint = NabdColors.OnAccent, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("ضيف", style = MaterialTheme.typography.labelLarge, color = NabdColors.OnAccent)
+                }
+            }
+        }
+        if (undoCount > 0) item {
+            GlassCard(Modifier.fillMaxWidth(), padding = 4.dp) {
+                Row(Modifier.padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("اتمسح $undoCount حاجة", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                    TextButton(onClick = onUndo) { Text("رجّعهم", color = NabdColors.Mint) }
+                    IconButton(onClick = onDismissUndo) { Icon(Icons.Rounded.Close, "إخفاء", tint = NabdColors.TextFaint, modifier = Modifier.size(18.dp)) }
                 }
             }
         }
@@ -306,9 +343,27 @@ fun StockContent(
             item {
                 OutlinedTextField(
                     query, onQuery, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp),
-                    placeholder = { Text("دوّر على حاجة") }, leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                    placeholder = { Text("دوّر على حاجة أو اكتب صنف جديد") }, leadingIcon = { Icon(Icons.Rounded.Search, null) },
                     trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Rounded.Close, "امسح") } },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (canQuickAdd) onQuickAdd(query.trim()) }),
                 )
+            }
+            if (canQuickAdd) item {
+                val target = category ?: StockCatalog.guessCategory(query)
+                GlassCard(Modifier.fillMaxWidth(), padding = 4.dp) {
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onQuickAdd(query.trim()) }.padding(horizontal = 8.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconBubble(Icons.Rounded.Add, NabdColors.Mint, 34.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("ضيف «${query.trim()}»", style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("في $target", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim, maxLines = 1)
+                        }
+                    }
+                }
             }
             item {
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -318,7 +373,7 @@ fun StockContent(
             }
             if (items.isEmpty()) {
                 item { EmptyState(Icons.Rounded.Inventory2, "لسه مفيش حاجات", "ضيف اللي في البيت، أو صوّر فاتورة وهتتضاف لوحدها.") }
-            } else if (shown.isEmpty()) {
+            } else if (shown.isEmpty() && !canQuickAdd) {
                 item { Text("مفيش حاجة بالشكل ده.", style = MaterialTheme.typography.bodyMedium, color = NabdColors.TextDim, modifier = Modifier.padding(8.dp)) }
             }
             // الجروبات بنفس ترتيب الشرايح، وفي كل جروب اللي خلص الأول
@@ -367,6 +422,9 @@ fun StockContent(
                 "عايز تكتب فاتورة بإيدك؟", style = MaterialTheme.typography.labelMedium, color = NabdColors.TextDim,
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onManualReceipt).padding(8.dp),
             )
+        }
+        if (page == 0 && items.any { category == null || it.category == category }) item {
+            PillButton(if (category == null) "امسح المخزون كله" else "امسح كل «$category»", Icons.Rounded.Delete, NabdColors.Danger, Modifier.fillMaxWidth(), onClick = onClear)
         }
     }
 }
@@ -458,19 +516,22 @@ private fun BoughtSheet(item: StockItem, history: List<StockPrice>, onSave: (Dou
     }
 }
 
-/** ضيف حاجة: اسم وتصنيف، أو تصنيف جديد، والشاشة بتفضل مفتوحة علشان تضيف كذا حاجة ورا بعض */
+/** ضيف حاجة: اكتب الاسم والتصنيف بيتحدد لوحده وتقدر تغيّره، والشاشة بتفضل مفتوحة علشان تضيف كذا حاجة ورا بعض */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun StockAddSheet(items: List<StockItem>, initialOut: Boolean, initialCategory: String?, onAdd: (String, String, Boolean) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf("") }
     var category by remember { mutableStateOf(initialCategory ?: StockCatalog.FOOD) }
+    // طول ما انت مااخترتش تصنيف بإيدك، بنخمّنه من الاسم
+    var picked by remember { mutableStateOf(initialCategory != null) }
     var out by remember { mutableStateOf(initialOut) }
     var newCategory by remember { mutableStateOf(false) }
     var custom by remember { mutableStateOf("") }
     var added by remember { mutableStateOf<List<String>>(emptyList()) }
     val cats = (StockCatalog.builtIn + items.map { it.category }).distinct()
     val have = items.map { it.key }.toSet()
-    val chosen = if (newCategory) custom.trim() else category
+    val guessed = name.takeIf { !picked && it.isNotBlank() }?.let(StockCatalog::guessCategory)
+    val chosen = if (newCategory) custom.trim() else guessed ?: category
     fun add(n: String) {
         if (n.isBlank() || chosen.isEmpty()) return
         onAdd(n, chosen, out)
@@ -483,16 +544,21 @@ private fun StockAddSheet(items: List<StockItem>, initialOut: Boolean, initialCa
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text("ضيف للمخزون", style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(name, { name = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp), label = { Text("اسم الحاجة") })
+            OutlinedTextField(
+                name, { name = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp), label = { Text("اسم أي صنف") },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { add(name) }),
+                trailingIcon = { if (name.isNotBlank()) IconButton(onClick = { add(name) }) { Icon(Icons.Rounded.CheckCircle, "ضيف", tint = NabdColors.Mint) } },
+            )
             Text("التصنيف", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                cats.forEach { c -> SelectChip(c, !newCategory && category == c, stockColor(c), stockIcon(c)) { category = c; newCategory = false } }
+                cats.forEach { c -> SelectChip(c, !newCategory && chosen == c, stockColor(c), stockIcon(c)) { category = c; picked = true; newCategory = false } }
                 SelectChip("تصنيف جديد", newCategory, NabdColors.Mint, Icons.Rounded.Add) { newCategory = true }
             }
             if (newCategory) {
                 OutlinedTextField(custom, { custom = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp), label = { Text("اسم التصنيف") })
             }
-            val ideas = StockCatalog.suggestions[chosen].orEmpty().filter { StockCatalog.key(it) !in have && it !in added }
+            val ideas = StockCatalog.suggestions[chosen].orEmpty().filter { StockCatalog.key(it) !in have && it !in added && name.isBlank() }
             if (ideas.isNotEmpty()) {
                 Text("أو اختار بسرعة", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

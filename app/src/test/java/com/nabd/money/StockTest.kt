@@ -48,6 +48,51 @@ class StockTest {
     }
 
     @Test
+    fun clearingEverythingCanBeUndoneWithPrices() = runBlocking {
+        store.clear()
+        val a = store.add("رز", StockCatalog.FOOD)!!
+        val b = store.add("صابون", StockCatalog.BATH, out = true)!!
+        store.addPrice(a.id, 40.0)
+        val snap = store.clear()
+        assertEquals(2, snap.items.size)
+        assertTrue(app.db.dao().stockItemsOnce().isEmpty())
+        assertTrue(app.db.dao().stockPricesOnce().isEmpty())
+        store.restore(snap)
+        assertEquals(setOf(a.id, b.id), app.db.dao().stockItemsOnce().map { it.id }.toSet())
+        assertEquals(40.0, app.db.dao().stockPricesOnce().single().price, 0.0)
+    }
+
+    @Test
+    fun clearingOneCategoryLeavesTheRest() = runBlocking {
+        store.clear()
+        val a = store.add("رز", StockCatalog.FOOD)!!
+        val b = store.add("صابون", StockCatalog.BATH)!!
+        store.addPrice(a.id, 40.0)
+        store.addPrice(b.id, 20.0)
+        val snap = store.clear(StockCatalog.BATH)
+        assertEquals(listOf("صابون"), snap.items.map { it.name })
+        assertEquals(listOf("رز"), app.db.dao().stockItemsOnce().map { it.name })
+        assertEquals(40.0, app.db.dao().stockPricesOnce().single().price, 0.0)
+    }
+
+    @Test
+    fun undoKeepsAnItemAddedAgainAndMovesItsOldPrices() = runBlocking {
+        store.clear()
+        val a = store.add("رز", StockCatalog.FOOD)!!
+        store.addPrice(a.id, 40.0)
+        val snap = store.clear()
+        val again = store.add("رز", StockCatalog.KITCHEN)!!
+        store.addPrice(again.id, 45.0)
+        store.restore(snap)
+        val item = app.db.dao().stockItemsOnce().single()
+        assertEquals(again.id, item.id)
+        assertEquals(StockCatalog.KITCHEN, item.category)
+        val prices = app.db.dao().stockPricesOnce()
+        assertEquals(2, prices.size)
+        assertTrue(prices.all { it.itemId == again.id })
+    }
+
+    @Test
     fun smallPiasterChangesAreNotExpensive() {
         assertEquals(PriceLevel.SAME, PriceCheck.check(5.25, listOf(p(5.0, 1))).level)
         assertEquals(PriceLevel.EXPENSIVE, PriceCheck.check(6.0, listOf(p(5.0, 1))).level)
