@@ -630,7 +630,7 @@ fun EditTxnSheet(
         }
     }
     if (confirmDelete) {
-        ConfirmDialog("حذف العملية؟", "هتتشال من نبض بس.", onDismiss = { confirmDelete = false }) {
+        ConfirmDialog("حذف العملية؟", "هتتشال من جيبك بس.", onDismiss = { confirmDelete = false }) {
             confirmDelete = false; onDelete(txn)
         }
     }
@@ -816,7 +816,7 @@ fun SettingsDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                 )
                 PillButton("التصنيفات والقواعد", Icons.Rounded.Category, NabdColors.Mint, Modifier.fillMaxWidth()) { categories = true }
                 PillButton("النسخة الاحتياطية", Icons.Rounded.CloudDone, NabdColors.Mint, Modifier.fillMaxWidth()) { backup = true }
-                PillButton("عن نبض", Icons.Rounded.Favorite, NabdColors.Pink, Modifier.fillMaxWidth()) { about = true }
+                PillButton("عن جيبك", Icons.Rounded.Favorite, NabdColors.Pink, Modifier.fillMaxWidth()) { about = true }
                 // مراجعة شاملة للرسايل: بتصلّح العمليات والأرصدة اللي اتسجلت غلط
                 val heal by vm.healMessage.collectAsState()
                 PillButton("راجع كل الرسايل وصلّح", Icons.Rounded.Check, NabdColors.Cyan, Modifier.fillMaxWidth()) { vm.healAll() }

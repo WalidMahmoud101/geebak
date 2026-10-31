@@ -127,7 +127,7 @@ object Updater {
         val code = tag.filter { it.isDigit() }.toIntOrNull() ?: return null
         return Release(
             versionCode = code,
-            name = "نبض (النسخة $code)",
+            name = "جيبك (النسخة $code)",
             notes = "",
             apkUrl = "https://github.com/$REPO/releases/download/$tag/nabd.apk",
             sizeBytes = 0,
@@ -150,7 +150,7 @@ object Updater {
     private fun dir(ctx: Context) = File(ctx.cacheDir, "updates").apply { mkdirs() }
 
     /**
-     * لو النسخة دي اتنزلت قبل كده: نتأكد إن الملف كامل وسليم (الحجم، وإنه نبض بنفس رقم النسخة)
+     * لو النسخة دي اتنزلت قبل كده: نتأكد إن الملف كامل وسليم (الحجم، وإنه جيبك بنفس رقم النسخة)
      * ونرجعه علشان مانزلوش تاني. أي ملف ناقص أو قديم أو بايظ بيتمسح.
      */
     suspend fun cached(ctx: Context, r: Release): File? = withContext(Dispatchers.IO) {
@@ -245,7 +245,7 @@ object Updater {
     fun install(ctx: Context, file: File) {
         val pm = ctx.packageManager
         if (!pm.canRequestPackageInstalls()) {
-            // أول مرة بس: لازم تسمح لنبض يثبت تحديثاته
+            // أول مرة بس: لازم تسمح لجيبك يثبت تحديثاته
             ctx.startActivity(
                 Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${ctx.packageName}"))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

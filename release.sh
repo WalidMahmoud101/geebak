@@ -1,5 +1,5 @@
 #!/bin/bash
-# ينشر نسخة جديدة من نبض على GitHub Releases، والتطبيق على الموبايل بيلقطها لوحده.
+# ينشر نسخة جديدة من جيبك على GitHub Releases، والتطبيق على الموبايل بيلقطها لوحده.
 # الاستخدام: زوّد versionCode و versionName في app/build.gradle.kts، اكتب الجديد في RELEASE_NOTES.md، وبعدين:
 #   ./release.sh
 set -euo pipefail
@@ -14,5 +14,5 @@ fi
 mkdir -p build
 cp app/build/outputs/apk/release/app-release.apk build/nabd.apk
 git push -q origin HEAD
-gh release create "v$CODE" build/nabd.apk --title "نبض $NAME" --notes-file RELEASE_NOTES.md
+gh release create "v$CODE" build/nabd.apk --title "جيبك $NAME" --notes-file RELEASE_NOTES.md
 echo "اتنشرت v$CODE ($NAME)"

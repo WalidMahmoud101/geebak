@@ -216,7 +216,7 @@ fun HomeScreen(
 private fun HomeHeader(unread: Int, onAgents: () -> Unit, onSettings: () -> Unit, onBell: () -> Unit, onAbout: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
-            Text("نبض", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onAbout))
+            Text("جيبك", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onAbout))
             Spacer(Modifier.width(8.dp))
             Text(greeting(), style = MaterialTheme.typography.bodySmall, color = NabdColors.TextDim, modifier = Modifier.padding(bottom = 3.dp))
         }

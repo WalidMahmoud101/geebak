@@ -460,7 +460,7 @@ private fun AccountSheet(vm: AppViewModel, a: Account, all: List<Account>, isHid
     if (confirmDelete) {
         ConfirmDialog(
             "حذف ${a.name}؟",
-            "هيتحذف الحساب وكل العمليات بتاعته من نبض بس (مش من البنك).",
+            "هيتحذف الحساب وكل العمليات بتاعته من جيبك بس (مش من البنك).",
             onDismiss = { confirmDelete = false }
         ) {
             vm.deleteAccount(a); confirmDelete = false; onDismiss()

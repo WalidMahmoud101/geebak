@@ -150,7 +150,7 @@ fun SavedInvoiceSheet(vm: AppViewModel, inv: Invoice, onDismiss: () -> Unit) {
                     runCatching { CompanyInvoice.print(ctx, CompanyInvoice.pdf(ctx, info), "فاتورة ${inv.number}") }.onFailure { note = "الطباعة ماشتغلتش: ${it.message}" }
                 }
                 PillButton("PDF", Icons.Rounded.PictureAsPdf, NabdColors.Danger, Modifier.weight(1f)) {
-                    runCatching { CompanyInvoice.share(ctx, CompanyInvoice.pdf(ctx, info), CompanyInvoice.MIME_PDF, "فاتورة نبض ${inv.number}") }.onFailure { note = "ماقدرتش أعمل الـ PDF: ${it.message}" }
+                    runCatching { CompanyInvoice.share(ctx, CompanyInvoice.pdf(ctx, info), CompanyInvoice.MIME_PDF, "فاتورة جيبك ${inv.number}") }.onFailure { note = "ماقدرتش أعمل الـ PDF: ${it.message}" }
                 }
             }
             GradientButton("Excel للمحاسب (.xlsx)", Modifier.fillMaxWidth(), Icons.Rounded.TableChart) {

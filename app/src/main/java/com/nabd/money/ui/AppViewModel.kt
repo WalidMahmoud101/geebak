@@ -389,7 +389,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun openBackup(uri: android.net.Uri) = backupJob {
         val json = com.nabd.money.util.BackupFiles.read(getApplication(), uri)
         val info = com.nabd.money.data.Backup.info(json)
-        if (info == null) backupMessage.value = "الملف ده مش نسخة احتياطية من نبض"
+        if (info == null) backupMessage.value = "الملف ده مش نسخة احتياطية من جيبك"
         else pendingRestore.value = info to json
     }
 

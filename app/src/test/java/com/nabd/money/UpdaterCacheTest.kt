@@ -17,7 +17,7 @@ import java.io.File
 @Config(sdk = [34])
 class UpdaterCacheTest {
     private val ctx get() = ApplicationProvider.getApplicationContext<NabdApp>()
-    private fun release(code: Int, size: Long) = Updater.Release(code, "نبض", "", "https://example.invalid/nabd.apk", size)
+    private fun release(code: Int, size: Long) = Updater.Release(code, "جيبك", "", "https://example.invalid/nabd.apk", size)
     private fun dir() = File(ctx.cacheDir, "updates").apply { mkdirs() }
 
     @Test

@@ -91,7 +91,7 @@ fun ResetSheet(vm: AppViewModel, onDismiss: () -> Unit) {
                 enabled = true,
             ) { confirm = ResetScope.EVERYTHING }
             Text(
-                "المسح جوا نبض بس، رسايلك في الموبايل مش بتتمسح. والرسايل القديمة مش هتتسجل تاني.",
+                "المسح جوا جيبك بس، رسايلك في الموبايل مش بتتمسح. والرسايل القديمة مش هتتسجل تاني.",
                 style = MaterialTheme.typography.labelSmall, color = NabdColors.TextFaint
             )
             if (canUndo) {

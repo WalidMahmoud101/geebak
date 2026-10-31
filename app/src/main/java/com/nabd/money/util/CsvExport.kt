@@ -52,7 +52,7 @@ object CsvExport {
         val send = Intent(Intent.ACTION_SEND)
             .setType("text/csv")
             .putExtra(Intent.EXTRA_STREAM, uri)
-            .putExtra(Intent.EXTRA_SUBJECT, "مصاريف نبض")
+            .putExtra(Intent.EXTRA_SUBJECT, "مصاريف جيبك")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         ctx.startActivity(Intent.createChooser(send, "تصدير لـ Excel").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }

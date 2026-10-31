@@ -65,7 +65,7 @@ class BackupTest {
         assertEquals(listOf("جيم"), app.settings.taxonomy.value.customCategories)
         assertEquals(51.5, app.settings.usdRate.value, 0.01)
 
-        // ملف مش من نبض مايتقبلش
+        // ملف مش من جيبك مايتقبلش
         assertNull(Backup.info("""{"hello":1}"""))
     }
 }

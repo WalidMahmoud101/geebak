@@ -92,11 +92,11 @@ data class AboutStats(val transactions: Int, val auto: Int, val manual: Int, val
     val autoPercent get() = if (transactions == 0) 0 else auto * 100 / transactions
 }
 
-/** مكتبات وخط وخدمات نبض بيستخدمها وتراخيصها (نفس اللي في THIRD_PARTY_LICENSES.md) */
+/** مكتبات وخط وخدمات جيبك بيستخدمها وتراخيصها (نفس اللي في THIRD_PARTY_LICENSES.md) */
 data class LicenseItem(val name: String, val use: String, val license: String)
 
 val licenseItems = listOf(
-    LicenseItem("نبض", "التطبيق نفسه", "MIT"),
+    LicenseItem("جيبك", "التطبيق نفسه", "MIT"),
     LicenseItem("Kotlin و Coroutines", "اللغة والتزامن", "Apache 2.0"),
     LicenseItem("Jetpack Compose + Material 3", "الواجهة", "Apache 2.0"),
     LicenseItem("AndroidX (Core، Activity، Lifecycle)", "أساسيات أندرويد", "Apache 2.0"),
@@ -119,7 +119,7 @@ private data class Feature(val icon: ImageVector, val color: Color, val title: S
 private val features = listOf(
     Feature(Icons.Rounded.Sms, Color(0xFF2F9E7E), "بيسجّل لوحده", "بيقرا رسايل البنك والمحافظ وإشعارات InstaPay وBinance وغيرهم، ويطلّع اتخصم كام والباقي كام. ويتجاهل الأكواد السرية والإعلانات."),
     Feature(Icons.Rounded.AccountBalanceWallet, Color(0xFF4C7BE0), "كل حساباتك", "إجمالي فلوسك وإجمالي كل بنك ومحفظة وكارت. وتضيف Binance وVisa وغيرهم بإيدك، والكاش (جيبك) حساب حقيقي."),
-    Feature(Icons.Rounded.BusinessCenter, Color(0xFF2E9BC9), "مصاريف الشركة والعهدة", "اللي دفعته للشغل، وفلوس الشركة اللي معاك، والصافي بينكم. وفاتورة PDF باسم نبض وملف Excel للمحاسب."),
+    Feature(Icons.Rounded.BusinessCenter, Color(0xFF2E9BC9), "مصاريف الشركة والعهدة", "اللي دفعته للشغل، وفلوس الشركة اللي معاك، والصافي بينكم. وفاتورة PDF باسم جيبك وملف Excel للمحاسب."),
     Feature(Icons.Rounded.Inventory2, Color(0xFFC98A1B), "المخزون وقايمة الشرا", "علّم اللي خلص من البيت فمايتنسيش، وصوّر الفاتورة تتقرا على موبايلك، ويقولك السعر الجديد غالي ولا رخيص عن آخر مرة."),
     Feature(Icons.Rounded.Mic, Color(0xFFE0663E), "سجّل بصوتك", "«ضيف في بينانس 100 دولار» أو «اتخصم 250 من الفيزا»: بيفهم المصري والأرقام بالكلام."),
     Feature(Icons.Rounded.CurrencyExchange, Color(0xFFD9A21B), "الدولار والدهب", "سعر الدولار بيتحدث لوحده، واضغط على إجمالي فلوسك يتحول للدولار. وسعر الدهب بالجنيه لكل العيارات أول بأول."),
@@ -128,7 +128,7 @@ private val features = listOf(
 )
 
 /**
- * عن نبض: بياناتك الحقيقية، اللي بيعمله، الخصوصية، والروابط.
+ * عن جيبك: بياناتك الحقيقية، اللي بيعمله، الخصوصية، والروابط.
  * منفصل عن الـ ViewModel علشان يتعرض في الاختبارات والمعاينة.
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -151,7 +151,7 @@ fun AboutContent(
         Hero(versionName, versionCode)
 
         // أرقامك
-        Text("نبض لحد دلوقتي", style = MaterialTheme.typography.titleMedium)
+        Text("جيبك لحد دلوقتي", style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatCard("عملية اتسجلت", stats.transactions, Modifier.weight(1f))
             StatCard("منها لوحدها", stats.autoPercent, Modifier.weight(1f), suffix = "%")
@@ -165,7 +165,7 @@ fun AboutContent(
         }
 
         // اللي بيعمله
-        Text("إيه اللي نبض بيعمله", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 6.dp))
+        Text("إيه اللي جيبك بيعمله", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 6.dp))
         features.forEach { f ->
             GlassCard(Modifier.fillMaxWidth(), padding = 12.dp) {
                 Row(verticalAlignment = Alignment.Top) {
@@ -246,7 +246,7 @@ fun AboutContent(
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("التراخيص", style = MaterialTheme.typography.titleSmall)
-                    Text("المكتبات والخط والخدمات اللي نبض شايلها", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
+                    Text("المكتبات والخط والخدمات اللي جيبك شايلها", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
                 }
                 Text(if (licensesOpen) "اقفل" else "افتح", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
             }
@@ -331,10 +331,10 @@ private fun Hero(versionName: String, versionCode: Int) {
             }
         }
         Spacer(Modifier.height(6.dp))
-        Text("نبض", fontSize = 38.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        Text("Nabd", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.7f))
+        Text("جيبك", fontSize = 38.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("Geebak", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.7f))
         Spacer(Modifier.height(6.dp))
-        Text("نبض فلوسك لحظة بلحظة", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))
+        Text("كل اللي في جيبك، لحظة بلحظة", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))
         Spacer(Modifier.height(12.dp))
         Text(
             "الإصدار $versionName  •  رقم $versionCode",
@@ -355,7 +355,7 @@ private fun StatCard(label: String, value: Int, modifier: Modifier, suffix: Stri
     }
 }
 
-/** عن نبض (شاشة كاملة): بيحسب أرقامك من قاعدة البيانات اللي على الموبايل */
+/** عن جيبك (شاشة كاملة): بيحسب أرقامك من قاعدة البيانات اللي على الموبايل */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutSheet(vm: AppViewModel, onDismiss: () -> Unit) {

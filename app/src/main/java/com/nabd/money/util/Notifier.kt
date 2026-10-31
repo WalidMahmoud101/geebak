@@ -35,7 +35,7 @@ object Notifier {
     }
 
     fun capture(ctx: Context, t: Txn, account: Account) {
-        val agent = AgentRegistry.byId(t.agentId)?.name ?: "نبض"
+        val agent = AgentRegistry.byId(t.agentId)?.name ?: "جيبك"
         val verb = if (t.direction == Direction.OUT) "اتخصم" else "اتضاف"
         val title = "$verb ${Money.fmt(t.amount, t.currency)} • ${account.name}"
         val rest = Money.fmt(account.balance, account.currency)
@@ -54,7 +54,7 @@ object Notifier {
     }
 
     fun update(ctx: Context, name: String, notes: String) {
-        post(ctx, CH_ALERTS, 98, "تحديث جديد: $name", notes.ifBlank { "افتح نبض ودوس \"نزّل وثبّت\"." })
+        post(ctx, CH_ALERTS, 98, "تحديث جديد: $name", notes.ifBlank { "افتح جيبك ودوس \"نزّل وثبّت\"." })
     }
 
     fun digest(ctx: Context, title: String, body: String) {

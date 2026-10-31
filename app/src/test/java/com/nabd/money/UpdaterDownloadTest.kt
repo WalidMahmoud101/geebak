@@ -53,7 +53,7 @@ class UpdaterDownloadTest {
         return s
     }
 
-    private fun release(s: ServerSocket, size: Long) = Updater.Release(99, "نبض", "", "http://127.0.0.1:${s.localPort}/nabd.apk", size)
+    private fun release(s: ServerSocket, size: Long) = Updater.Release(99, "جيبك", "", "http://127.0.0.1:${s.localPort}/nabd.apk", size)
 
     @Test
     fun stoppingEndsAStalledDownloadRightAwayWithoutRetrying() = runBlocking {
@@ -83,7 +83,7 @@ class UpdaterDownloadTest {
 
     @Test
     fun theButtonAlwaysDoesSomethingUseful() {
-        val r = Updater.Release(9, "نبض", "", "", 0)
+        val r = Updater.Release(9, "جيبك", "", "", 0)
         assertEquals("اتحقق", UpdateState.Idle.action())
         assertEquals("اتحقق", UpdateState.UpToDate.action())
         assertEquals("اتحقق", UpdateState.Error("x").action())

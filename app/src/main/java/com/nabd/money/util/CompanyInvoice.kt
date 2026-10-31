@@ -61,7 +61,7 @@ data class InvoiceInfo(
 }
 
 /**
- * فاتورة مصاريف الشركة: PDF بشكل شيك باسم نبض (للطباعة والتسليم)، وملف Excel (.xlsx) للمحاسب.
+ * فاتورة مصاريف الشركة: PDF بشكل شيك باسم جيبك (للطباعة والتسليم)، وملف Excel (.xlsx) للمحاسب.
  * من غير أي مكتبة: PDF بـ android.graphics.pdf، والـ xlsx ملف zip فيه XML.
  */
 object CompanyInvoice {
@@ -235,7 +235,7 @@ object CompanyInvoice {
                 color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 2.6f
                 strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
             })
-            cell(c, "نبض", tp(f.bold, 28f, Color.WHITE), RIGHT - 70f - 160f, 54f, 160f, RIGHT_ALIGN)
+            cell(c, "جيبك", tp(f.bold, 28f, Color.WHITE), RIGHT - 70f - 160f, 54f, 160f, RIGHT_ALIGN)
             cell(c, "إدارة فلوسك بذكاء", tp(f.regular, 10f, Color.parseColor("#CFEBDD")), RIGHT - 70f - 160f, 92f, 160f, RIGHT_ALIGN)
             // يسار الهيدر: نوع المستند ورقمه
             cell(c, "فاتورة مصاريف", tp(f.bold, 17f, Color.WHITE), LEFT + 16f, 50f, 190f, LEFT_ALIGN)
@@ -257,7 +257,7 @@ object CompanyInvoice {
             cell(c, "${info.items.size} بند", value, LEFT, 187f, colWd, RIGHT_ALIGN)
             y = FIRST_TABLE_Y
         } else {
-            cell(c, "نبض • فاتورة ${info.number}", tp(f.medium, 10f, DIM), LEFT, 40f, RIGHT - LEFT, RIGHT_ALIGN)
+            cell(c, "جيبك • فاتورة ${info.number}", tp(f.medium, 10f, DIM), LEFT, 40f, RIGHT - LEFT, RIGHT_ALIGN)
             c.drawLine(LEFT, 60f, RIGHT, 60f, Paint().apply { color = LINE; strokeWidth = 1f })
             y = NEXT_TABLE_Y
         }
@@ -327,7 +327,7 @@ object CompanyInvoice {
 
         // الفوتر
         c.drawLine(LEFT, 806f, RIGHT, 806f, Paint().apply { color = LINE; strokeWidth = 0.8f })
-        cell(c, "اتعملت بتطبيق نبض", tp(f.regular, 9f, DIM), LEFT, 812f, RIGHT - LEFT, CENTER)
+        cell(c, "اتعملت بتطبيق جيبك", tp(f.regular, 9f, DIM), LEFT, 812f, RIGHT - LEFT, CENTER)
         cell(c, "صفحة $pageNo من $pageCount", tp(f.regular, 9f, DIM), LEFT, 812f, 120f, LEFT_ALIGN)
     }
 
@@ -357,7 +357,7 @@ object CompanyInvoice {
         fun inl(ref: String, text: String, style: Int) = """<c r="$ref" s="$style" t="inlineStr"><is><t xml:space="preserve">${esc(text)}</t></is></c>"""
         fun num(ref: String, v: Double, style: Int) = """<c r="$ref" s="$style"><v>$v</v></c>"""
 
-        rows.append("""<row r="$r" ht="26" customHeight="1">${inl("A$r", "نبض — فاتورة مصاريف الشركة", 5)}</row>"""); r++
+        rows.append("""<row r="$r" ht="26" customHeight="1">${inl("A$r", "جيبك — فاتورة مصاريف الشركة", 5)}</row>"""); r++
         fun meta(label: String, value: String) {
             rows.append("""<row r="$r">${inl("A$r", label, 6)}${inl("B$r", value, 2)}</row>"""); r++
         }
@@ -404,7 +404,7 @@ object CompanyInvoice {
             }
         }
         r++
-        rows.append("""<row r="$r">${inl("A$r", "اتعملت بتطبيق نبض", 6)}</row>""")
+        rows.append("""<row r="$r">${inl("A$r", "اتعملت بتطبيق جيبك", 6)}</row>""")
 
         val widths = listOf(6, 16, 34, 18, 9, 14, 14, 9, 11, 30)
         val cols = widths.mapIndexed { i, w -> """<col min="${i + 1}" max="${i + 1}" width="$w" customWidth="1"/>""" }.joinToString("")

@@ -143,7 +143,7 @@ fun InvoiceSheet(
                     }
                     PillButton("PDF", Icons.Rounded.PictureAsPdf, NabdColors.Danger, Modifier.weight(1f)) {
                         act {
-                            runCatching { CompanyInvoice.share(ctx, CompanyInvoice.pdf(ctx, info), CompanyInvoice.MIME_PDF, "فاتورة نبض ${info.number}") }
+                            runCatching { CompanyInvoice.share(ctx, CompanyInvoice.pdf(ctx, info), CompanyInvoice.MIME_PDF, "فاتورة جيبك ${info.number}") }
                                 .onFailure { note = "ماقدرتش أعمل الـ PDF: ${it.message}" }
                         }
                     }

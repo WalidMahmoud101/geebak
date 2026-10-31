@@ -41,7 +41,7 @@ object Backup {
         }.toString()
     }
 
-    /** بيرجع null لو الملف مش نسخة نبض */
+    /** بيرجع null لو الملف مش نسخة جيبك */
     fun info(json: String): BackupInfo? = runCatching {
         val o = JSONObject(json)
         if (o.optString("magic") != MAGIC) return null
@@ -59,7 +59,7 @@ object Backup {
 
     suspend fun restore(db: NabdDatabase, settings: Settings, json: String): BackupInfo {
         val o = JSONObject(json)
-        require(o.optString("magic") == MAGIC) { "الملف ده مش نسخة احتياطية من نبض" }
+        require(o.optString("magic") == MAGIC) { "الملف ده مش نسخة احتياطية من جيبك" }
         require(o.optInt("format") <= FORMAT) { "النسخة دي من إصدار أحدث، حدّث التطبيق الأول" }
         // نقرا كل حاجة الأول، علشان لو في غلط في الملف مانمسحش البيانات الحالية
         val accounts = o.getJSONArray("accounts").objects().map(::account)
