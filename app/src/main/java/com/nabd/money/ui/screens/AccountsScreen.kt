@@ -92,7 +92,10 @@ fun AccountsScreen(vm: AppViewModel, onEdit: (Txn) -> Unit) {
     Box(Modifier.fillMaxSize()) {
         LazyColumn(contentPadding = ScreenPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
-                ScreenTitle("الحسابات", "إجمالي فلوسك ${Money.fmt(total)}") {
+                ScreenTitle("الحسابات", "إجمالي فلوسك ${Money.masked(Money.fmt(total))}") {
+                    IconButton(onClick = { vm.settings.hideBalances = !Money.hideBalances }) {
+                        Icon(if (Money.hideBalances) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, if (Money.hideBalances) "اظهر الرصيد" else "اخفي الرصيد", tint = NabdColors.TextDim)
+                    }
                     // زرار واضح فوق، مش بس الزرار العايم اللي ممكن يستخبى ورا الشريط
                     Row(
                         Modifier.clip(RoundedCornerShape(12.dp)).background(NabdColors.Mint).clickable { adding = true }
@@ -190,7 +193,7 @@ internal fun HiddenAccountsCard(hidden: List<Account>, open: Boolean, onToggle: 
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).clickable { onOpen(h) }.padding(vertical = 2.dp)) {
                         Text(h.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(Money.fmt(h.balance, h.currency), style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim, maxLines = 1)
+                        Text(Money.masked(Money.fmt(h.balance, h.currency)), style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim, maxLines = 1)
                     }
                     Spacer(Modifier.width(8.dp))
                     Text(
@@ -249,7 +252,7 @@ internal fun InstitutionCard(
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    if (inst.countedCount > 0) Money.fmt(inst.total) else "—",
+                    if (inst.countedCount > 0) Money.masked(Money.fmt(inst.total)) else "—",
                     fontWeight = FontWeight.Bold, fontSize = 15.sp,
                     color = if (inst.total < 0) NabdColors.Danger else NabdColors.Text
                 )
@@ -302,7 +305,7 @@ internal fun InstitutionCard(
                 } else {
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
-                            Money.fmt(a.balance, a.currency),
+                            Money.masked(Money.fmt(a.balance, a.currency)),
                             style = MaterialTheme.typography.titleSmall,
                             color = if (ex == null) NabdColors.Text else NabdColors.TextFaint
                         )
@@ -345,7 +348,7 @@ private fun AccountSheet(vm: AppViewModel, a: Account, all: List<Account>, isHid
                     Text(a.name, color = Color.White, style = MaterialTheme.typography.titleMedium)
                     Text(a.type.ar + " • " + a.currency, color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.labelMedium)
                     Spacer(Modifier.height(16.dp))
-                    Text(Money.fmt(a.balance, a.currency), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                    Text(Money.masked(Money.fmt(a.balance, a.currency)), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
                     Text(
                         when {
                             a.isCredit -> "الحد المتاح في الكارت • مش من فلوسك"

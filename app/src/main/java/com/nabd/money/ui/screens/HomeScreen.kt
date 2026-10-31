@@ -1,6 +1,8 @@
 package com.nabd.money.ui.screens
 
 import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -152,6 +154,7 @@ fun HomeScreen(
                 total, counted, pending,
                 onDetails = { breakdown = true },
                 onToggleCurrency = { vm.settings.displayCurrency = if (Money.mode == "USD") "EGP" else "USD" },
+                onToggleHidden = { vm.settings.hideBalances = !Money.hideBalances },
             )
         }
         item {
@@ -240,15 +243,16 @@ private fun greeting(): String = when (java.time.LocalTime.now().hour) {
  */
 @OptIn(androidx.compose.animation.ExperimentalAnimationApi::class)
 @Composable
-private fun BalanceCard(total: Double, counted: Int, pending: Int, onDetails: () -> Unit, onToggleCurrency: () -> Unit) {
+private fun BalanceCard(total: Double, counted: Int, pending: Int, onDetails: () -> Unit, onToggleCurrency: () -> Unit, onToggleHidden: () -> Unit) {
     val shape = RoundedCornerShape(18.dp)
     val onCard = Color.White
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val usd = Money.mode == "USD"
     val rate = Money.rate
     // النص بيتحسب من الاختيار نفسه، فالحركة بين القديم والجديد تفضل صح
-    fun primary(inUsd: Boolean) = if (inUsd) Money.plain("", total / rate, "USD", decimals = total / rate < 1000) else Money.plain("", total, "EGP", decimals = false)
-    fun secondary(inUsd: Boolean) = if (inUsd) "≈ " + Money.plain("", total, "EGP", decimals = false) else "≈ " + Money.plain("", total / rate, "USD", decimals = false)
+    val hidden = Money.hideBalances
+    fun primary(inUsd: Boolean) = Money.masked(if (inUsd) Money.plain("", total / rate, "USD", decimals = total / rate < 1000) else Money.plain("", total, "EGP", decimals = false))
+    fun secondary(inUsd: Boolean) = "≈ " + Money.masked(if (inUsd) Money.plain("", total, "EGP", decimals = false) else Money.plain("", total / rate, "USD", decimals = false))
     Row(
         Modifier
             .fillMaxWidth()
@@ -302,6 +306,9 @@ private fun BalanceCard(total: Double, counted: Int, pending: Int, onDetails: ()
                 style = MaterialTheme.typography.labelSmall,
                 color = if (pending > 0) Color(0xFFFFE08A) else onCard.copy(alpha = 0.7f)
             )
+        }
+        IconButton(onClick = onToggleHidden) {
+            Icon(if (hidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, if (hidden) "اظهر الرصيد" else "اخفي الرصيد", tint = onCard, modifier = Modifier.size(22.dp))
         }
         Row(
             Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onDetails).padding(horizontal = 8.dp, vertical = 10.dp),
@@ -460,7 +467,7 @@ private fun InstitutionLine(inst: Institution, egp: (Account) -> Double, onClick
                 )
             }
             Text(
-                if (inst.countedCount > 0) Money.fmt(inst.total, decimals = false) else "—",
+                if (inst.countedCount > 0) Money.masked(Money.fmt(inst.total, decimals = false)) else "—",
                 style = MaterialTheme.typography.titleSmall,
                 color = if (inst.countedCount > 0) NabdColors.Text else NabdColors.TextFaint
             )
@@ -475,10 +482,10 @@ private fun InstitutionLine(inst: Institution, egp: (Account) -> Double, onClick
                         overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     Text(
                         when (ex) {
-                            null -> Money.fmt(a.balance, a.currency, decimals = false)
-                            Exclusion.CREDIT -> "متاح ${Money.fmt(a.balance, a.currency, decimals = false)}"
+                            null -> Money.masked(Money.fmt(a.balance, a.currency, decimals = false))
+                            Exclusion.CREDIT -> "متاح ${Money.masked(Money.fmt(a.balance, a.currency, decimals = false))}"
                             Exclusion.UNKNOWN -> "محتاج رصيده"
-                            else -> Money.fmt(a.balance, a.currency, decimals = false)
+                            else -> Money.masked(Money.fmt(a.balance, a.currency, decimals = false))
                         },
                         style = MaterialTheme.typography.labelLarge,
                         color = if (ex == null) NabdColors.Text else NabdColors.TextFaint

@@ -60,7 +60,7 @@ fun NetWorthSheet(vm: AppViewModel, accounts: List<Account>, onDismiss: () -> Un
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text("إجمالي فلوسك", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
-            Text(Money.fmt(total), fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            Text(Money.masked(Money.fmt(total)), fontSize = 30.sp, fontWeight = FontWeight.Bold)
             Text(
                 "مجموع الحسابات اللي رصيدها مؤكد • الدولار بـ ${Money.fmt(vm.settings.usdRate.value, decimals = true)}",
                 style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim
@@ -74,15 +74,15 @@ fun NetWorthSheet(vm: AppViewModel, accounts: List<Account>, onDismiss: () -> Un
                         Text(inst.name, style = MaterialTheme.typography.titleSmall)
                         inst.accounts.filter { NetWorth.counts(it, egp) }.takeIf { it.size > 1 }?.let { list ->
                             Text(
-                                list.joinToString(" + ") { Money.fmt(it.balance, it.currency, decimals = false) },
+                                list.joinToString(" + ") { Money.masked(Money.fmt(it.balance, it.currency, decimals = false)) },
                                 style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim,
                                 maxLines = 2, overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text(Money.fmt(inst.total, decimals = false), style = MaterialTheme.typography.titleSmall)
-                        if (total > 0) {
+                        Text(Money.masked(Money.fmt(inst.total, decimals = false)), style = MaterialTheme.typography.titleSmall)
+                        if (total > 0 && !Money.hideBalances) {
                             Text("${(inst.total / total * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
                         }
                     }
@@ -119,7 +119,7 @@ fun NetWorthSheet(vm: AppViewModel, accounts: List<Account>, onDismiss: () -> Un
                                     .padding(horizontal = 10.dp, vertical = 6.dp)
                             )
                         } else {
-                            Text(Money.fmt(a.balance, a.currency, decimals = false), style = MaterialTheme.typography.labelLarge, color = NabdColors.TextFaint)
+                            Text(Money.masked(Money.fmt(a.balance, a.currency, decimals = false)), style = MaterialTheme.typography.labelLarge, color = NabdColors.TextFaint)
                         }
                     }
                 }

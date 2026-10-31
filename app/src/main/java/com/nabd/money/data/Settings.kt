@@ -118,6 +118,10 @@ class Settings(context: Context) {
         get() = sp.getLong("last_digest_day", 0)
         set(v) = sp.edit().putLong("last_digest_day", v).apply()
 
+    var hideBalances: Boolean
+        get() = sp.getBoolean("hide_balances", false)
+        set(v) { sp.edit().putBoolean("hide_balances", v).apply(); com.nabd.money.util.Money.hideBalances = v }
+
     private val _theme = MutableStateFlow(
         runCatching { com.nabd.money.ui.theme.ThemeMode.valueOf(sp.getString("theme", "SYSTEM")!!) }
             .getOrDefault(com.nabd.money.ui.theme.ThemeMode.SYSTEM)
@@ -145,6 +149,7 @@ class Settings(context: Context) {
         loadFx()
         com.nabd.money.util.Money.rate = _usdRate.value
         com.nabd.money.util.Money.mode = sp.getString("display_currency", "AUTO")!!
+        com.nabd.money.util.Money.hideBalances = sp.getBoolean("hide_balances", false)
         com.nabd.money.agents.Categorizer.user = _taxonomy.value
     }
 
@@ -230,6 +235,7 @@ class Settings(context: Context) {
         _usdRate.value = sp.getFloat("usd_rate", 50f).toDouble()
         com.nabd.money.util.Money.rate = _usdRate.value
         com.nabd.money.util.Money.mode = displayCurrency
+        com.nabd.money.util.Money.hideBalances = hideBalances
         loadFx()
         _ratesAt.value = ratesUpdatedAt
         _gold.value = readGold()

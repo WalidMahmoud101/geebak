@@ -10,6 +10,12 @@ object Money {
     /** طريقة عرض المبالغ: AUTO = بعملة كل حساب، EGP = الكل بالجنيه، USD = الكل بالدولار */
     var mode by androidx.compose.runtime.mutableStateOf("AUTO")
     var rate by androidx.compose.runtime.mutableStateOf(50.0)
+    /** الرصيد مستخبي: علشان محدش يشوف معاك كام لو بص في الموبايل */
+    var hideBalances by androidx.compose.runtime.mutableStateOf(false)
+    const val MASK = "****"
+
+    /** الرصيد والإجمالي بس. المصاريف والفواتير بتفضل ظاهرة */
+    fun masked(text: String) = if (hideBalances) MASK else text
 
     private val convertible = setOf("EGP", "USD", "USDT", "USDC", "EUR", "GBP", "SAR", "AED")
 
