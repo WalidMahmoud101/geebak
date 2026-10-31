@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -79,9 +80,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nabd.money.agents.PriceCheck
@@ -237,6 +241,7 @@ fun StockScreen(vm: AppViewModel, onBack: () -> Unit) {
         onToggle = { vm.setStockOut(it, !it.isOut) },
         onOpen = { openId = it.id },
         onBought = { buying = it },
+        onQuantity = { item, q -> vm.setStockQuantity(item, q) },
         onQuickAdd = { vm.addStock(it, StockCatalog.targetFor(it, category), page == 1); query = "" },
         onAddTo = { name, dept -> vm.addStock(name, dept, page == 1); query = "" },
         onClear = { confirmClear = true },
@@ -257,10 +262,13 @@ fun StockScreen(vm: AppViewModel, onBack: () -> Unit) {
         )
     }
 
-    if (adding) StockAddSheet(items, initialOut = page == 1, initialCategory = category, onAdd = { n, c, o -> vm.addStock(n, c, o) }) { adding = false }
+    if (adding) StockAddSheet(items, initialOut = page == 1, initialCategory = category, onAdd = { n, c, o, q -> vm.addStock(n, c, o, q) }) { adding = false }
     buying?.let { item ->
         BoughtSheet(item, prices[item.id].orEmpty(),
-            onSave = { p, s -> if (p != null) vm.addStockPrice(item, p, s) else vm.setStockOut(item, false); buying = null },
+            onSave = { p, s, q ->
+                if (p != null) vm.addStockPrice(item, p, s, q) else if (q != null) vm.boughtStock(item, q) else vm.setStockOut(item, false)
+                buying = null
+            },
             onDismiss = { buying = null })
     }
     openId?.let { id ->
@@ -283,6 +291,7 @@ fun StockContent(
     onBack: () -> Unit, onAdd: () -> Unit, onCamera: () -> Unit, onGallery: () -> Unit, onManualReceipt: () -> Unit,
     onToggle: (StockItem) -> Unit, onOpen: (StockItem) -> Unit, onBought: (StockItem) -> Unit,
     modifier: Modifier = Modifier,
+    onQuantity: (StockItem, Double) -> Unit = { _, _ -> },
     onQuickAdd: (String) -> Unit = {},
     onAddTo: (String, String) -> Unit = { _, _ -> },
     onClear: () -> Unit = {},
@@ -293,10 +302,15 @@ fun StockContent(
     val out = items.filter { it.isOut }
     val categories = (StockCatalog.builtIn + items.map { it.category } + StockCatalog.carrefour).distinct()
     val q = StockCatalog.key(query)
-    val shown = items.filter { StockCatalog.inFilter(it.category, category) && (q.isEmpty() || it.key.contains(q)) }
+    // فلتر الحالة مع البحث بالصنف وشرايح النوع: 0 الكل، 1 موجود، 2 خلصت
+    var status by rememberSaveable { mutableStateOf(0) }
+    val shown = items.filter {
+        StockCatalog.inFilter(it.category, category) && (q.isEmpty() || it.key.contains(q)) &&
+            (status == 0 || it.isOut == (status == 2))
+    }
     val inCarrefour = category == StockCatalog.CARREFOUR || category in StockCatalog.carrefour
     val have = items.map { it.key }.toSet()
-    val catalogHits = CarrefourCatalog.search(query).filter { StockCatalog.key(it.first) !in have }.take(8)
+    val catalogHits = CarrefourCatalog.search(query, category?.takeIf { inCarrefour }).filter { StockCatalog.key(it.first) !in have }.take(8)
     // اللي بتدوّر عليه مش موجود؟ يبقى ضيفه من مكانك
     val canQuickAdd = q.isNotEmpty() && items.none { it.key == q }
 
@@ -406,6 +420,12 @@ fun StockContent(
                     StockCatalog.carrefour.forEach { c -> SelectChip(c, category == c, stockColor(c), stockIcon(c)) { onCategory(if (category == c) StockCatalog.CARREFOUR else c) } }
                 }
             }
+            if (items.isNotEmpty()) item {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("كل الحالات", "موجود", "خلصت").forEachIndexed { i, label -> SelectChip(label, status == i) { status = i } }
+                }
+            }
+            if (category != null) item { AddToCategory(category, onQuickAdd) }
             if (category in StockCatalog.carrefour) item { CarrefourPicks(category!!, have) { onAddTo(it, category) } }
             if (items.isEmpty()) {
                 item { EmptyState(Icons.Rounded.Inventory2, "لسه مفيش حاجات", "ضيف اللي في البيت، أو صوّر فاتورة وهتتضاف لوحدها.") }
@@ -421,7 +441,7 @@ fun StockContent(
                     GlassCard(Modifier.fillMaxWidth(), padding = 4.dp) {
                         inCat.forEachIndexed { i, it ->
                             if (i > 0) HorizontalDivider(color = NabdColors.Stroke, modifier = Modifier.padding(horizontal = 10.dp))
-                            StockRow(it, prices[it.id].orEmpty(), { onToggle(it) }) { onOpen(it) }
+                            StockRow(it, prices[it.id].orEmpty(), { onToggle(it) }, { q -> onQuantity(it, q) }) { onOpen(it) }
                         }
                     }
                 }
@@ -465,6 +485,31 @@ fun StockContent(
     }
 }
 
+/** زرار واضح للتصنيف أو القسم المختار، لأي صنف مش موجود في التطبيق. الخانة بتفضل مفتوحة لصنف بعده */
+@Composable
+internal fun AddToCategory(category: String, onAdd: (String) -> Unit) {
+    var writing by remember(category) { mutableStateOf(false) }
+    var name by remember(category) { mutableStateOf("") }
+    val focus = remember { FocusRequester() }
+    fun add() {
+        if (name.isNotBlank()) onAdd(name.trim())
+        name = ""
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        PillButton("ضيف في «$category»", Icons.Rounded.Add, NabdColors.Mint, Modifier.fillMaxWidth()) { writing = !writing }
+        if (writing) {
+            OutlinedTextField(
+                name, { name = it }, modifier = Modifier.fillMaxWidth().focusRequester(focus), singleLine = true, shape = RoundedCornerShape(14.dp),
+                label = { Text("اسم الصنف في $category") },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { add() }),
+                trailingIcon = { if (name.isNotBlank()) IconButton(onClick = { add() }) { Icon(Icons.Rounded.CheckCircle, "ضيف", tint = NabdColors.Mint) } },
+            )
+            LaunchedEffect(Unit) { focus.requestFocus() }
+        }
+    }
+}
+
 /** أصناف القسم من كارفور: لمسة تضيف، واللي عندك بيختفي من القايمة */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -487,7 +532,7 @@ private fun CarrefourPicks(dept: String, have: Set<String>, onPick: (String) -> 
 }
 
 @Composable
-private fun StockRow(item: StockItem, history: List<StockPrice>, onToggle: () -> Unit, onClick: () -> Unit) {
+private fun StockRow(item: StockItem, history: List<StockPrice>, onToggle: () -> Unit, onQuantity: (Double) -> Unit, onClick: () -> Unit) {
     val verdict = remember(history) { PriceCheck.latest(history) }
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 8.dp),
@@ -508,6 +553,7 @@ private fun StockRow(item: StockItem, history: List<StockPrice>, onToggle: () ->
                     PriceBadge(verdict)
                 }
             }
+            QuantityRow(item.quantity, onQuantity)
         }
         Spacer(Modifier.width(8.dp))
         val c = if (item.isOut) NabdColors.Danger else NabdColors.TextDim
@@ -517,6 +563,32 @@ private fun StockRow(item: StockItem, history: List<StockPrice>, onToggle: () ->
                 .background(if (item.isOut) c.copy(alpha = if (NabdColors.isDark) 0.16f else 0.10f) else NabdColors.SurfaceTop)
                 .clickable(onClick = onToggle).padding(horizontal = 12.dp, vertical = 6.dp)
         )
+    }
+}
+
+/** الكمية تحت السعر: بزرارين علشان تتغير من غير ما تفتح الصنف */
+@Composable
+private fun QuantityRow(quantity: Double?, onChange: (Double) -> Unit) {
+    Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("الكمية", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
+        Spacer(Modifier.width(6.dp))
+        StepButton("−", "قلّل الكمية", enabled = (quantity ?: 0.0) > 0) { onChange(((quantity ?: 0.0) - 1).coerceAtLeast(0.0)) }
+        Text(
+            quantity?.let(StockCatalog::quantityText) ?: "—", style = MaterialTheme.typography.titleSmall, textAlign = TextAlign.Center, maxLines = 1,
+            modifier = Modifier.widthIn(min = 34.dp).padding(horizontal = 4.dp),
+        )
+        StepButton("+", "زوّد الكمية", enabled = true) { onChange((quantity ?: 0.0) + 1) }
+    }
+}
+
+@Composable
+private fun StepButton(label: String, description: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(NabdColors.SurfaceTop)
+            .clickable(enabled = enabled, onClickLabel = description, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, style = MaterialTheme.typography.titleMedium, color = if (enabled) NabdColors.Text else NabdColors.TextFaint)
     }
 }
 
@@ -556,8 +628,9 @@ fun PriceField(value: String, onChange: (String) -> Unit, history: List<StockPri
 /** من قايمة الشرا: جبتها، وبكام؟ السعر اختياري */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BoughtSheet(item: StockItem, history: List<StockPrice>, onSave: (Double?, String?) -> Unit, onDismiss: () -> Unit) {
+private fun BoughtSheet(item: StockItem, history: List<StockPrice>, onSave: (Double?, String?, Double?) -> Unit, onDismiss: () -> Unit) {
     var price by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("1") }
     var store by remember { mutableStateOf(history.firstOrNull()?.store.orEmpty()) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = NabdColors.Surface) {
         Column(
@@ -566,9 +639,13 @@ private fun BoughtSheet(item: StockItem, history: List<StockPrice>, onSave: (Dou
         ) {
             Text("جبت ${item.name}", style = MaterialTheme.typography.titleLarge)
             PriceField(price, { price = it }, history)
+            OutlinedTextField(
+                amount, { amount = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp), label = { Text("جبت كام؟") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            )
             OutlinedTextField(store, { store = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp), label = { Text("منين؟ (اختياري)") })
             val v = Money.parseInput(price)?.takeIf { it > 0 }
-            GradientButton(if (v != null) "احفظ السعر" else "جبتها من غير سعر", Modifier.fillMaxWidth(), Icons.Rounded.CheckCircle) { onSave(v, store) }
+            GradientButton(if (v != null) "احفظ السعر" else "جبتها من غير سعر", Modifier.fillMaxWidth(), Icons.Rounded.CheckCircle) { onSave(v, store, Money.parseInput(amount)?.takeIf { it > 0 }) }
         }
     }
 }
@@ -576,8 +653,9 @@ private fun BoughtSheet(item: StockItem, history: List<StockPrice>, onSave: (Dou
 /** ضيف حاجة: اكتب الاسم والتصنيف بيتحدد لوحده وتقدر تغيّره، والشاشة بتفضل مفتوحة علشان تضيف كذا حاجة ورا بعض */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun StockAddSheet(items: List<StockItem>, initialOut: Boolean, initialCategory: String?, onAdd: (String, String, Boolean) -> Unit, onDismiss: () -> Unit) {
+private fun StockAddSheet(items: List<StockItem>, initialOut: Boolean, initialCategory: String?, onAdd: (String, String, Boolean, Double?) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf("") }
+    var quantity by remember { mutableStateOf("") }
     val carrefourMode = initialCategory == StockCatalog.CARREFOUR
     var category by remember { mutableStateOf(initialCategory?.takeIf { !carrefourMode } ?: if (carrefourMode) StockCatalog.PANTRY else StockCatalog.FOOD) }
     // طول ما انت مااخترتش تصنيف بإيدك، بنخمّنه من الاسم
@@ -586,15 +664,19 @@ private fun StockAddSheet(items: List<StockItem>, initialOut: Boolean, initialCa
     var newCategory by remember { mutableStateOf(false) }
     var custom by remember { mutableStateOf("") }
     var added by remember { mutableStateOf<List<String>>(emptyList()) }
+    var hitType by remember { mutableStateOf<String?>(null) }
+    val nameFocus = remember { FocusRequester() }
     val cats = (StockCatalog.builtIn + items.map { it.category }).distinct().filter { it !in StockCatalog.carrefour }
     val have = items.map { it.key }.toSet()
     val guessed = name.takeIf { !picked && it.isNotBlank() }?.let { StockCatalog.targetFor(it, initialCategory.takeIf { carrefourMode }) }
     val chosen = if (newCategory) custom.trim() else guessed ?: category
-    fun add(n: String) {
-        if (n.isBlank() || chosen.isEmpty()) return
-        onAdd(n, chosen, out)
+    fun add(n: String, into: String = chosen) {
+        if (n.isBlank() || into.isEmpty()) return
+        onAdd(n, into, out, Money.parseInput(quantity)?.takeIf { it >= 0 })
         added = added + n.trim()
         name = ""
+        quantity = ""
+        hitType = null
     }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = NabdColors.Surface) {
         Column(
@@ -603,11 +685,53 @@ private fun StockAddSheet(items: List<StockItem>, initialOut: Boolean, initialCa
         ) {
             Text("ضيف للمخزون", style = MaterialTheme.typography.titleLarge)
             OutlinedTextField(
-                name, { name = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp), label = { Text("اسم أي صنف") },
+                name, { name = it }, modifier = Modifier.fillMaxWidth().focusRequester(nameFocus), singleLine = true, shape = RoundedCornerShape(14.dp), label = { Text("ابحث أو اكتب اسم الصنف") },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { add(name) }),
+                leadingIcon = { Icon(Icons.Rounded.Search, null) },
                 trailingIcon = { if (name.isNotBlank()) IconButton(onClick = { add(name) }) { Icon(Icons.Rounded.CheckCircle, "ضيف", tint = NabdColors.Mint) } },
             )
+            OutlinedTextField(
+                quantity, { quantity = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp),
+                label = { Text("الكمية في البيت (اختياري)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            )
+            // وانت بتكتب: اللي عندك، واللي في كارفور، وتفلتر النتايج بالنوع
+            val typed = StockCatalog.key(name)
+            val mine = if (typed.length >= 2) items.filter { it.key.contains(typed) }.take(4) else emptyList()
+            val found = CarrefourCatalog.searchEverywhere(name).filter { StockCatalog.key(it.first) !in have && it.first !in added }
+            val places = CarrefourCatalog.categoriesMatching(name, items.map { it.category })
+            val hitTypes = found.map { it.second }.distinct()
+            mine.forEach { i ->
+                Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(i.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text("عندك", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim)
+                }
+            }
+            if (places.isNotEmpty()) {
+                Text("التصنيفات والأقسام", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // الانتقال للتصنيف: بنختاره ونفضّي البحث فتظهر أصنافه تحت
+                    places.forEach { c -> SelectChip(c, false, stockColor(c), stockIcon(c)) { category = c; picked = true; newCategory = false; name = ""; hitType = null } }
+                }
+            }
+            if (hitTypes.size > 1) {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SelectChip("كل الأنواع", hitType == null || hitType !in hitTypes) { hitType = null }
+                    hitTypes.forEach { t -> SelectChip(t, hitType == t, stockColor(t), stockIcon(t)) { hitType = t } }
+                }
+            }
+            found.filter { hitType == null || hitType !in hitTypes || it.second == hitType }.take(10).forEach { (item, dept) ->
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { add(item, dept) }.padding(horizontal = 4.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(item, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(dept, style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim, maxLines = 1)
+                    }
+                    Icon(Icons.Rounded.Add, "ضيف ${item}", tint = NabdColors.Mint, modifier = Modifier.size(20.dp))
+                }
+            }
             Text("التصنيف", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 cats.forEach { c -> SelectChip(c, !newCategory && chosen == c, stockColor(c), stockIcon(c)) { category = c; picked = true; newCategory = false } }
@@ -621,9 +745,14 @@ private fun StockAddSheet(items: List<StockItem>, initialOut: Boolean, initialCa
                 OutlinedTextField(custom, { custom = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp), label = { Text("اسم التصنيف") })
             }
             val ideas = (StockCatalog.suggestions[chosen].orEmpty() + CarrefourCatalog.items[chosen].orEmpty()).filter { StockCatalog.key(it) !in have && it !in added && name.isBlank() }
-            if (ideas.isNotEmpty()) {
+            if (name.isBlank()) {
                 Text("أو اختار بسرعة", style = MaterialTheme.typography.labelLarge, color = NabdColors.TextDim)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // حاجة مش في الاختيارات: بنثبّت القسم المختار ونوديك على خانة الاسم
+                    SelectChip("حاجة جديدة", false, NabdColors.Mint, Icons.Rounded.Edit) {
+                        if (!newCategory) { category = chosen; picked = true }
+                        nameFocus.requestFocus()
+                    }
                     ideas.forEach { s -> SelectChip(s, false, NabdColors.Mint, Icons.Rounded.Add) { add(s) } }
                 }
             }
@@ -652,6 +781,7 @@ private fun StockItemSheet(vm: AppViewModel, item: StockItem, history: List<Stoc
     var category by remember(item.category) { mutableStateOf(item.category) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var quantity by remember(item.quantity) { mutableStateOf(item.quantity?.let(StockCatalog::quantityText).orEmpty()) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = NabdColors.Surface) {
         Column(
             Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 28.dp),
@@ -684,6 +814,14 @@ private fun StockItemSheet(vm: AppViewModel, item: StockItem, history: List<Stoc
                     item.outAt?.takeIf { item.isOut }?.let { Text("خلصت ${Dates.relative(it)}", style = MaterialTheme.typography.labelSmall, color = NabdColors.TextDim) }
                 }
                 Switch(item.isOut, { vm.setStockOut(item, it) })
+            }
+            OutlinedTextField(
+                quantity, { quantity = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(14.dp),
+                label = { Text("الكمية في البيت") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            )
+            val typedQuantity = Money.parseInput(quantity)?.takeIf { it >= 0 }
+            if (typedQuantity != item.quantity && (typedQuantity != null || quantity.isBlank())) {
+                GradientButton("احفظ الكمية", Modifier.fillMaxWidth(), Icons.Rounded.CheckCircle) { vm.setStockQuantity(item, typedQuantity) }
             }
             HorizontalDivider(color = NabdColors.Stroke)
             PriceField(price, { price = it }, history)

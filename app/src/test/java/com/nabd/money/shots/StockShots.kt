@@ -41,7 +41,12 @@ class StockShots {
     private val now = System.currentTimeMillis()
 
     private fun item(id: Long, name: String, cat: String, isOut: Boolean = false) =
-        StockItem(id = id, name = name, key = StockCatalog.key(name), category = cat, isOut = isOut, outAt = if (isOut) now - day else null)
+        StockItem(id = id, name = name, key = StockCatalog.key(name), category = cat, isOut = isOut, outAt = if (isOut) now - day else null, quantity = when {
+            isOut -> 0.0
+            id == 1L -> 2.0
+            id == 4L -> 1.5
+            else -> null
+        })
     private val items = listOf(
         item(1, "سكر الضحى 1 كيلو", StockCatalog.FOOD), item(2, "زيت كريستال 1 لتر", StockCatalog.KITCHEN, true),
         item(3, "بانيه فراخ مجمد", StockCatalog.MEAT, true), item(4, "مسحوق اريال 2 كيلو", StockCatalog.CLEANING),

@@ -119,6 +119,55 @@ class StockTest {
         }
         assertTrue(CarrefourCatalog.search("جهينة").any { it.second == StockCatalog.DAIRY })
         assertTrue(CarrefourCatalog.search("ا").isEmpty())
+        // فلتر النوع: نفس الكلمة في قسم واحد بس
+        assertTrue(CarrefourCatalog.search("دجاج").map { it.second }.toSet().size > 1)
+        assertEquals(setOf(StockCatalog.FROZEN), CarrefourCatalog.search("دجاج", StockCatalog.FROZEN).map { it.second }.toSet())
+        assertEquals(CarrefourCatalog.search("دجاج").size, CarrefourCatalog.search("دجاج", StockCatalog.CARREFOUR).size)
+    }
+
+    @Test
+    fun addSearchFindsItemsAcrossCategoriesAndTheCategoriesThemselves() {
+        val hits = CarrefourCatalog.searchEverywhere("فويل")
+        assertTrue(hits.any { it.second == StockCatalog.KITCHEN })
+        assertEquals(hits.size, hits.map { StockCatalog.key(it.first) }.toSet().size)
+        assertTrue(CarrefourCatalog.searchEverywhere("جهينة").any { it.second == StockCatalog.DAIRY })
+        assertEquals(listOf(StockCatalog.DAIRY), CarrefourCatalog.categoriesMatching("الألبان"))
+        assertEquals(listOf("كهربا البيت"), CarrefourCatalog.categoriesMatching("كهربا", listOf("كهربا البيت")))
+    }
+
+    @Test
+    fun quantityFollowsTheShoppingList() = runBlocking {
+        store.clear()
+        val a = store.add("رز", StockCatalog.FOOD, quantity = 2.0)!!
+        assertEquals(2.0, a.quantity!!, 0.0)
+        // الصفر بينزّله على قايمة الشرا، وأكتر من صفر بيرجّعه
+        store.setQuantity(a.id, 0.0)
+        assertTrue(dao.stockItem(a.id)!!.isOut)
+        store.setQuantity(a.id, 3.0)
+        assertFalse(dao.stockItem(a.id)!!.isOut)
+        // علّمته خلصت يدوي: صفر. ورجعته من غير كمية: مش محددة مش صفر
+        store.setOut(a.id, true)
+        assertEquals(0.0, dao.stockItem(a.id)!!.quantity!!, 0.0)
+        store.setOut(a.id, false)
+        assertNull(dao.stockItem(a.id)!!.quantity)
+    }
+
+    @Test
+    fun buyingAddsToWhatIsAtHomeAndUnsetStaysUnset() = runBlocking {
+        store.clear()
+        val a = store.add("زيت", StockCatalog.KITCHEN, quantity = 1.0)!!
+        val b = store.add("سكر", StockCatalog.FOOD)!!
+        assertNull(b.quantity)
+        // سعر من غير شرا مابيغيرش الكمية
+        store.addPrice(a.id, 90.0)
+        assertEquals(1.0, dao.stockItem(a.id)!!.quantity!!, 0.0)
+        store.addPrice(a.id, 95.0, bought = 2.0)
+        assertEquals(3.0, dao.stockItem(a.id)!!.quantity!!, 0.0)
+        store.saveReceipt(listOf(ReceiptEntry("زيت", 2.0, 92.0, StockCatalog.KITCHEN, a.id), ReceiptEntry("جبنة رومي", 0.258, 280.0, StockCatalog.FOOD)), "كازيون", 5)
+        assertEquals(5.0, dao.stockItem(a.id)!!.quantity!!, 0.0)
+        assertEquals(0.258, dao.stockItemsOnce().first { it.name == "جبنة رومي" }.quantity!!, 0.0)
+        assertEquals("0.258", StockCatalog.quantityText(0.258))
+        assertEquals("3", StockCatalog.quantityText(3.0))
     }
 
     @Test
@@ -232,11 +281,13 @@ class StockTest {
         val i = store.add("سكر", StockCatalog.FOOD, out = true)!!
         store.addPrice(i.id, 40.0, "كازيون")
         store.setOut(i.id, true)
+        store.setQuantity(i.id, 0.0)
         val json = Backup.export(app.db, app.settings, "test")
         store.add("حاجة بعد النسخة", StockCatalog.OTHER)
         Backup.restore(app.db, app.settings, json)
         assertEquals(listOf("سكر"), dao.stockItemsOnce().map { it.name })
         assertTrue(dao.stockItemsOnce().single().isOut)
+        assertEquals(0.0, dao.stockItemsOnce().single().quantity!!, 0.0)
         assertEquals(40.0, dao.stockPricesOnce().single().price, 0.0)
 
         val old = org.json.JSONObject(json).apply { remove("stockItems"); remove("stockPrices") }.toString()
@@ -259,14 +310,15 @@ class StockTest {
             db.version = 5
         }
         val room = Room.databaseBuilder(ctx, NabdDatabase::class.java, "mig5.db")
-            .addMigrations(NabdDatabase.MIGRATION_5_6).allowMainThreadQueries().build()
+            .addMigrations(NabdDatabase.MIGRATION_5_6, NabdDatabase.MIGRATION_6_7).allowMainThreadQueries().build()
         val d = room.dao()
         assertEquals(6000.0, d.budgetsOnce().single().monthlyLimit, 0.0)
         assertEquals("NBD-1", d.invoicesOnce().single().number)
         // Room بيتأكد من شكل الجداول، والكتابة والقراية شغالين
-        val id = d.insertStockItem(StockItem(name = "سكر", key = "سكر", category = StockCatalog.FOOD))
+        val id = d.insertStockItem(StockItem(name = "سكر", key = "سكر", category = StockCatalog.FOOD, quantity = 2.5))
         d.insertStockPrice(StockPrice(itemId = id, price = 40.0, at = 1))
         assertEquals(1, d.stockPricesOnce().size)
+        assertEquals(2.5, d.stockItemsOnce().single().quantity!!, 0.0)
         room.close()
     }
 

@@ -208,6 +208,9 @@ interface NabdDao {
     @Query("UPDATE stock_items SET isOut = :out, outAt = :at WHERE id IN (:ids)")
     suspend fun setStockOut(ids: List<Long>, out: Boolean, at: Long?)
 
+    @Query("UPDATE stock_items SET quantity = :quantity WHERE id = :id")
+    suspend fun setStockQuantity(id: Long, quantity: Double?)
+
     @Query("DELETE FROM stock_items WHERE id = :id")
     suspend fun deleteStockItem(id: Long)
 

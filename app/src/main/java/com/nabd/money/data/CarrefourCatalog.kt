@@ -363,10 +363,26 @@ object CarrefourCatalog {
         ),
     )
 
-    /** بحث في كل الأقسام، والقسم مع كل صنف علشان يتضاف في مكانه */
-    fun search(query: String): List<Pair<String, String>> {
+    /** بحث في كل مكان وانت بتضيف: أصناف كارفور وأمثلة التصنيفات، والصنف مع مكانه */
+    fun searchEverywhere(query: String): List<Pair<String, String>> {
         val q = StockCatalog.key(query)
         if (q.length < 2) return emptyList()
-        return items.flatMap { (dept, names) -> names.filter { StockCatalog.key(it).contains(q) }.map { it to dept } }
+        val ready = StockCatalog.suggestions.flatMap { (category, names) -> names.filter { StockCatalog.key(it).contains(q) }.map { it to category } }
+        return (ready + search(query)).distinctBy { StockCatalog.key(it.first) }
+    }
+
+    /** التصنيفات والأقسام اللي اسمها فيه اللي بتدوّر عليه */
+    fun categoriesMatching(query: String, extra: List<String> = emptyList()): List<String> {
+        val q = StockCatalog.key(query)
+        if (q.length < 2) return emptyList()
+        return (StockCatalog.builtIn + StockCatalog.carrefour + extra).distinct().filter { StockCatalog.key(it).contains(q) }
+    }
+
+    /** بحث بالصنف، والنوع (القسم) اختياري. القسم بييجي مع كل صنف علشان يتضاف في مكانه */
+    fun search(query: String, type: String? = null): List<Pair<String, String>> {
+        val q = StockCatalog.key(query)
+        if (q.length < 2) return emptyList()
+        return items.filter { (dept, _) -> StockCatalog.inFilter(dept, type) }
+            .flatMap { (dept, names) -> names.filter { StockCatalog.key(it).contains(q) }.map { it to dept } }
     }
 }

@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [Account::class, Txn::class, Budget::class, Insight::class, Invoice::class, StockItem::class, StockPrice::class],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class NabdDatabase : RoomDatabase() {
@@ -18,8 +18,15 @@ abstract class NabdDatabase : RoomDatabase() {
     companion object {
         fun build(context: Context): NabdDatabase =
             Room.databaseBuilder(context, NabdDatabase::class.java, "nabd.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build()
+
+        /** كمية كل صنف في البيت. عمود جديد فاضي، فالأصناف القديمة زي ما هي */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE stock_items ADD COLUMN quantity REAL")
+            }
+        }
 
         /** المخزون: حاجات البيت وأسعارها. جداول جديدة بس، فمفيش حاجة قديمة بتتلمس */
         val MIGRATION_5_6 = object : Migration(5, 6) {

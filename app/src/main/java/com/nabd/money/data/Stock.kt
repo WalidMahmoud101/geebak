@@ -108,6 +108,10 @@ object StockCatalog {
         else -> filter
     }
 
+    /** 3 أو 1.5 أو 0.258، من غير أصفار زيادة */
+    fun quantityText(v: Double): String =
+        if (v == Math.rint(v)) v.toLong().toString() else "%.3f".format(java.util.Locale.US, v).trimEnd('0').trimEnd('.')
+
     fun aliasesOf(i: StockItem) = i.aliases.split('\n').filter { it.isNotBlank() }
 
     /**
@@ -145,22 +149,44 @@ class StockStore(private val db: NabdDatabase) {
     private val dao = db.dao()
 
     /** بيرجع الصنف الجديد، أو الموجود لو نفس الاسم متسجل */
-    suspend fun add(name: String, category: String, out: Boolean = false): StockItem? = db.withTransaction {
+    suspend fun add(name: String, category: String, out: Boolean = false, quantity: Double? = null): StockItem? = db.withTransaction {
         val clean = name.trim()
         val key = StockCatalog.key(clean)
         if (key.isEmpty()) return@withTransaction null
         val existing = dao.stockItemsOnce().firstOrNull { it.key == key }
         if (existing != null) {
             if (out && !existing.isOut) setOut(existing.id, true)
+            if (quantity != null) setQuantity(existing.id, quantity)
             return@withTransaction dao.stockItem(existing.id)
         }
         val now = System.currentTimeMillis()
-        val i = StockItem(name = clean, key = key, category = category, isOut = out, outAt = now.takeIf { out }, createdAt = now)
+        val i = StockItem(name = clean, key = key, category = category, isOut = out, outAt = now.takeIf { out }, createdAt = now, quantity = if (out) quantity?.let { 0.0 } else quantity)
         i.copy(id = dao.insertStockItem(i))
     }
 
-    suspend fun setOut(id: Long, out: Boolean) =
+    /** خلصت يعني الكمية صفر. ولو رجعت موجودة من غير ما نعرف بكام، الكمية تبقى مش محددة */
+    suspend fun setOut(id: Long, out: Boolean) = db.withTransaction {
         dao.setStockOut(listOf(id), out, System.currentTimeMillis().takeIf { out })
+        val quantity = dao.stockItem(id)?.quantity ?: return@withTransaction
+        if (out) dao.setStockQuantity(id, 0.0) else if (quantity <= 0) dao.setStockQuantity(id, null)
+    }
+
+    /** الكمية صفر بتنزّل الصنف على قايمة الشرا، وأكتر من صفر بترجّعه موجود. null = مش محددة */
+    suspend fun setQuantity(id: Long, quantity: Double?) = db.withTransaction {
+        val item = dao.stockItem(id) ?: return@withTransaction
+        val q = quantity?.coerceAtLeast(0.0)
+        dao.setStockQuantity(id, q)
+        when {
+            q == 0.0 && !item.isOut -> dao.setStockOut(listOf(id), true, System.currentTimeMillis())
+            q != null && q > 0 && item.isOut -> dao.setStockOut(listOf(id), false, null)
+        }
+    }
+
+    /** اشتريت: الكمية بتزيد على اللي في البيت */
+    suspend fun addQuantity(id: Long, amount: Double) = db.withTransaction {
+        val item = dao.stockItem(id) ?: return@withTransaction
+        setQuantity(id, (item.quantity ?: 0.0) + amount)
+    }
 
     /** false لو الاسم الجديد بتاع صنف تاني */
     suspend fun edit(item: StockItem, name: String, category: String): Boolean = db.withTransaction {
@@ -194,9 +220,10 @@ class StockStore(private val db: NabdDatabase) {
     }
 
     /** سعر جديد بإيدك. لو جبت الحاجة، بترجع موجودة في البيت */
-    suspend fun addPrice(id: Long, price: Double, store: String? = null, at: Long = System.currentTimeMillis()) = db.withTransaction {
-        dao.insertStockPrice(StockPrice(itemId = id, price = price, store = store?.trim()?.takeIf { it.isNotEmpty() }, at = at))
+    suspend fun addPrice(id: Long, price: Double, store: String? = null, at: Long = System.currentTimeMillis(), bought: Double? = null) = db.withTransaction {
+        dao.insertStockPrice(StockPrice(itemId = id, price = price, qty = bought ?: 1.0, store = store?.trim()?.takeIf { it.isNotEmpty() }, at = at))
         setOut(id, false)
+        if (bought != null) addQuantity(id, bought)
     }
 
     /**
@@ -218,6 +245,7 @@ class StockStore(private val db: NabdDatabase) {
             }
             dao.insertStockPrice(StockPrice(itemId = item.id, price = e.price, qty = e.qty, store = cleanStore, at = at, fromReceipt = true))
             setOut(item.id, false)
+            addQuantity(item.id, e.qty)
         }
     }
 }

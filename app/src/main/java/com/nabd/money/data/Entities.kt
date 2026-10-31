@@ -139,6 +139,8 @@ data class StockItem(
     /** أسماء تانية للحاجة دي على الفواتير (مفاتيح مفصولة بسطر) */
     val aliases: String = "",
     val createdAt: Long = System.currentTimeMillis(),
+    /** الكمية اللي في البيت. null = لسه ماتحددتش، مش صفر */
+    val quantity: Double? = null,
 )
 
 /** سعر الوحدة من الحاجة دي في وقت معين، من فاتورة أو بإيدك */

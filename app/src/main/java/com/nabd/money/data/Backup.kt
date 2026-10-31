@@ -141,10 +141,12 @@ object Backup {
     private fun stockItemJson(i: StockItem) = JSONObject()
         .put("id", i.id).put("name", i.name).put("key", i.key).put("category", i.category).put("isOut", i.isOut)
         .put("outAt", i.outAt ?: JSONObject.NULL).put("aliases", i.aliases).put("createdAt", i.createdAt)
+        .put("quantity", i.quantity ?: JSONObject.NULL)
 
     private fun stockItem(o: JSONObject) = StockItem(
         id = o.getLong("id"), name = o.getString("name"), key = o.getString("key"), category = o.getString("category"),
         isOut = o.optBoolean("isOut"), outAt = o.optLongOrNull("outAt"), aliases = o.optString("aliases"), createdAt = o.getLong("createdAt"),
+        quantity = if (o.isNull("quantity")) null else o.getDouble("quantity"),
     )
 
     private fun stockPriceJson(p: StockPrice) = JSONObject()

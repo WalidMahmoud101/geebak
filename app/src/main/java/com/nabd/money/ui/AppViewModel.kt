@@ -501,11 +501,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val stockItems = dao.stockItems().state(emptyList())
     val stockPrices = dao.stockPrices().map { list -> list.groupBy { it.itemId } }.state(emptyMap())
 
-    fun addStock(name: String, category: String, out: Boolean) = viewModelScope.launch(Dispatchers.IO) { stock.add(name, category, out) }
+    fun addStock(name: String, category: String, out: Boolean, quantity: Double? = null) = viewModelScope.launch(Dispatchers.IO) { stock.add(name, category, out, quantity) }
+    fun setStockQuantity(item: com.nabd.money.data.StockItem, quantity: Double?) = viewModelScope.launch(Dispatchers.IO) { stock.setQuantity(item.id, quantity) }
+    fun boughtStock(item: com.nabd.money.data.StockItem, amount: Double) = viewModelScope.launch(Dispatchers.IO) { stock.setOut(item.id, false); stock.addQuantity(item.id, amount) }
     fun setStockOut(item: com.nabd.money.data.StockItem, out: Boolean) = viewModelScope.launch(Dispatchers.IO) { stock.setOut(item.id, out) }
     suspend fun editStock(item: com.nabd.money.data.StockItem, name: String, category: String) = withContext(Dispatchers.IO) { stock.edit(item, name, category) }
     fun deleteStock(item: com.nabd.money.data.StockItem) = viewModelScope.launch(Dispatchers.IO) { stock.delete(item.id) }
-    fun addStockPrice(item: com.nabd.money.data.StockItem, price: Double, store: String?) = viewModelScope.launch(Dispatchers.IO) { stock.addPrice(item.id, price, store) }
+    fun addStockPrice(item: com.nabd.money.data.StockItem, price: Double, store: String?, bought: Double? = null) = viewModelScope.launch(Dispatchers.IO) { stock.addPrice(item.id, price, store, bought = bought) }
     fun deleteStockPrice(p: com.nabd.money.data.StockPrice) = viewModelScope.launch(Dispatchers.IO) { dao.deleteStockPrice(p.id) }
 
     /** آخر مسح، علشان زرار "رجّعهم" */
